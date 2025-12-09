@@ -1,0 +1,33 @@
+/* src/components/Layout/MainLayout.css */
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.main-content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  background: #6097ce;
+  padding: 24px;
+}
+
+/* Estilo para scroll mais suave */
+.main-content-wrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-content-wrapper::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.main-content-wrapper::-webkit-scrollbar-thumb {
+  background: #667eea ;
+  border-radius: 4px;
+}
+
+.main-content-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #667eea  ;
+}
