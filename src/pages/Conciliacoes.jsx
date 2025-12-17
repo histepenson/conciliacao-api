@@ -1,10 +1,15 @@
-import { useState } from 'react'; // Esta linha deve estar presente
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/axiosConfig';
 import '../assets/styles/App.css';
 import FileUploadCard from '../components/FileUploadCard/FileUploadCard.jsx';
 import ResultDisplay from '../components/ResultDisplay/ResultDisplay.jsx';
 
 function Conciliacoes() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { conta, dataBase, empresaId, empresa } = location.state || {};
+
   const [files, setFiles] = useState({
     origem: null,
     contabil: null,
@@ -14,6 +19,19 @@ function Conciliacoes() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+
+  // Verifica se tem os dados da conciliação
+  useEffect(() => {
+    if (!conta || !dataBase || !empresaId) {
+      alert('Dados da conciliação não encontrados. Redirecionando...');
+      navigate('/conciliacoes/periodo');
+    }
+  }, [conta, dataBase, empresaId, navigate]);
+
+  // Função para voltar
+  const voltarParaSelecao = () => {
+    navigate('/conciliacoes/periodo');
+  };
 
   // Função para lidar com drag over
   const handleDragOver = (e, type) => {
@@ -83,6 +101,9 @@ function Conciliacoes() {
       formData.append('arquivo_origem', files.origem)
       formData.append('arquivo_contabil', files.contabil)
       formData.append('arquivo_geral_contabilidade', files.geral)
+      formData.append('conta_contabil', conta.conta_contabil)
+      formData.append('data_base', dataBase)
+      formData.append('empresa_id', empresaId)
 
       console.log('📤 Enviando arquivos para API...')
 
@@ -103,11 +124,104 @@ function Conciliacoes() {
     }
   }
 
+  // Função para efetivar conciliação (preparada para implementação futura)
+  const efetivarConciliacao = async () => {
+    if (!result) {
+      alert('Processe os arquivos antes de efetivar a conciliação');
+      return;
+    }
+
+    try {
+      // TODO: Implementar chamada à API para efetivar a conciliação
+      console.log('📝 Efetivando conciliação:', {
+        conta: conta,
+        dataBase: dataBase,
+        empresaId: empresaId,
+        empresa: empresa,
+        result: result
+      });
+
+      // Placeholder - implementar endpoint /conciliacao/efetivar
+      // const response = await api.post('/conciliacao/efetivar', {
+      //   conta_contabil: conta.conta_contabil,
+      //   data_base: dataBase,
+      //   empresa_id: empresaId,
+      //   resultado: result
+      // });
+
+      alert('Conciliação efetivada com sucesso!');
+      
+      // Aguarda e volta para seleção
+      setTimeout(() => {
+        navigate('/conciliacoes/periodo');
+      }, 1500);
+
+    } catch (err) {
+      console.error('❌ Erro ao efetivar:', err);
+      alert('Erro ao efetivar conciliação');
+    }
+  };
+
   const allFilesUploaded = files.origem && files.contabil && files.geral
   const pendingCount = 3 - Object.values(files).filter(Boolean).length
 
+  // Se não tem dados, não renderiza nada (useEffect vai redirecionar)
+  if (!conta || !dataBase) {
+    return null;
+  }
+
   return (
     <div className="container">
+      {/* Contexto da Conciliação - FIXO NO TOPO */}
+      <div className="card" style={{ 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+        color: 'white',
+        marginBottom: '1.5rem',
+        position: 'sticky',
+        top: '0',
+        zIndex: 100,
+        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem', fontWeight: '600' }}>
+              🎯 Conciliação em Andamento
+            </h2>
+            <div style={{ display: 'flex', gap: '2rem', fontSize: '0.95rem' }}>
+              <div>
+                <strong>Conta:</strong> {conta.conta_contabil} - {conta.descricao}
+              </div>
+              <div>
+                <strong>Data-Base:</strong> {dataBase}
+              </div>
+              {empresa && (
+                <div>
+                  <strong>Empresa:</strong> {empresa.codigo} - {empresa.nome}
+                </div>
+              )}
+            </div>
+          </div>
+          <button 
+            onClick={voltarParaSelecao}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.3)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
+          >
+            ← Voltar
+          </button>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="header">
         <h1>📤 Módulo de Conciliações</h1>
@@ -133,8 +247,8 @@ function Conciliacoes() {
       {/* Upload Cards */}
       <FileUploadCard
         type="origem"
-        title="1. Arquivo Origem (Financeiro)"
-        description="financeiro.xlsx - Base de dados financeira com títulos a receber"
+        title="1. Arquivo Origem"
+        description="origem.xlsx - Base de dados de origem (exemplo: financeir, faturamento, etc)"
         iconColor="#3b82f6"
         file={files.origem}
         onFileSelect={handleFileSelect}
@@ -148,7 +262,7 @@ function Conciliacoes() {
       <FileUploadCard
         type="contabil"
         title="2. Arquivo Contábil"
-        description="fcontabilidade.xlsx - Saldos contábeis por cliente"
+        description="contabilidade.xlsx - Saldos contábeis"
         iconColor="#22c55e"
         file={files.contabil}
         onFileSelect={handleFileSelect}
@@ -162,7 +276,7 @@ function Conciliacoes() {
       <FileUploadCard
         type="geral"
         title="3. Base Geral Contabilidade"
-        description="base_geral.xlsx - Lançamentos contábeis detalhados"
+        description="base_geral.xlsx - Todos lançamentos contábeis detalhados"
         iconColor="#a855f7"
         file={files.geral}
         onFileSelect={handleFileSelect}
@@ -223,6 +337,51 @@ function Conciliacoes() {
           </button>
         </div>
       </div>
+
+      {/* Botão Efetivar Conciliação - Aparece após processamento */}
+      {result && (
+        <div className="card" style={{ 
+          background: '#10b981', 
+          padding: '1.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ color: 'white' }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: '600' }}>
+              ✅ Análise Concluída
+            </h3>
+            <p style={{ margin: 0, opacity: 0.9, fontSize: '0.95rem' }}>
+              Revise os resultados e clique em "Efetivar" para confirmar a conciliação
+            </p>
+          </div>
+          <button 
+            onClick={efetivarConciliacao}
+            style={{
+              background: 'white',
+              color: '#10b981',
+              border: 'none',
+              padding: '0.875rem 2rem',
+              borderRadius: '0.5rem',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 6px 8px rgba(0,0,0,0.15)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            }}
+          >
+            Efetivar Conciliação
+          </button>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (

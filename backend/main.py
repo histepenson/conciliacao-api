@@ -2,7 +2,7 @@
 API Python para Conciliação com IA
 Exemplo usando FastAPI
 """
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException,Form
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 from typing import Dict, Any
@@ -17,16 +17,24 @@ from routers.conciliacao_router import router as conciliacao_router
 from routers.arquivo_router import router as arquivo_router
 from db import engine
 from models import Base
+import uvicorn
+
 
 app = FastAPI()
 
 # CORS
+# Domínios permitidos (frontend)
+origins = [
+    "http://localhost:3000",  # React dev
+]
+
+# Configura CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,  # ou ["*"] para liberar todos em dev
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],    # GET, POST, PUT, DELETE
+    allow_headers=["*"],    # Content-Type, Authorization, etc
 )
 
 # Routers
@@ -76,7 +84,8 @@ async def root():
 async def processar_conciliacao(
     arquivo_origem: UploadFile = File(...),
     arquivo_contabil: UploadFile = File(...),
-    arquivo_geral_contabilidade: UploadFile = File(...)
+    arquivo_geral_contabilidade: UploadFile = File(...),
+    conta_contabil : str = Form(...)
 ) -> Dict[str, Any]:
 
     try:
@@ -183,5 +192,4 @@ async def processar_conciliacao(
         raise HTTPException(status_code=500, detail=f"Erro ao processar: {str(e)}")
     
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

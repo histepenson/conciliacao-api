@@ -1,19 +1,44 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from database import get_db
-from models.models import Empresa
-import schemas.schemas as schemas
+from db import get_db
+from schemas.empresa_schema import EmpresaCreate, EmpresaOut, EmpresaUpdate
+from services.empresa_services import (
+    criar_empresa, listar_empresas, obter_empresa,
+    atualizar_empresa, deletar_empresa
+)
 
-router = APIRouter(prefix="/empresa", tags=["Empresa"])
+router = APIRouter(prefix="/empresas", tags=["Empresa"])
 
-@router.post("/", response_model=schemas.Empresa)
-def create(empresa: schemas.EmpresaCreate, db: Session = Depends(get_db)):
-    obj = Empresa(**empresa.dict())
-    db.add(obj)
-    db.commit()
-    db.refresh(obj)
-    return obj
 
-@router.get("/", response_model=list[schemas.Empresa])
-def list_all(db: Session = Depends(get_db)):
-    return db.query(Empresa).all()
+@router.post("/", response_model=EmpresaOut)
+def criar(emp: EmpresaCreate, db: Session = Depends(get_db)):
+    return criar_empresa(db, emp)
+
+
+@router.get("/", response_model=list[EmpresaOut])
+def listar(db: Session = Depends(get_db)):
+    return listar_empresas(db)
+
+
+@router.get("/{empresa_id}", response_model=EmpresaOut)
+def obter(empresa_id: int, db: Session = Depends(get_db)):
+    empresa = obter_empresa(db, empresa_id)
+    if not empresa:
+        raise HTTPException(404, "Empresa não encontrada")
+    return empresa
+
+
+@router.put("/{empresa_id}", response_model=EmpresaOut)
+def atualizar(empresa_id: int, dados: EmpresaUpdate, db: Session = Depends(get_db)):
+    empresa = atualizar_empresa(db, empresa_id, dados)
+    if not empresa:
+        raise HTTPException(404, "Empresa não encontrada")
+    return empresa
+
+
+@router.delete("/{empresa_id}")
+def excluir(empresa_id: int, db: Session = Depends(get_db)):
+    sucesso = deletar_empresa(db, empresa_id)
+    if not sucesso:
+        raise HTTPException(404, "Empresa não encontrada")
+    return {"message": "Empresa deletada com sucesso"}

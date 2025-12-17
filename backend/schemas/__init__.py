@@ -5,9 +5,9 @@ from .empresa_schema import (
 )
 
 from .planodecontas_schema import (
-    PlanoContasCreate,
-    PlanoContasUpdate,
-    PlanoContasResponse
+    PlanoDeContasCreate,
+    PlanoDeContasUpdate,
+    PlanoDeContasResponse
 )
 
 from .conciliacao_schema import (
@@ -26,9 +26,9 @@ __all__ = [
     "EmpresaUpdate",
     "EmpresaResponse",
 
-    "PlanoContasCreate",
-    "PlanoContasUpdate",
-    "PlanoContasResponse",
+    "PlanoDeContasCreate",
+    "PlanoDeContasUpdate",
+    "PlanoDeContasResponse",
 
     "ConciliacaoCreate",
     "ConciliacaoUpdate",

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -7,7 +7,6 @@ class EmpresaBase(BaseModel):
     nome: str
     cnpj: str
     status: bool = True
-
 
 class EmpresaCreate(EmpresaBase):
     pass
@@ -25,3 +24,7 @@ class EmpresaResponse(EmpresaBase):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# Alias para compatibilidade com routers que usam EmpresaOut
+EmpresaOut = EmpresaResponse
