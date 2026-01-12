@@ -30,10 +30,11 @@ async def no_cache_middleware(request, call_next):
 # CORS
 # Domínios permitidos (frontend)
 origins = [
-    "http://localhost:3000",  # React dev
+    "http://localhost:3000",
+    "http://localhost:8000",  # Vite
     "https://conciliacao-app-production.up.railway.app",
-
 ]
+
 
 # Configura CORS
 app.add_middleware(
