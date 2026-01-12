@@ -45,11 +45,12 @@ app.add_middleware(
     allow_headers=["*"],    # Content-Type, Authorization, etc
 )
 
-# Routers
-app.include_router(empresa_router)
-app.include_router(plano_router)
-app.include_router(conciliacao_router)
-app.include_router(arquivo_router)
+# Routers com prefixo /api
+app.include_router(empresa_router, prefix="/api")
+app.include_router(plano_router, prefix="/api")
+app.include_router(conciliacao_router, prefix="/api")
+app.include_router(arquivo_router, prefix="/api")
+
 
 # Create tables
 Base.metadata.create_all(bind=engine)
