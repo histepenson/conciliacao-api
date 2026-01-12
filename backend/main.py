@@ -25,6 +25,8 @@ app = FastAPI(
 # Domínios permitidos (frontend)
 origins = [
     "http://localhost:3000",  # React dev
+    "https://conciliacao-app-production.up.railway.app",
+
 ]
 
 # Configura CORS
@@ -44,11 +46,6 @@ app.include_router(arquivo_router)
 
 # Create tables
 Base.metadata.create_all(bind=engine)
-
-origins = [
-    "https://conciliacao-app-production.up.railway.app",
-    "http://localhost:3000",  # opcional p/ testes locais
-]
 
 @app.get("/")
 async def root():
