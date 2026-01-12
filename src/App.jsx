@@ -51,8 +51,6 @@ function App() {
 
       <Routes>
         <Route path="/" element={<MainLayout />}>
-          {/* Redirecionamento padrão */}
-          <Route index element={<Navigate to="/conciliacoes" replace />} />
 
           {/* CONCILIAÇÕES */}
           <Route path="conciliacoes" element={<Conciliacoes />} />
