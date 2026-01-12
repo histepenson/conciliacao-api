@@ -11,10 +11,10 @@ from .planodecontas_schema import (
 )
 
 from .conciliacao_schema import (
-    ConciliacaoCreate,
-    ConciliacaoUpdate,
-    ConciliacaoResponse
+    RequestConciliacao,
+    RelatorioConsolidacao
 )
+
 
 from .arquivo_conciliacao_schema import (
     ArquivoConciliacaoCreate,
@@ -30,9 +30,8 @@ __all__ = [
     "PlanoDeContasUpdate",
     "PlanoDeContasResponse",
 
-    "ConciliacaoCreate",
-    "ConciliacaoUpdate",
-    "ConciliacaoResponse",
+    "RequestConciliacao",
+    "RelatorioConsolidacao",
 
     "ArquivoConciliacaoCreate",
     "ArquivoConciliacaoResponse",

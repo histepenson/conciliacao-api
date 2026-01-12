@@ -4,6 +4,7 @@ import api from '../api/axiosConfig';
 import '../assets/styles/App.css';
 import FileUploadCard from '../components/FileUploadCard/FileUploadCard.jsx';
 import ResultDisplay from '../components/ResultDisplay/ResultDisplay.jsx';
+import * as XLSX from 'xlsx'
 
 function Conciliacoes() {
   const location = useLocation();
@@ -89,40 +90,117 @@ function Conciliacoes() {
     setResult(null)
     setError(null)
   }
+const readFileAsJson = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
 
-  // Função para processar arquivos
-  const processFiles = async () => {
-    setIsProcessing(true)
-    setError(null)
-    setResult(null)
-
-    try {
-      const formData = new FormData()
-      formData.append('arquivo_origem', files.origem)
-      formData.append('arquivo_contabil', files.contabil)
-      formData.append('arquivo_geral_contabilidade', files.geral)
-      formData.append('conta_contabil', conta.conta_contabil)
-      formData.append('data_base', dataBase)
-      formData.append('empresa_id', empresaId)
-
-      console.log('📤 Enviando arquivos para API...')
-
-      const response = await api.post('/conciliacao/processar', formData)
-
-      console.log('✅ Resposta recebida:', response.data)
-      setResult(response.data)
-
-    } catch (err) {
-      console.error('❌ Erro ao processar:', err)
-      setError(
-        err.response?.data?.detail || 
-        err.message || 
-        'Erro ao processar arquivos. Verifique se a API está rodando.'
-      )
-    } finally {
-      setIsProcessing(false)
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result)
+      const workbook = XLSX.read(data, { type: 'array' })
+      const sheetName = workbook.SheetNames[0]
+      const sheet = workbook.Sheets[sheetName]
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: null })
+      resolve(json)
     }
+
+    reader.onerror = reject
+    reader.readAsArrayBuffer(file)
+  })
+}
+// Adicione esta função logo após a função readFileAsJson
+
+const processFiles = async () => {
+  setIsProcessing(true)
+  setError(null)
+  setResult(null)
+
+  try {
+    console.log('🔄 Iniciando processamento...')
+    
+    // 1. Ler arquivos
+    const origemRegistros = await readFileAsJson(files.origem)
+    const contabilRegistros = await readFileAsJson(files.contabil)
+    const geralRegistros = await readFileAsJson(files.geral)
+
+    console.log('📊 Registros lidos:')
+    console.log('  - Origem:', origemRegistros.length)
+    console.log('  - Contábil:', contabilRegistros.length)
+    console.log('  - Geral:', geralRegistros.length)
+
+    // 2. Montar payload conforme API
+    const payload = {
+      base_origem: {
+        registros: origemRegistros
+      },
+      base_contabil_filtrada: {
+        conta_contabil: conta.conta_contabil,
+        registros: contabilRegistros
+      },
+      base_contabil_geral: {
+        registros: geralRegistros
+      },
+      parametros: {
+        data_base: dataBase,
+        empresa_id: empresaId,
+        empresa_nome: empresa?.nome
+      }
+    }
+
+    console.log('📤 Payload montado:', {
+      origem_count: payload.base_origem.registros.length,
+      contabil_count: payload.base_contabil_filtrada.registros.length,
+      geral_count: payload.base_contabil_geral.registros.length,
+      conta: payload.base_contabil_filtrada.conta_contabil,
+      data_base: payload.parametros.data_base
+    })
+
+    // 3. Chamar API
+    console.log('🌐 Chamando API /conciliacoes/contabil...')
+    const response = await api.post('/conciliacoes/contabil', payload)
+
+    console.log('✅ Resposta recebida:', response.data)
+    console.log('📊 Resumo:', response.data.resumo)
+    console.log('📊 Diferenças origem maior:', response.data.diferencas_origem_maior?.length || 0)
+    console.log('📊 Diferenças contábil maior:', response.data.diferencas_contabilidade_maior?.length || 0)
+
+    // 4. Garantir que o result esteja no formato certo
+    if (response.data) {
+      const resultData = {
+        resumo: response.data.resumo || {},
+        diferencas_origem_maior: response.data.diferencas_origem_maior || [],
+        diferencas_contabilidade_maior: response.data.diferencas_contabilidade_maior || [],
+        observacoes: response.data.observacoes || [],
+        alertas: response.data.alertas || []
+      }
+      
+      console.log('💾 Salvando resultado no estado:', resultData)
+      setResult(resultData)
+      
+      // Verificar se tem dados vazios
+      if (resultData.resumo.total_origem === 0 && resultData.resumo.total_destino === 0) {
+        console.warn('⚠️ ATENÇÃO: Totais zerados! Verifique os dados de entrada.')
+      }
+    } else {
+      console.error('❌ Resposta vazia da API')
+      setError('Resposta vazia da API')
+    }
+
+  } catch (err) {
+    console.error('❌ Erro detalhado:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status
+    })
+    
+    setError(
+      err.response?.data?.detail ||
+      err.message ||
+      'Erro ao processar conciliação'
+    )
+  } finally {
+    setIsProcessing(false)
   }
+}
 
   // Função para efetivar conciliação (preparada para implementação futura)
   const efetivarConciliacao = async () => {
@@ -146,6 +224,7 @@ function Conciliacoes() {
       //   conta_contabil: conta.conta_contabil,
       //   data_base: dataBase,
       //   empresa_id: empresaId,
+      
       //   resultado: result
       // });
 

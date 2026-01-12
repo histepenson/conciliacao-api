@@ -1,13 +1,11 @@
 // src/api/axiosConfig.js
-
 import axios from 'axios';
 
-// Configuração da API
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: 'http://localhost:8000',
   headers: {
-    'Content-Type': 'multipart/form-data',
+    'Content-Type': 'application/json',
   },
 });
 
-export default api; // ⬅️ ESSENCIAL: Exportar a instância
+export default api;

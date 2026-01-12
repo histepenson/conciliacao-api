@@ -215,4 +215,3 @@ def _formatar_arquivo_excel(caminho_arquivo: str):
         ws.column_dimensions['I'].width = 25  # Tipo Diferença
     
     wb.save(caminho_arquivo)
-

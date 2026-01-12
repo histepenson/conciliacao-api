@@ -1,55 +1,79 @@
 import pandas as pd
-from datetime import datetime
 import re
+
+
 def normalizar_planilha_contabilidade(entrada):
     """
-    Normaliza a planilha de contabilidade COM AGRUPAMENTO.
-    
-    Parâmetros:
-    -----------
-    entrada : str ou DataFrame
-        Caminho do arquivo Excel ou DataFrame já carregado
-    
+    Normaliza relatório de CONTABILIDADE (Balancete).
+
+    Layout esperado:
+    Codigo | Descricao | ... | Saldo atual
+
     Retorna:
-    --------
-    DataFrame normalizado com colunas: codigo, cliente, valor (AGRUPADO)
+    codigo | cliente | valor
     """
-    
-    # Carregar DataFrame
+
+    # ==========================
+    # 1️⃣ CARREGAR DATAFRAME
+    # ==========================
     if isinstance(entrada, pd.DataFrame):
         df = entrada.copy()
     elif isinstance(entrada, str):
         df = pd.read_excel(entrada)
     else:
-        raise ValueError("entrada deve ser um caminho de arquivo ou DataFrame")
-    
-    # Processar
-    df_normalizado = pd.DataFrame()
-    df_normalizado['codigo'] = df['Codigo.1']
-    df_normalizado['cliente'] = df['Descricao.1']
-    df_normalizado['valor_bruto'] = df['Saldo atual']
-    
-    df_normalizado = df_normalizado[df_normalizado['codigo'].notna()].copy()
-    df_normalizado = df_normalizado[df_normalizado['valor_bruto'].notna()].copy()
-    
-    def converter_valor(valor_str):
-        if pd.isna(valor_str):
+        raise ValueError("entrada deve ser DataFrame ou caminho de arquivo")
+
+    # ==========================
+    # 2️⃣ MAPEAR COLUNAS (DIRETO)
+    # ==========================
+    col_codigo = None
+    col_cliente = None
+    col_valor = None
+
+    for col in df.columns:
+        if col.lower().startswith("codigo"):
+            col_codigo = col
+        if col.lower().startswith("descricao"):
+            col_cliente = col
+        if col.lower() == "saldo atual":
+            col_valor = col
+
+    if not col_codigo or not col_valor:
+        raise ValueError(
+            f"Layout contábil inválido. Colunas encontradas: {list(df.columns)}"
+        )
+
+    # ==========================
+    # 3️⃣ NORMALIZAR
+    # ==========================
+    df_norm = pd.DataFrame()
+    df_norm["codigo"] = df[col_codigo]
+    df_norm["cliente"] = df[col_cliente] if col_cliente else None
+
+    # ==========================
+    # 4️⃣ CONVERTER VALOR
+    # ==========================
+    def converter_valor(v):
+        if pd.isna(v):
             return 0.0
-        
-        valor_str = str(valor_str).strip()
-        valor_str = re.sub(r'\s*[DC]$', '', valor_str)
-        valor_str = valor_str.replace('.', '').replace(',', '.')
-        
+        v = str(v).replace(".", "").replace(",", ".")
         try:
-            return float(valor_str)
+            return float(v)
         except:
             return 0.0
-    
-    df_normalizado['valor'] = df_normalizado['valor_bruto'].apply(converter_valor)
-    
-    # ⭐ AGLUTINAR POR CÓDIGO (somar valores) ⭐
-    df_agrupado = df_normalizado.groupby(['codigo', 'cliente']).agg({
-        'valor': 'sum'
-    }).reset_index()
-    
+
+    df_norm["valor"] = df[col_valor].apply(converter_valor)
+
+    # ==========================
+    # 5️⃣ LIMPAR E AGRUPAR
+    # ==========================
+    df_norm = df_norm[df_norm["codigo"].notna()].copy()
+
+    df_agrupado = (
+        df_norm
+        .groupby(["codigo", "cliente"], dropna=False)
+        .agg({"valor": "sum"})
+        .reset_index()
+    )
+
     return df_agrupado
