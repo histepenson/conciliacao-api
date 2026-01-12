@@ -10,6 +10,7 @@ from services.empresa_services import (
 router = APIRouter(prefix="/empresas", tags=["Empresa"])
 
 
+
 @router.post("/", response_model=EmpresaOut)
 def criar(emp: EmpresaCreate, db: Session = Depends(get_db)):
     return criar_empresa(db, emp)

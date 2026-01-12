@@ -21,6 +21,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.middleware("http")
+async def no_cache_middleware(request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
 # CORS
 # Domínios permitidos (frontend)
 origins = [
