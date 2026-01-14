@@ -1,31 +1,17 @@
-# Dependências
-node_modules/
-venv/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Build
-dist/
-build/
+# Virtualenv
+.venv/
+venv/
 
 # Env
 .env
-.env.local
 
-# IDE
+# OS / IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Temporários
-/tmp/
-*.tmp
