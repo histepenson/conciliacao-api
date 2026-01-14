@@ -13,7 +13,7 @@ WORKDIR /app
 # Instalar dependências do backend
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-
+DATABASE_URL
 # Copiar código do backend
 COPY backend/ ./backend/
 

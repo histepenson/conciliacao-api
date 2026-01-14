@@ -11,6 +11,7 @@ from pathlib import Path
 # ============================================================
 
 # Obtém o diretório do arquivo atual (backend/)
+load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 Base = declarative_base()
 
