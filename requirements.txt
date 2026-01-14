@@ -7,3 +7,4 @@ python-multipart
 sqlalchemy>=2.0.25
 psycopg2-binary>=2.9
 asyncpg>=0.29
+python-dotenv>=1.0.0
