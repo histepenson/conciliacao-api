@@ -6,13 +6,15 @@ from services.empresa_services import (
     criar_empresa, listar_empresas, obter_empresa,
     atualizar_empresa, deletar_empresa
 )
+from middleware.auth import CurrentUser
+from middleware.permission import require_admin
 
 router = APIRouter(prefix="/empresas", tags=["Empresa"])
 
 
 
 @router.post("/", response_model=EmpresaOut)
-def criar(emp: EmpresaCreate, db: Session = Depends(get_db)):
+def criar(emp: EmpresaCreate, db: Session = Depends(get_db), current_user: CurrentUser = Depends(require_admin)):
     return criar_empresa(db, emp)
 
 

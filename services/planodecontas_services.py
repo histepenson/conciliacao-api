@@ -1,6 +1,7 @@
 # services/planodecontas_services.py
 from sqlalchemy.orm import Session
 from models.planodecontas import PlanoDeContas
+from models.conciliacao import Conciliacao
 from datetime import datetime, timezone
 from typing import List, Dict, Tuple, Optional
 import logging
@@ -112,47 +113,103 @@ def validar_estrutura_arquivo(df: pd.DataFrame) -> Tuple[bool, List[str]]:
     
     # Verificar tipos de conta válidos
     if 'tipo_conta' in df.columns:
-        tipos_invalidos = df[~df['tipo_conta'].isin([1, 2])]['tipo_conta'].unique()
+        tipos_invalidos = df[~df['tipo_conta'].isin(['1', '2', 1, 2])]['tipo_conta'].unique()
         if len(tipos_invalidos) > 0:
             erros.append(f"Tipos de conta inválidos encontrados: {tipos_invalidos}")
     
     return len(erros) == 0, erros
 
 
+def normalizar_colunas(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normaliza os nomes das colunas do Excel para o formato esperado.
+    Aceita variações com acentos, maiúsculas, espaços, underscores, etc.
+    """
+    import unicodedata
+    import re
+
+    def limpar_nome(nome: str) -> str:
+        nome = str(nome).strip().lower()
+        nome = unicodedata.normalize('NFKD', nome).encode('ascii', 'ignore').decode('ascii')
+        nome = re.sub(r'[\s\-]+', '_', nome)
+        nome = re.sub(r'[^a-z0-9_]', '', nome)
+        return nome
+
+    mapeamento = {
+        'conta_contabil': ['conta_contabil', 'contacontabil', 'conta', 'codigo', 'cod', 'codigo_conta', 'cod_conta'],
+        'descricao': ['descricao', 'desc', 'nome', 'nome_conta', 'descricao_conta'],
+        'tipo_conta': ['tipo_conta', 'tipoconta', 'tipo', 'tp_conta', 'tipo_de_conta'],
+        'conta_superior': ['conta_superior', 'contasuperior', 'conta_pai', 'pai', 'superior', 'conta_mae'],
+        'conciliavel': ['conciliavel', 'concilia', 'conc', 'reconciliavel'],
+    }
+
+    colunas_normalizadas = {limpar_nome(col): col for col in df.columns}
+    rename_map = {}
+
+    for campo_esperado, variacoes in mapeamento.items():
+        for variacao in variacoes:
+            if variacao in colunas_normalizadas:
+                rename_map[colunas_normalizadas[variacao]] = campo_esperado
+                break
+
+    if rename_map:
+        df = df.rename(columns=rename_map)
+        logger.info(f"Colunas mapeadas: {rename_map}")
+
+    return df
+
+
 def preparar_dados_importacao(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Separa as contas em sintéticas e analíticas,
     ordenadas corretamente para importação
-    
+
     Args:
         df: DataFrame com os dados do plano de contas
-        
+
     Returns:
         Tupla (df_sinteticas, df_analiticas)
     """
     logger.info(f"Preparando dados para importação...")
-    
+
     logger.info(f"Total de registros lidos: {len(df)}")
-    
+    logger.info(f"Colunas do arquivo: {list(df.columns)}")
+
+    # Normalizar nomes de colunas
+    df = normalizar_colunas(df)
+
     # Validar estrutura
     valido, erros = validar_estrutura_arquivo(df)
     if not valido:
         raise ValueError(f"Erro na validação do arquivo:\n" + "\n".join(erros))
-    
-    # Limpar espaços em branco da conta_superior
-    df['conta_superior'] = df['conta_superior'].astype(str).str.strip()
-    df.loc[df['conta_superior'] == '', 'conta_superior'] = None
-    
+
+    # Normalizar conta_contabil como string
+    df['conta_contabil'] = df['conta_contabil'].str.strip()
+
+    # Normalizar conta_superior como string (vazio/NaN → None)
+    df['conta_superior'] = df['conta_superior'].str.strip()
+    df.loc[df['conta_superior'].isna() | (df['conta_superior'] == ''), 'conta_superior'] = None
+
+    # Remover contas duplicadas (manter a última ocorrência)
+    total_antes = len(df)
+    df = df.drop_duplicates(subset=['conta_contabil'], keep='last')
+    duplicatas_removidas = total_antes - len(df)
+    if duplicatas_removidas > 0:
+        logger.warning(f"Removidas {duplicatas_removidas} contas duplicadas do arquivo")
+
     # Ordenar hierarquicamente
     df_ordenado = ordenar_contas_hierarquicamente(df)
-    
+
+    # Normalizar tipo_conta para string
+    df_ordenado['tipo_conta'] = df_ordenado['tipo_conta'].astype(str).str.strip()
+
     # Separar sintéticas e analíticas
-    df_sinteticas = df_ordenado[df_ordenado['tipo_conta'] == 1].copy()
-    df_analiticas = df_ordenado[df_ordenado['tipo_conta'] == 2].copy()
-    
+    df_sinteticas = df_ordenado[df_ordenado['tipo_conta'] == '1'].copy()
+    df_analiticas = df_ordenado[df_ordenado['tipo_conta'] == '2'].copy()
+
     logger.info(f"Contas sintéticas: {len(df_sinteticas)}")
     logger.info(f"Contas analíticas: {len(df_analiticas)}")
-    
+
     return df_sinteticas, df_analiticas
 
 def converter_conciliavel(valor) -> bool:
@@ -167,14 +224,14 @@ def converter_conciliavel(valor) -> bool:
 
     valor_str = str(valor).strip().upper()
 
-    if valor_str == "1":
+    if valor_str in ("1", "SIM", "S", "YES", "Y", "TRUE", "VERDADEIRO"):
         return True
-    if valor_str == "0":
+    if valor_str in ("0", "NAO", "NÃO", "N", "NO", "FALSE", "FALSO", ""):
         return False
 
     raise ValueError(
         f"Valor inválido para conciliavel: '{valor}'. "
-        "Use apenas 1 ou 0."
+        "Use: 1/0, Sim/Não, S/N, True/False."
     )
 
 
@@ -201,10 +258,36 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
     logger.info("="*80)
     
     try:
+        # Verificar contas existentes da empresa
+        contas_existentes = db.query(PlanoDeContas).filter(
+            PlanoDeContas.empresa_id == empresa_id
+        ).count()
+
+        if contas_existentes > 0:
+            # Verificar se há conciliações vinculadas antes de deletar
+            conciliacoes_vinculadas = db.query(Conciliacao).filter(
+                Conciliacao.empresa_id == empresa_id
+            ).count()
+
+            if conciliacoes_vinculadas > 0:
+                raise ValueError(
+                    f"Não é possível reimportar o plano de contas: existem {conciliacoes_vinculadas} "
+                    f"conciliação(ões) vinculada(s) a esta empresa. "
+                    f"Remova as conciliações antes de reimportar."
+                )
+
+            logger.info(f"Removendo {contas_existentes} contas existentes da empresa {empresa_id} para reimportação...")
+            db.query(PlanoDeContas).filter(
+                PlanoDeContas.empresa_id == empresa_id
+            ).delete(synchronize_session=False)
+            db.flush()
+            logger.info(f"✓ Contas existentes removidas")
+
         estatisticas = {
             'total_contas': len(df_sinteticas) + len(df_analiticas),
             'sinteticas_importadas': 0,
             'analiticas_importadas': 0,
+            'contas_removidas': contas_existentes,
             'erros': []
         }
         
@@ -227,7 +310,7 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
                 db_conta.conta_contabil = str(conta['conta_contabil'])
                 db_conta.descricao = conta['descricao']
                 db_conta.conciliavel = converter_conciliavel(conta['conciliavel'])
-                db_conta.tipo_conta = str(conta['tipo_conta'])
+                db_conta.tipo_conta = str(conta['tipo_conta']).strip()
                 db_conta.conta_superior = conta_superior
                 db_conta.empresa_id = empresa_id
                 
@@ -263,8 +346,8 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
                 db_conta = PlanoDeContas()
                 db_conta.conta_contabil = str(conta['conta_contabil'])
                 db_conta.descricao = conta['descricao']
-                db_conta.conciliavel = bool(conta['conciliavel'])
-                db_conta.tipo_conta = str(conta['tipo_conta'])
+                db_conta.conciliavel = converter_conciliavel(conta['conciliavel'])
+                db_conta.tipo_conta = str(conta['tipo_conta']).strip()
                 db_conta.conta_superior = conta_superior
                 db_conta.empresa_id = empresa_id
                 

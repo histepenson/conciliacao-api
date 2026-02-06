@@ -9,8 +9,8 @@ __pycache__/
 venv/
 
 # Env
-
-
+.env
+.env.*
 # OS / IDE
 .vscode/
 .idea/
