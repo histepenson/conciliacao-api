@@ -54,6 +54,7 @@ class ConfiguracaoColunas:
     # Colunas auxiliares
     numero_documento: List[str]
     parcela: List[str]
+    tipo_titulo: List[str]
 
     # Substrings para busca flexível de valor vencido
     substrings_vencido: List[List[str]]
@@ -603,6 +604,15 @@ class ProcessadorFinanceiroBase(ABC):
         col_parcela = obter_coluna_opcional(df, self.config.parcela)
         df["parcela"] = df[col_parcela] if col_parcela else None
 
+        # Tipo do título (TP)
+        col_tipo = obter_coluna_opcional(df, self.config.tipo_titulo)
+        if not col_tipo:
+            col_tipo = buscar_coluna_flexivel(df, [
+                ["tipo", "titulo"],
+                ["tipo", "doc"],
+            ])
+        df["tipo_titulo"] = df[col_tipo] if col_tipo else None
+
         return df
 
     def validar_layout(self, entrada: Any) -> ResultadoValidacaoLayout:
@@ -755,5 +765,5 @@ class ProcessadorFinanceiroBase(ABC):
         return df[[
             "codigo", "cliente", "valor",
             "data_emissao", "data_vencimento",
-            "numero_documento", "parcela"
+            "numero_documento", "parcela", "tipo_titulo"
         ]].copy()

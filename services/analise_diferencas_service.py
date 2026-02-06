@@ -431,6 +431,7 @@ class AnaliseDiferencasService:
                     data_emissao = r.get("data_emissao", "")
                     prf_numero = r.get("numero_documento", r.get("prf_numero", ""))
                     parcela = r.get("parcela", "")
+                    tipo_titulo = r.get("tipo_titulo", "")
 
                     doc_parts = []
                     prf_str = ""
@@ -460,6 +461,10 @@ class AnaliseDiferencasService:
                                 doc_parts.append(parcela_str)
                     documento = "-".join(doc_parts)
 
+                    tp_str = ""
+                    if tipo_titulo not in [None, ""] and not pd.isna(tipo_titulo):
+                        tp_str = str(tipo_titulo).strip()
+
                     lancamentos_financeiro_detalhes.append(
                         {
                             "conta_origem": codigo,
@@ -468,6 +473,7 @@ class AnaliseDiferencasService:
                             "tipo_lancamento": "",
                             "data_lancamento": self._formatar_data(data_emissao),
                             "documento": documento,
+                            "tipo_titulo": tp_str,
                             "historico": "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
                         }
@@ -562,11 +568,17 @@ class AnaliseDiferencasService:
                             p_str = str(parcela_val).strip()
                             if p_str and p_str not in doc_parts:
                                 doc_parts.append(p_str)
+                        tp_val = r.get("tipo_titulo", "")
+                        tp_str2 = ""
+                        if tp_val not in [None, ""] and not pd.isna(tp_val):
+                            tp_str2 = str(tp_val).strip()
+
                         registros_match_financeiro.append({
                             "descricao": str(r.get("cliente", "")).strip(),
                             "valor": round(float(r.get("valor", 0) or 0), 2),
                             "data_emissao": self._formatar_data(r.get("data_emissao", "")),
                             "documento": "-".join(doc_parts),
+                            "tipo_titulo": tp_str2,
                             "status": status_registro,
                         })
 

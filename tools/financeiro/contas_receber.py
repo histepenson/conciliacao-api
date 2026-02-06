@@ -107,6 +107,16 @@ CONFIGURACAO_CONTAS_RECEBER = ConfiguracaoColunas(
         "parcela_num",
     ],
 
+    # Colunas de tipo do título (TP)
+    tipo_titulo=[
+        "tp",
+        "tipo",
+        "tipo_titulo",
+        "tipo_documento",
+        "tipo_doc",
+        "tipo_tit",
+    ],
+
     # Substrings para busca flexível de valor vencido
     substrings_vencido=[
         ["tit", "vencidos", "valor", "corrigido"],
