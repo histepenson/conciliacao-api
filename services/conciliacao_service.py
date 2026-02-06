@@ -295,23 +295,8 @@ class ConciliacaoService:
         # ==========================
         # 8️⃣ RETORNO FINAL (DICT)
         # ==========================
-
-        # Converter df_completo para lista de dicts (todos os registros: OK + diferenças)
-        if df_completo is not None and not df_completo.empty:
-            # Substituir NaN/Infinity por valores seguros para JSON
-            df_safe = df_completo.fillna({"Código": "", "Cliente": ""})
-            df_safe = df_safe.fillna(0)
-            # Remover possíveis infinitos
-            numeric_cols = df_safe.select_dtypes(include=["float", "int"]).columns
-            for col in numeric_cols:
-                df_safe[col] = df_safe[col].replace([float("inf"), float("-inf")], 0)
-            diferencas_todas = df_safe.to_dict("records")
-        else:
-            diferencas_todas = []
-
         retorno = {
             "resumo": resumo,
-            "diferencas": diferencas_todas,
             "diferencas_origem_maior": diferencas_origem_maior,
             "diferencas_contabilidade_maior": diferencas_contabilidade_maior,
             "analise_detalhada": analise_detalhada,
@@ -332,8 +317,7 @@ class ConciliacaoService:
 
         logger.info("✅ Conciliação executada com sucesso")
         logger.info(
-            "📦 Retorno final com %s diferencas_total, %s origem_maior, %s contabil_maior, %s análise_detalhada, %s análise_profunda",
-            len(diferencas_todas),
+            "📦 Retorno final com %s origem_maior, %s contabil_maior, %s análise_detalhada, %s análise_profunda",
             len(diferencas_origem_maior),
             len(diferencas_contabilidade_maior),
             len(analise_detalhada),
