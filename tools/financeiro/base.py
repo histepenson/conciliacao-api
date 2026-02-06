@@ -282,36 +282,37 @@ def serie_para_numerico(df: pd.DataFrame, coluna: str) -> pd.Series:
 
 def extrair_base_loja(texto: str) -> Tuple[str, str]:
     """
-    Extrai código base (6 dígitos) e loja (2 dígitos) de um texto.
+    Extrai código base e loja de um texto usando o separador '-'.
+
+    Suporta qualquer quantidade de dígitos em base e loja.
 
     Formatos suportados:
-    - "123456-87-NOME CLIENTE"
-    - "123456-87"
-    - "12345687"
-    - "123456"
+    - "01704361-81-NOME CLIENTE" → ("01704361", "81")
+    - "123456-789"               → ("123456", "789")
+    - "123456-87"                → ("123456", "87")
+    - "12345678" (sem separador) → ("12345678", "")
 
     Args:
         texto: Texto contendo o código
 
     Returns:
-        Tupla (base, loja) com 6 e 2 dígitos respectivamente
+        Tupla (base, loja) extraídos pelo separador '-'
     """
-    digitos = re.sub(r"\D+", "", texto or "")
+    texto = str(texto or "").strip()
+    if not texto:
+        return "", ""
 
-    if not digitos:
-        return "000000", "00"
+    partes = texto.split("-")
+    base = re.sub(r"\D+", "", partes[0])
 
-    if len(digitos) >= 8:
-        base = digitos[:6]
-        loja = digitos[6:8]
-    elif len(digitos) >= 6:
-        base = digitos[:6]
-        loja = "00"
-    else:
-        base = digitos.zfill(6)
-        loja = "00"
+    if not base:
+        return "", ""
 
-    return base.zfill(6), loja.zfill(2)
+    loja = ""
+    if len(partes) >= 2:
+        loja = re.sub(r"\D+", "", partes[1])
+
+    return base, loja
 
 
 def formatar_codigo(base: str, loja: str, prefixo: str = "C") -> str:
@@ -319,23 +320,23 @@ def formatar_codigo(base: str, loja: str, prefixo: str = "C") -> str:
     Formata código no padrão do sistema.
 
     Args:
-        base: Código base (6 dígitos)
-        loja: Código loja (2 dígitos)
+        base: Código base (tamanho variável)
+        loja: Código loja (tamanho variável)
         prefixo: Prefixo do código (default: "C" para cliente)
 
     Returns:
-        Código formatado (ex: "C12345678")
+        Código formatado (ex: "C0170436181")
     """
-    return f"{prefixo}{base.zfill(6)}{loja.zfill(2)}"
+    loja_fmt = loja if loja else "00"
+    return f"{prefixo}{base}{loja_fmt}"
 
 
 def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> pd.DataFrame:
     """
     Normaliza uma série de códigos de cliente/fornecedor.
 
-    Processa códigos no formato "BASE-LOJA-NOME" e extrai:
-    - codigo: Código formatado (ex: C12345678)
-    - cliente: Nome do cliente/fornecedor
+    Processa códigos no formato "BASE-LOJA-NOME" usando o separador '-'.
+    Suporta qualquer quantidade de dígitos em base e loja.
 
     Args:
         serie_cliente: Series com os valores originais
@@ -352,33 +353,15 @@ def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> p
     base_split = partes[0] if 0 in partes.columns else serie_cliente
     loja_split = partes[1] if 1 in partes.columns else pd.Series("", index=serie_cliente.index)
 
-    # Fallback: extrair base/loja do texto completo
-    base_loja_fallback = serie_cliente.apply(extrair_base_loja)
-    base_fallback = base_loja_fallback.apply(lambda t: t[0])
-    loja_fallback = base_loja_fallback.apply(lambda t: t[1])
+    # Extrair apenas dígitos de cada parte
+    base_digits = base_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
+    loja_digits = loja_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
 
-    # Determinar se temos loja separada ou embutida
-    loja_split_digits = loja_split.astype(str).str.extract(r"(\d+)", expand=False)
-    has_loja_split = loja_split_digits.notna() & (loja_split_digits.astype(str).str.len() > 0)
-
-    base_split_digits = base_split.astype(str).str.extract(r"(\d+)", expand=False)
-
-    # Montar código base
-    codigo_base = base_fallback.copy()
-    codigo_base.loc[has_loja_split] = base_split_digits.loc[has_loja_split].fillna(
-        base_fallback.loc[has_loja_split]
-    )
-    codigo_base = codigo_base.astype(str).str.zfill(6)
-
-    # Montar loja
-    loja = loja_fallback.copy()
-    loja.loc[has_loja_split] = loja_split_digits.loc[has_loja_split].fillna(
-        loja_fallback.loc[has_loja_split]
-    )
-    loja = loja.astype(str).str.zfill(2)
+    # Quando não tem separador '-', usar todos os dígitos como base
+    loja_digits = loja_digits.where(loja_digits.str.len() > 0, "00")
 
     # Formatar código final
-    codigo = prefixo + codigo_base + loja
+    codigo = prefixo + base_digits + loja_digits
 
     # Extrair nome do cliente
     cliente_split = partes[2] if 2 in partes.columns else None

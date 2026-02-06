@@ -66,20 +66,18 @@ def normalizar_planilha_contabilidade(entrada):
         if not s:
             return ""
 
-        # Remove tudo que não for dígito
-        digitos = re.sub(r"\D+", "", s)
-        if not digitos:
+        # Usa separador '-' para dividir base e loja (tamanho variável)
+        partes = s.split("-")
+        base = re.sub(r"\D+", "", partes[0])
+
+        if not base:
             return ""
 
-        # Esperado no financeiro: base 6 + loja 2
-        if len(digitos) >= 8:
-            base = digitos[:6]
-            loja = digitos[6:8]
-        elif len(digitos) >= 6:
-            base = digitos[:6]
-            loja = "00"
-        else:
-            base = digitos.zfill(6)
+        loja = ""
+        if len(partes) >= 2:
+            loja = re.sub(r"\D+", "", partes[1])
+
+        if not loja:
             loja = "00"
 
         return f"C{base}{loja}"

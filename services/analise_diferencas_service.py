@@ -634,18 +634,18 @@ class AnaliseDiferencasService:
         if not s:
             return ""
 
-        digitos = re.sub(r"\D+", "", s)
-        if not digitos:
+        # Usa separador '-' para dividir base e loja (tamanho variável)
+        partes = s.split("-")
+        base = re.sub(r"\D+", "", partes[0])
+
+        if not base:
             return ""
 
-        if len(digitos) >= 8:
-            base = digitos[:6]
-            loja = digitos[6:8]
-        elif len(digitos) >= 6:
-            base = digitos[:6]
-            loja = "00"
-        else:
-            base = digitos.zfill(6)
+        loja = ""
+        if len(partes) >= 2:
+            loja = re.sub(r"\D+", "", partes[1])
+
+        if not loja:
             loja = "00"
 
         return f"C{base}{loja}"
@@ -663,28 +663,20 @@ class AnaliseDiferencasService:
     def _gerar_variacoes_codigo(self, codigo: str) -> List[str]:
         """
         Gera variações do código para busca flexível.
-        Ex: C00060801 -> ['C00060801', '00060801', '0060801', '060801', '60801', '6080100', '60801']
+        Suporta códigos de tamanho variável (base e loja).
+        Ex: C0170436181 -> ['C0170436181', '0170436181', '170436181']
         """
         variacoes = [codigo]
 
-        # Remove o prefixo C
-        if codigo.startswith("C"):
-            sem_c = codigo[1:]
-            variacoes.append(sem_c)
+        # Remove o prefixo C ou F
+        if codigo and codigo[0] in ("C", "F"):
+            sem_prefixo = codigo[1:]
+            variacoes.append(sem_prefixo)
 
-            # Remove zeros à esquerda progressivamente
-            stripped = sem_c.lstrip("0")
+            # Remove zeros à esquerda
+            stripped = sem_prefixo.lstrip("0")
             if stripped:
                 variacoes.append(stripped)
-
-            # Separa base e loja
-            if len(sem_c) >= 8:
-                base = sem_c[:6]
-                loja = sem_c[6:8]
-                variacoes.append(base)
-                variacoes.append(base.lstrip("0"))
-                if loja != "00":
-                    variacoes.append(f"{base.lstrip('0')}{loja}")
 
         return list(set(variacoes))
 
