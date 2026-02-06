@@ -327,8 +327,7 @@ def formatar_codigo(base: str, loja: str, prefixo: str = "C") -> str:
     Returns:
         Código formatado (ex: "C0170436181")
     """
-    loja_fmt = loja if loja else "00"
-    return f"{prefixo}{base}{loja_fmt}"
+    return f"{prefixo}{base}{loja}"
 
 
 def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> pd.DataFrame:
@@ -357,8 +356,8 @@ def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> p
     base_digits = base_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
     loja_digits = loja_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
 
-    # Quando não tem separador '-', usar todos os dígitos como base
-    loja_digits = loja_digits.where(loja_digits.str.len() > 0, "00")
+    # Quando não tem separador '-', loja fica vazia (todos os dígitos são o código)
+    loja_digits = loja_digits.where(loja_digits.str.len() > 0, "")
 
     # Formatar código final
     codigo = prefixo + base_digits + loja_digits

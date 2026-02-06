@@ -635,6 +635,7 @@ class AnaliseDiferencasService:
             return ""
 
         # Usa separador '-' para dividir base e loja (tamanho variável)
+        # Sem separador: todos os dígitos formam o código completo
         partes = s.split("-")
         base = re.sub(r"\D+", "", partes[0])
 
@@ -644,9 +645,6 @@ class AnaliseDiferencasService:
         loja = ""
         if len(partes) >= 2:
             loja = re.sub(r"\D+", "", partes[1])
-
-        if not loja:
-            loja = "00"
 
         return f"C{base}{loja}"
 
