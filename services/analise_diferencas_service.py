@@ -429,7 +429,7 @@ class AnaliseDiferencasService:
                     cliente = str(r.get("cliente", "")).strip()
                     valor_fin_det = float(r.get("valor", 0) or 0)
                     data_emissao = r.get("data_emissao", "")
-                    prf_numero = r.get("prf_numero", "")
+                    prf_numero = r.get("numero_documento", r.get("prf_numero", ""))
                     parcela = r.get("parcela", "")
 
                     doc_parts = []
@@ -553,7 +553,7 @@ class AnaliseDiferencasService:
                         df_financeiro_detalhado["codigo"].astype(str).str.strip() == codigo
                     ]
                     for _, r in matches_fin_det.iterrows():
-                        prf = r.get("prf_numero", "")
+                        prf = r.get("numero_documento", r.get("prf_numero", ""))
                         parcela_val = r.get("parcela", "")
                         doc_parts = []
                         if prf not in [None, ""] and not pd.isna(prf):
