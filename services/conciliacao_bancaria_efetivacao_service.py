@@ -12,12 +12,16 @@ from sqlalchemy import and_
 from models import Conciliacao, PlanoDeContas
 from schemas.efetivacao_schema import StatusConciliacao
 from middleware.auth import CurrentUser
+from services.file_storage_service import FileStorageService
 
 logger = logging.getLogger(__name__)
 
 
 class ConciliacaoBancariaEfetivacaoService:
     """Service para efetivar conciliacao bancaria."""
+
+    def __init__(self):
+        self.file_storage = FileStorageService()
 
     def _parse_periodo(self, data_base: str) -> Tuple[int, int]:
         """Converte data-base DD/MM/YYYY para (ano, mes)."""
@@ -88,6 +92,16 @@ class ConciliacaoBancariaEfetivacaoService:
 
         now = datetime.now(timezone.utc)
 
+        # Salvar resultado JSON no volume
+        ano, mes = self._parse_periodo(data_base)
+        caminhos_arquivos = self.file_storage.save_bank_files(
+            empresa_id=empresa_id,
+            ano=ano,
+            mes=mes,
+            conta_contabil=conta.conta_contabil,
+            resultado=resultado
+        )
+
         conciliacao = Conciliacao(
             empresa_id=empresa_id,
             conta_contabil_id=conta_contabil_id,
@@ -97,7 +111,7 @@ class ConciliacaoBancariaEfetivacaoService:
             usuario_responsavel_id=current_user.user_id,
             data_efetivacao=now,
             resultado_json=resultado,
-            caminhos_arquivos=None
+            caminhos_arquivos=caminhos_arquivos
         )
 
         db.add(conciliacao)

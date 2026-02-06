@@ -193,7 +193,8 @@ class EfetivacaoService:
             df_origem=df_origem,
             df_contabil_filtrado=df_contabil_filtrado,
             df_contabil_geral=df_contabil_geral,
-            resultado=request.resultado
+            resultado=request.resultado,
+            tipo_conciliacao=request.tipo_conciliacao
         )
 
         # Obter saldo do resultado
@@ -283,6 +284,10 @@ class EfetivacaoService:
         for c in conciliacoes:
             resumo_json = c.resultado_json.get("resumo", {}) if c.resultado_json else {}
 
+            # Detectar tipo de conciliação
+            resultado_json_full = c.resultado_json or {}
+            tipo_conc = "banco" if "movimentos_por_dia" in resultado_json_full else "contabil"
+
             item = ConciliacaoEfetivadaResumo(
                 id=c.id,
                 empresa_id=c.empresa_id,
@@ -299,6 +304,7 @@ class EfetivacaoService:
                 total_destino=resumo_json.get("total_destino"),
                 diferenca=resumo_json.get("diferenca"),
                 situacao=resumo_json.get("situacao"),
+                tipo_conciliacao=tipo_conc,
                 created_at=c.created_at,
                 updated_at=c.updated_at
             )
@@ -327,6 +333,10 @@ class EfetivacaoService:
 
         resumo_json = conciliacao.resultado_json.get("resumo", {}) if conciliacao.resultado_json else {}
 
+        # Detectar tipo de conciliação
+        resultado_json_full = conciliacao.resultado_json or {}
+        tipo_conc = "banco" if "movimentos_por_dia" in resultado_json_full else "contabil"
+
         return ConciliacaoEfetivadaDetalhe(
             id=conciliacao.id,
             empresa_id=conciliacao.empresa_id,
@@ -343,6 +353,7 @@ class EfetivacaoService:
             total_destino=resumo_json.get("total_destino"),
             diferenca=resumo_json.get("diferenca"),
             situacao=resumo_json.get("situacao"),
+            tipo_conciliacao=tipo_conc,
             saldo=conciliacao.saldo,
             resultado_json=conciliacao.resultado_json,
             caminhos_arquivos=conciliacao.caminhos_arquivos,
@@ -429,8 +440,11 @@ class EfetivacaoService:
                 ).first()
                 conta_contabil = conta.conta_contabil if conta else "desconhecida"
                 ano, mes = self._parse_periodo(conciliacao.periodo)
+                # Detectar tipo para salvar no path correto
+                resultado_full = conciliacao.resultado_json or {}
+                tipo_conc = "banco" if "movimentos_por_dia" in resultado_full else "receber"
                 caminho_regenerado = self.file_storage.save_json_result(
-                    conciliacao.resultado_json, empresa_id, ano, mes, conta_contabil
+                    conciliacao.resultado_json, empresa_id, ano, mes, conta_contabil, tipo_conc
                 )
                 # Atualizar caminho no banco
                 if not conciliacao.caminhos_arquivos:
@@ -492,11 +506,16 @@ class EfetivacaoService:
         ano, mes = self._parse_periodo(conciliacao.periodo)
         conta_contabil = conciliacao.conta_contabil.conta_contabil if conciliacao.conta_contabil else ""
 
+        # Detectar tipo para saber qual diretório remover
+        resultado_full = conciliacao.resultado_json or {}
+        tipo_conc = "banco" if "movimentos_por_dia" in resultado_full else "receber"
+
         self.file_storage.delete_reconciliation_files(
             empresa_id=empresa_id,
             ano=ano,
             mes=mes,
-            conta_contabil=conta_contabil
+            conta_contabil=conta_contabil,
+            tipo_conciliacao=tipo_conc
         )
 
         # Registrar no audit log antes de excluir

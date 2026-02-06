@@ -14,9 +14,9 @@ from pathlib import Path
 
 router = APIRouter(prefix="/arquivos", tags=["Arquivos"])
 
-# Diretório para uploads
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+# Diretório para uploads - usa env var STORAGE_DIR, default "data"
+UPLOAD_DIR = Path(os.environ.get("STORAGE_DIR", "data"))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.get("/", response_model=List[ArquivoConciliacaoResponse])

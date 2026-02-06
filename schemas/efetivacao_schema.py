@@ -24,6 +24,7 @@ class EfetivarConciliacaoRequest(BaseModel):
     conta_contabil_id: int
     conta_contabil: str  # código da conta
     periodo: str  # "YYYY-MM"
+    tipo_conciliacao: str = "receber"  # receber, pagar
 
     # Dados já processados (normalizados)
     base_origem: Dict[str, Any]  # { registros: [...] }
@@ -63,6 +64,7 @@ class ConciliacaoEfetivadaResumo(BaseModel):
     total_destino: Optional[float] = None
     diferenca: Optional[float] = None
     situacao: Optional[str] = None
+    tipo_conciliacao: Optional[str] = None  # banco, receber, pagar
 
     created_at: datetime
     updated_at: datetime

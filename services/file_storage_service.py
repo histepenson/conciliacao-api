@@ -2,17 +2,19 @@
 Service para gerenciamento de armazenamento de arquivos de conciliação.
 
 Estrutura de diretórios:
-uploads/{empresa_id}/{ano}/{mes}/{conta_contabil}/
-  ├── originais/                         # Arquivos originais do upload
+{STORAGE_DIR}/empresa_{id}/{ano}/{mes}/{tipo}/{conta_contabil}/
+  ├── originais/
   │   ├── origem.xlsx
   │   ├── contabil_filtrado.xlsx
   │   └── contabil_geral.xlsx
-  ├── normalizados/                      # Dados normalizados para auditoria
+  ├── normalizados/
   │   ├── origem.xlsx
   │   ├── contabil_filtrado.xlsx
   │   └── contabil_geral.xlsx
   └── relatorio/
       └── resultado.json
+
+Tipos: banco, receber, pagar
 """
 import os
 import json
@@ -26,8 +28,8 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Diretório base para uploads
-UPLOAD_BASE_DIR = Path("uploads")
+# Diretório base - usa env var STORAGE_DIR, default "data"
+UPLOAD_BASE_DIR = Path(os.environ.get("STORAGE_DIR", "data"))
 
 
 class FileStorageService:
@@ -46,7 +48,6 @@ class FileStorageService:
     @staticmethod
     def _sanitize_conta(conta_contabil: str) -> str:
         """Sanitiza código da conta para uso em path de arquivo."""
-        # Remove caracteres que podem causar problemas em paths
         return conta_contabil.replace(".", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
     def get_base_path(
@@ -54,7 +55,8 @@ class FileStorageService:
         empresa_id: int,
         ano: int,
         mes: int,
-        conta_contabil: str
+        conta_contabil: str,
+        tipo_conciliacao: str = "receber"
     ) -> Path:
         """
         Retorna o path base para arquivos de uma conciliação.
@@ -64,12 +66,13 @@ class FileStorageService:
             ano: Ano do período
             mes: Mês do período (1-12)
             conta_contabil: Código da conta contábil
+            tipo_conciliacao: banco, receber ou pagar
 
         Returns:
-            Path base: uploads/{empresa_id}/{ano}/{mes:02d}/{conta_sanitizada}/
+            Path base: {STORAGE_DIR}/empresa_{id}/{ano}/{mes:02d}/{tipo}/{conta}/
         """
         sanitized_conta = self._sanitize_conta(conta_contabil)
-        return UPLOAD_BASE_DIR / str(empresa_id) / str(ano) / f"{mes:02d}" / sanitized_conta
+        return UPLOAD_BASE_DIR / f"empresa_{empresa_id}" / str(ano) / f"{mes:02d}" / tipo_conciliacao / sanitized_conta
 
     def save_original_file(
         self,
@@ -79,28 +82,19 @@ class FileStorageService:
         mes: int,
         conta_contabil: str,
         tipo_arquivo: str,
-        nome_original: str
+        nome_original: str,
+        tipo_conciliacao: str = "receber"
     ) -> str:
         """
         Salva arquivo original exatamente como foi enviado.
 
-        Args:
-            file_content: Conteúdo binário do arquivo
-            empresa_id: ID da empresa
-            ano: Ano do período
-            mes: Mês do período
-            conta_contabil: Código da conta contábil
-            tipo_arquivo: Tipo (origem, contabil_filtrado, contabil_geral)
-            nome_original: Nome original do arquivo
-
         Returns:
             Caminho completo do arquivo salvo
         """
-        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil)
+        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
         originais_path = base_path / "originais"
         self._ensure_directory(originais_path)
 
-        # Extrair extensão do arquivo original
         extensao = Path(nome_original).suffix or ".xlsx"
         filename = f"{tipo_arquivo}{extensao}"
         file_path = originais_path / filename
@@ -118,23 +112,16 @@ class FileStorageService:
         ano: int,
         mes: int,
         conta_contabil: str,
-        tipo_arquivo: str
+        tipo_arquivo: str,
+        tipo_conciliacao: str = "receber"
     ) -> str:
         """
         Salva DataFrame normalizado como arquivo Excel.
 
-        Args:
-            df: DataFrame com dados normalizados
-            empresa_id: ID da empresa
-            ano: Ano do período
-            mes: Mês do período
-            conta_contabil: Código da conta contábil
-            tipo_arquivo: Tipo (origem, contabil_filtrado, contabil_geral)
-
         Returns:
             Caminho completo do arquivo salvo
         """
-        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil)
+        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
         normalizados_path = base_path / "normalizados"
         self._ensure_directory(normalizados_path)
 
@@ -152,27 +139,20 @@ class FileStorageService:
         empresa_id: int,
         ano: int,
         mes: int,
-        conta_contabil: str
+        conta_contabil: str,
+        tipo_conciliacao: str = "receber"
     ) -> str:
         """
         Salva resultado da conciliação como JSON.
 
-        Args:
-            data: Dicionário com resultado da conciliação
-            empresa_id: ID da empresa
-            ano: Ano do período
-            mes: Mês do período
-            conta_contabil: Código da conta contábil
-
         Returns:
             Caminho completo do arquivo salvo
         """
-        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil)
+        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
         relatorio_path = base_path / "relatorio"
         self._ensure_directory(relatorio_path)
 
-        timestamp = self._generate_timestamp()
-        filename = f"resultado_{timestamp}.json"
+        filename = "resultado.json"
         file_path = relatorio_path / filename
 
         with open(file_path, 'w', encoding='utf-8') as f:
@@ -199,10 +179,12 @@ class FileStorageService:
         df_contabil_filtrado: pd.DataFrame,
         df_contabil_geral: pd.DataFrame,
         # Resultado
-        resultado: Dict[str, Any]
+        resultado: Dict[str, Any],
+        # Tipo de conciliação
+        tipo_conciliacao: str = "receber"
     ) -> Dict[str, Dict[str, str]]:
         """
-        Salva todos os arquivos de uma conciliação.
+        Salva todos os arquivos de uma conciliação contábil (receber/pagar).
 
         Returns:
             Dicionário com estrutura:
@@ -222,32 +204,58 @@ class FileStorageService:
 
         # Salvar arquivos originais
         caminhos["origem"]["original"] = self.save_original_file(
-            arquivo_origem, empresa_id, ano, mes, conta_contabil, "origem", nome_origem
+            arquivo_origem, empresa_id, ano, mes, conta_contabil, "origem", nome_origem, tipo_conciliacao
         )
         caminhos["contabil_filtrado"]["original"] = self.save_original_file(
-            arquivo_contabil_filtrado, empresa_id, ano, mes, conta_contabil, "contabil_filtrado", nome_contabil_filtrado
+            arquivo_contabil_filtrado, empresa_id, ano, mes, conta_contabil, "contabil_filtrado", nome_contabil_filtrado, tipo_conciliacao
         )
         caminhos["contabil_geral"]["original"] = self.save_original_file(
-            arquivo_contabil_geral, empresa_id, ano, mes, conta_contabil, "contabil_geral", nome_contabil_geral
+            arquivo_contabil_geral, empresa_id, ano, mes, conta_contabil, "contabil_geral", nome_contabil_geral, tipo_conciliacao
         )
 
         # Salvar dados normalizados
         caminhos["origem"]["normalizado"] = self.save_dataframe_as_excel(
-            df_origem, empresa_id, ano, mes, conta_contabil, "origem"
+            df_origem, empresa_id, ano, mes, conta_contabil, "origem", tipo_conciliacao
         )
         caminhos["contabil_filtrado"]["normalizado"] = self.save_dataframe_as_excel(
-            df_contabil_filtrado, empresa_id, ano, mes, conta_contabil, "contabil_filtrado"
+            df_contabil_filtrado, empresa_id, ano, mes, conta_contabil, "contabil_filtrado", tipo_conciliacao
         )
         caminhos["contabil_geral"]["normalizado"] = self.save_dataframe_as_excel(
-            df_contabil_geral, empresa_id, ano, mes, conta_contabil, "contabil_geral"
+            df_contabil_geral, empresa_id, ano, mes, conta_contabil, "contabil_geral", tipo_conciliacao
         )
 
         # Salvar resultado JSON
         caminhos["relatorio"]["json"] = self.save_json_result(
-            resultado, empresa_id, ano, mes, conta_contabil
+            resultado, empresa_id, ano, mes, conta_contabil, tipo_conciliacao
         )
 
-        logger.info(f"Todos os arquivos salvos para empresa {empresa_id}, período {ano}-{mes:02d}, conta {conta_contabil}")
+        logger.info(f"Todos os arquivos salvos para empresa {empresa_id}, período {ano}-{mes:02d}, conta {conta_contabil}, tipo {tipo_conciliacao}")
+        return caminhos
+
+    def save_bank_files(
+        self,
+        empresa_id: int,
+        ano: int,
+        mes: int,
+        conta_contabil: str,
+        resultado: Dict[str, Any]
+    ) -> Dict[str, Dict[str, str]]:
+        """
+        Salva arquivos de conciliação bancária (apenas resultado JSON).
+
+        Returns:
+            Dicionário com estrutura:
+            {
+                "relatorio": {"json": "path"}
+            }
+        """
+        caminhos = {"relatorio": {}}
+
+        caminhos["relatorio"]["json"] = self.save_json_result(
+            resultado, empresa_id, ano, mes, conta_contabil, "banco"
+        )
+
+        logger.info(f"Arquivos bancários salvos para empresa {empresa_id}, período {ano}-{mes:02d}, conta {conta_contabil}")
         return caminhos
 
     def file_exists(self, file_path: str) -> bool:
@@ -266,21 +274,16 @@ class FileStorageService:
         empresa_id: int,
         ano: int,
         mes: int,
-        conta_contabil: str
+        conta_contabil: str,
+        tipo_conciliacao: str = "receber"
     ) -> bool:
         """
         Remove todos os arquivos de uma conciliação.
 
-        Args:
-            empresa_id: ID da empresa
-            ano: Ano do período
-            mes: Mês do período
-            conta_contabil: Código da conta contábil
-
         Returns:
             True se removido com sucesso, False caso contrário
         """
-        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil)
+        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
 
         if base_path.exists():
             try:
@@ -299,28 +302,25 @@ class FileStorageService:
         mes: int,
         conta_contabil: str,
         tipo_arquivo: str,
-        formato: str
+        formato: str,
+        tipo_conciliacao: str = "receber"
     ) -> Optional[str]:
         """
         Obtém o caminho de um arquivo específico.
 
         Args:
-            empresa_id: ID da empresa
-            ano: Ano do período
-            mes: Mês do período
-            conta_contabil: Código da conta contábil
             tipo_arquivo: origem, contabil_filtrado, contabil_geral, relatorio
             formato: original, normalizado, json
+            tipo_conciliacao: banco, receber, pagar
 
         Returns:
             Caminho do arquivo ou None se não existir
         """
-        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil)
+        base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
 
         if tipo_arquivo == "relatorio":
             relatorio_path = base_path / "relatorio"
             if relatorio_path.exists():
-                # Pegar o arquivo mais recente
                 json_files = list(relatorio_path.glob("*.json"))
                 if json_files:
                     return str(max(json_files, key=os.path.getmtime))
