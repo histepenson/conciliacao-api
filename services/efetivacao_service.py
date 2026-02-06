@@ -417,13 +417,35 @@ class EfetivacaoService:
         if not caminho:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Arquivo do tipo '{tipo_arquivo}' formato '{formato}' não encontrado"
+                detail=f"Arquivo do tipo '{tipo_arquivo}' formato '{formato}' não encontrado nos registros"
             )
 
         if not self.file_storage.file_exists(caminho):
+            # Para relatorio/json, regenerar a partir do resultado_json do banco
+            if tipo_arquivo == "relatorio" and formato == "json" and conciliacao.resultado_json:
+                logger.info(f"Regenerando arquivo JSON para conciliação {conciliacao_id} a partir do banco")
+                conta = db.query(PlanoDeContas).filter(
+                    PlanoDeContas.id == conciliacao.conta_contabil_id
+                ).first()
+                conta_contabil = conta.conta_contabil if conta else "desconhecida"
+                ano, mes = self._parse_periodo(conciliacao.periodo)
+                caminho_regenerado = self.file_storage.save_json_result(
+                    conciliacao.resultado_json, empresa_id, ano, mes, conta_contabil
+                )
+                # Atualizar caminho no banco
+                if not conciliacao.caminhos_arquivos:
+                    conciliacao.caminhos_arquivos = {}
+                if "relatorio" not in conciliacao.caminhos_arquivos:
+                    conciliacao.caminhos_arquivos["relatorio"] = {}
+                conciliacao.caminhos_arquivos["relatorio"]["json"] = caminho_regenerado
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(conciliacao, "caminhos_arquivos")
+                db.commit()
+                return caminho_regenerado
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Arquivo não encontrado no sistema de arquivos"
+                detail="Arquivo não encontrado no servidor. Os arquivos podem ter sido perdidos após um redeploy. O relatório JSON pode ser regenerado, mas os arquivos Excel originais precisam ser re-efetivados."
             )
 
         return caminho
