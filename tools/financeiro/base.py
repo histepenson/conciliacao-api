@@ -303,7 +303,7 @@ def extrair_base_loja(texto: str) -> Tuple[str, str]:
         return "", ""
 
     partes = texto.split("-")
-    base = re.sub(r"\D+", "", partes[0])
+    base = re.sub(r"[^a-zA-Z0-9]", "", partes[0])
 
     if not base:
         return "", ""
@@ -352,15 +352,15 @@ def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> p
     base_split = partes[0] if 0 in partes.columns else serie_cliente
     loja_split = partes[1] if 1 in partes.columns else pd.Series("", index=serie_cliente.index)
 
-    # Extrair apenas dígitos de cada parte
-    base_digits = base_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
+    # Extrair base (preserva letras + dígitos) e loja (apenas dígitos)
+    base_clean = base_split.astype(str).str.replace(r"[^a-zA-Z0-9]", "", regex=True)
     loja_digits = loja_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
 
     # Quando não tem separador '-', loja fica vazia (todos os dígitos são o código)
     loja_digits = loja_digits.where(loja_digits.str.len() > 0, "")
 
     # Formatar código final
-    codigo = prefixo + base_digits + loja_digits
+    codigo = prefixo + base_clean + loja_digits
 
     # Extrair nome do cliente
     cliente_split = partes[2] if 2 in partes.columns else None
