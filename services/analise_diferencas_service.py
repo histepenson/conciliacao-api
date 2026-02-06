@@ -650,14 +650,15 @@ class AnaliseDiferencasService:
         return f"C{base}{loja}"
 
     def _normalizar_codigo_numerico(self, valor: object) -> str:
-        """Normaliza qualquer valor para apenas dígitos (sem zeros à esquerda)."""
+        """Normaliza código preservando prefixo C/F e letras, removendo apenas caracteres especiais."""
         if pd.isna(valor):
             return ""
         s = str(valor).strip()
         if not s:
             return ""
-        digitos = re.sub(r"\D+", "", s)
-        return digitos.lstrip("0") or "0"
+        # Mantém letras + dígitos (incluindo prefixo C/F que faz parte do código)
+        clean = re.sub(r"[^a-zA-Z0-9]", "", s)
+        return clean
 
     def _gerar_variacoes_codigo(self, codigo: str) -> List[str]:
         """
