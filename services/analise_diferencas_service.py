@@ -543,40 +543,41 @@ class AnaliseDiferencasService:
                     lancamentos_credito, diferenca, "C"
                 )
 
-            # Registros individuais para itens CONCILIADO (match expandido)
-            if tipo == "CONCILIADO":
-                # Financeiro detalhado
-                if df_financeiro_detalhado is not None and not df_financeiro_detalhado.empty:
-                    if "codigo" in df_financeiro_detalhado.columns:
-                        matches_fin_det = df_financeiro_detalhado[
-                            df_financeiro_detalhado["codigo"].astype(str).str.strip() == codigo
-                        ]
-                        for _, r in matches_fin_det.iterrows():
-                            prf = r.get("prf_numero", "")
-                            parcela_val = r.get("parcela", "")
-                            doc_parts = []
-                            if prf not in [None, ""] and not pd.isna(prf):
-                                doc_parts.append(str(prf).strip())
-                            if parcela_val not in [None, ""] and not pd.isna(parcela_val):
-                                p_str = str(parcela_val).strip()
-                                if p_str and p_str not in doc_parts:
-                                    doc_parts.append(p_str)
-                            registros_match_financeiro.append({
-                                "descricao": str(r.get("cliente", "")).strip(),
-                                "valor": round(float(r.get("valor", 0) or 0), 2),
-                                "data_emissao": self._formatar_data(r.get("data_emissao", "")),
-                                "documento": "-".join(doc_parts),
-                                "status": "conciliado",
-                            })
+            # Registros individuais de ambas as bases (para todos os tipos)
+            status_registro = "conciliado" if tipo == "CONCILIADO" else "divergente"
 
-                # Contabilidade
-                matches_cont_det = df_cont[df_cont["codigo"].astype(str).str.strip() == codigo]
-                for _, r in matches_cont_det.iterrows():
-                    registros_match_contabilidade.append({
-                        "descricao": str(r.get("cliente", "")).strip(),
-                        "valor": round(float(r.get("valor", 0) or 0), 2),
-                        "status": "conciliado",
-                    })
+            # Financeiro detalhado
+            if df_financeiro_detalhado is not None and not df_financeiro_detalhado.empty:
+                if "codigo" in df_financeiro_detalhado.columns:
+                    matches_fin_det = df_financeiro_detalhado[
+                        df_financeiro_detalhado["codigo"].astype(str).str.strip() == codigo
+                    ]
+                    for _, r in matches_fin_det.iterrows():
+                        prf = r.get("prf_numero", "")
+                        parcela_val = r.get("parcela", "")
+                        doc_parts = []
+                        if prf not in [None, ""] and not pd.isna(prf):
+                            doc_parts.append(str(prf).strip())
+                        if parcela_val not in [None, ""] and not pd.isna(parcela_val):
+                            p_str = str(parcela_val).strip()
+                            if p_str and p_str not in doc_parts:
+                                doc_parts.append(p_str)
+                        registros_match_financeiro.append({
+                            "descricao": str(r.get("cliente", "")).strip(),
+                            "valor": round(float(r.get("valor", 0) or 0), 2),
+                            "data_emissao": self._formatar_data(r.get("data_emissao", "")),
+                            "documento": "-".join(doc_parts),
+                            "status": status_registro,
+                        })
+
+            # Contabilidade
+            matches_cont_det = df_cont[df_cont["codigo"].astype(str).str.strip() == codigo]
+            for _, r in matches_cont_det.iterrows():
+                registros_match_contabilidade.append({
+                    "descricao": str(r.get("cliente", "")).strip(),
+                    "valor": round(float(r.get("valor", 0) or 0), 2),
+                    "status": status_registro,
+                })
 
             analises.append(
                 {
