@@ -35,7 +35,11 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(git remote set-url:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(if not exist \"C:\\\\conciliacao-app\\\\src\\\\utils\" mkdir \"C:\\\\conciliacao-app\\\\src\\\\utils\")",
+      "Bash(if not exist \"C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog\" mkdir \"C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog\")",
+      "Bash(cmd /c \"if not exist C:\\\\conciliacao-app\\\\src\\\\utils mkdir C:\\\\conciliacao-app\\\\src\\\\utils\")",
+      "Bash(cmd /c \"if not exist C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog mkdir C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog\")"
     ]
   }
 }
