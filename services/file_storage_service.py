@@ -238,18 +238,38 @@ class FileStorageService:
         ano: int,
         mes: int,
         conta_contabil: str,
-        resultado: Dict[str, Any]
+        resultado: Dict[str, Any],
+        arquivo_extrato: bytes = None,
+        arquivo_razao: bytes = None,
+        nome_extrato: str = "extrato.xlsx",
+        nome_razao: str = "razao.xlsx"
     ) -> Dict[str, Dict[str, str]]:
         """
-        Salva arquivos de conciliação bancária (apenas resultado JSON).
+        Salva arquivos de conciliação bancária (originais + resultado JSON).
 
         Returns:
             Dicionário com estrutura:
             {
+                "extrato": {"original": "path"},
+                "razao": {"original": "path"},
                 "relatorio": {"json": "path"}
             }
         """
         caminhos = {"relatorio": {}}
+
+        if arquivo_extrato:
+            caminhos["extrato"] = {}
+            caminhos["extrato"]["original"] = self.save_original_file(
+                arquivo_extrato, empresa_id, ano, mes, conta_contabil,
+                "extrato", nome_extrato, "banco"
+            )
+
+        if arquivo_razao:
+            caminhos["razao"] = {}
+            caminhos["razao"]["original"] = self.save_original_file(
+                arquivo_razao, empresa_id, ano, mes, conta_contabil,
+                "razao", nome_razao, "banco"
+            )
 
         caminhos["relatorio"]["json"] = self.save_json_result(
             resultado, empresa_id, ano, mes, conta_contabil, "banco"

@@ -5,13 +5,13 @@ Endpoints:
 - POST /conciliacoes/bancaria - Processa conciliacao bancaria
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 import logging
+import json
 
 from schemas.conciliacao_bancaria_schema import (
     RequestConciliacaoBancaria,
     RelatorioConciliacaoBancaria,
-    EfetivarConciliacaoBancariaRequest,
 )
 from services.conciliacao_bancaria_service import ConciliacaoBancariaService
 from services.conciliacao_bancaria_efetivacao_service import ConciliacaoBancariaEfetivacaoService
@@ -72,19 +72,33 @@ def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria):
 
 
 @router.post("/bancaria/efetivar", response_model=EfetivarConciliacaoResponse, status_code=201)
-def efetivar_conciliacao_bancaria(
-    request: EfetivarConciliacaoBancariaRequest,
+async def efetivar_conciliacao_bancaria(
+    dados: str = Form(...),
+    arquivo_extrato: UploadFile = File(...),
+    arquivo_razao: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
+    try:
+        dados_json = json.loads(dados)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="JSON inválido no campo 'dados'")
+
+    extrato_bytes = await arquivo_extrato.read()
+    razao_bytes = await arquivo_razao.read()
+
     service = ConciliacaoBancariaEfetivacaoService()
     conciliacao = service.efetivar(
         db=db,
-        empresa_id=request.empresa_id,
-        conta_contabil_id=request.conta_contabil_id,
-        data_base=request.data_base,
-        resultado=request.resultado,
-        current_user=current_user
+        empresa_id=dados_json["empresa_id"],
+        conta_contabil_id=dados_json["conta_contabil_id"],
+        data_base=dados_json["data_base"],
+        resultado=dados_json["resultado"],
+        current_user=current_user,
+        arquivo_extrato=extrato_bytes,
+        arquivo_razao=razao_bytes,
+        nome_extrato=arquivo_extrato.filename or "extrato.xlsx",
+        nome_razao=arquivo_razao.filename or "razao.xlsx"
     )
     return EfetivarConciliacaoResponse(
         id=conciliacao.id,

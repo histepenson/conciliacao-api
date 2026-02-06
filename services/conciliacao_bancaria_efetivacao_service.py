@@ -3,7 +3,7 @@ Service para efetivacao de conciliacao bancaria.
 """
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Optional, Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -68,7 +68,11 @@ class ConciliacaoBancariaEfetivacaoService:
         conta_contabil_id: int,
         data_base: str,
         resultado: Dict[str, Any],
-        current_user: CurrentUser
+        current_user: CurrentUser,
+        arquivo_extrato: Optional[bytes] = None,
+        arquivo_razao: Optional[bytes] = None,
+        nome_extrato: str = "extrato.xlsx",
+        nome_razao: str = "razao.xlsx"
     ) -> Conciliacao:
         periodo = self._normalize_periodo(data_base)
 
@@ -92,14 +96,18 @@ class ConciliacaoBancariaEfetivacaoService:
 
         now = datetime.now(timezone.utc)
 
-        # Salvar resultado JSON no volume
+        # Salvar arquivos no volume
         ano, mes = self._parse_periodo(data_base)
         caminhos_arquivos = self.file_storage.save_bank_files(
             empresa_id=empresa_id,
             ano=ano,
             mes=mes,
             conta_contabil=conta.conta_contabil,
-            resultado=resultado
+            resultado=resultado,
+            arquivo_extrato=arquivo_extrato,
+            arquivo_razao=arquivo_razao,
+            nome_extrato=nome_extrato,
+            nome_razao=nome_razao
         )
 
         conciliacao = Conciliacao(

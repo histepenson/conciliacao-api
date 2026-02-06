@@ -265,7 +265,7 @@ async def download_arquivo(
             detail="Sem acesso a esta empresa"
         )
 
-    valid_tipos = ["origem", "contabil_filtrado", "contabil_geral", "relatorio"]
+    valid_tipos = ["origem", "contabil_filtrado", "contabil_geral", "relatorio", "extrato", "razao"]
     if tipo_arquivo not in valid_tipos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
