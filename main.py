@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from core.config import settings
+import os
+import logging
 import traceback
+from pathlib import Path
 from routers.empresa_router import router as empresa_router
 from routers.planodecontas_router import router as planodecontas_router
 from routers.conciliacao_router import router as conciliacao_router
@@ -55,6 +58,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": f"Erro interno do servidor: {str(exc)}"},
     )
 
+
+# Log de storage ao iniciar
+_storage_dir = Path(os.environ.get("STORAGE_DIR", "data")).resolve()
+logging.getLogger(__name__).info(f"STORAGE_DIR configurado: {_storage_dir} (existe: {_storage_dir.exists()})")
 
 app.include_router(empresa_router, prefix="/api")
 app.include_router(planodecontas_router, prefix="/api")

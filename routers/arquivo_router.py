@@ -15,7 +15,8 @@ from pathlib import Path
 router = APIRouter(prefix="/arquivos", tags=["Arquivos"])
 
 # Diretório para uploads - usa env var STORAGE_DIR, default "data"
-UPLOAD_DIR = Path(os.environ.get("STORAGE_DIR", "data"))
+# resolve() garante path absoluto (importante no Railway com volume montado)
+UPLOAD_DIR = Path(os.environ.get("STORAGE_DIR", "data")).resolve()
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

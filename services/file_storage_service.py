@@ -29,7 +29,10 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 # Diretório base - usa env var STORAGE_DIR, default "data"
-UPLOAD_BASE_DIR = Path(os.environ.get("STORAGE_DIR", "data"))
+# resolve() garante path absoluto (importante no Railway com volume montado)
+UPLOAD_BASE_DIR = Path(os.environ.get("STORAGE_DIR", "data")).resolve()
+UPLOAD_BASE_DIR.mkdir(parents=True, exist_ok=True)
+logger.info(f"FileStorageService: UPLOAD_BASE_DIR={UPLOAD_BASE_DIR}")
 
 
 class FileStorageService:
