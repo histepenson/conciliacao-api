@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
+    # Storage
+    STORAGE_DIR: str = "data"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
