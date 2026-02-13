@@ -10,13 +10,12 @@ from schemas.arquivo_conciliacao_schema import (  # ← Schemas Pydantic
     ArquivoConciliacaoResponse
 )
 import os
-from pathlib import Path
+from core.config import resolve_storage_dir
 
 router = APIRouter(prefix="/arquivos", tags=["Arquivos"])
 
-# Diretório para uploads - usa env var STORAGE_DIR, default "data"
-# resolve() garante path absoluto (importante no Railway com volume montado)
-UPLOAD_DIR = Path(os.environ.get("STORAGE_DIR", "data")).resolve()
+# Diretório para uploads com fallback automático para /data na Railway.
+UPLOAD_DIR = resolve_storage_dir()
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

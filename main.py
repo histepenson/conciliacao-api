@@ -2,11 +2,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-from core.config import settings
+from core.config import settings, resolve_storage_dir
 import os
 import logging
 import traceback
-from pathlib import Path
 from routers.empresa_router import router as empresa_router
 from routers.planodecontas_router import router as planodecontas_router
 from routers.conciliacao_router import router as conciliacao_router
@@ -61,8 +60,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Log de storage ao iniciar
-_storage_dir = Path(os.environ.get("STORAGE_DIR", "data")).resolve()
-logging.getLogger(__name__).info(f"STORAGE_DIR configurado: {_storage_dir} (existe: {_storage_dir.exists()})")
+_storage_dir = resolve_storage_dir()
+_is_railway = os.environ.get("RAILWAY_ENVIRONMENT") is not None
+logging.getLogger(__name__).info(
+    f"STORAGE_DIR resolvido: {_storage_dir} (existe: {_storage_dir.exists()}, railway: {_is_railway})"
+)
 
 app.include_router(empresa_router, prefix="/api")
 app.include_router(planodecontas_router, prefix="/api")

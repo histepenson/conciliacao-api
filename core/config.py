@@ -1,7 +1,10 @@
 # core/config.py
-from pydantic_settings import BaseSettings
-from functools import lru_cache
+import os
 import secrets
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -67,3 +70,21 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+def resolve_storage_dir() -> Path:
+    """
+    Resolve diretório de storage com fallback seguro para Railway.
+
+    Regras:
+    - Se STORAGE_DIR estiver definido e diferente de "data", usa valor informado.
+    - Se estiver em Railway e STORAGE_DIR estiver ausente ou "data", usa "/data".
+    - Caso contrário, usa "data" (desenvolvimento local).
+    """
+    configured = os.environ.get("STORAGE_DIR", settings.STORAGE_DIR).strip()
+    is_railway = os.environ.get("RAILWAY_ENVIRONMENT") is not None
+
+    if is_railway and (not configured or configured == "data"):
+        return Path("/data").resolve()
+
+    return Path(configured or "data").resolve()

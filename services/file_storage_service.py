@@ -25,12 +25,12 @@ from datetime import datetime
 from typing import Dict, Optional, Any, BinaryIO
 
 import pandas as pd
+from core.config import resolve_storage_dir
 
 logger = logging.getLogger(__name__)
 
-# Diretório base - usa env var STORAGE_DIR, default "data"
-# resolve() garante path absoluto (importante no Railway com volume montado)
-UPLOAD_BASE_DIR = Path(os.environ.get("STORAGE_DIR", "data")).resolve()
+# Diretório base com fallback automático para /data na Railway.
+UPLOAD_BASE_DIR = resolve_storage_dir()
 UPLOAD_BASE_DIR.mkdir(parents=True, exist_ok=True)
 logger.info(f"FileStorageService: UPLOAD_BASE_DIR={UPLOAD_BASE_DIR}")
 
