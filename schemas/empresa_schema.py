@@ -7,6 +7,7 @@ class EmpresaBase(BaseModel):
     nome: str
     cnpj: str
     status: bool = True
+    permite_efetivar_divergente: bool = False
 
 class EmpresaCreate(EmpresaBase):
     pass
@@ -16,6 +17,7 @@ class EmpresaUpdate(BaseModel):
     nome: Optional[str] = None
     cnpj: Optional[str] = None
     status: Optional[bool] = None
+    permite_efetivar_divergente: Optional[bool] = None
 
 
 class EmpresaResponse(EmpresaBase):

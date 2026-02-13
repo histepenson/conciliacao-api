@@ -39,7 +39,9 @@
       "Bash(if not exist \"C:\\\\conciliacao-app\\\\src\\\\utils\" mkdir \"C:\\\\conciliacao-app\\\\src\\\\utils\")",
       "Bash(if not exist \"C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog\" mkdir \"C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog\")",
       "Bash(cmd /c \"if not exist C:\\\\conciliacao-app\\\\src\\\\utils mkdir C:\\\\conciliacao-app\\\\src\\\\utils\")",
-      "Bash(cmd /c \"if not exist C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog mkdir C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog\")"
+      "Bash(cmd /c \"if not exist C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog mkdir C:\\\\conciliacao-app\\\\src\\\\components\\\\TipoFilterDialog\")",
+      "WebFetch(domain:planning.com.br)",
+      "WebFetch(domain:alianzo.com.br)"
     ]
   }
 }

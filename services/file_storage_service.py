@@ -281,6 +281,52 @@ class FileStorageService:
         logger.info(f"Arquivos bancários salvos para empresa {empresa_id}, período {ano}-{mes:02d}, conta {conta_contabil}")
         return caminhos
 
+    def save_stock_files(
+        self,
+        empresa_id: int,
+        ano: int,
+        mes: int,
+        conta_contabil: str,
+        resultado: Dict[str, Any],
+        arquivo_kardex: bytes = None,
+        arquivo_razao: bytes = None,
+        nome_kardex: str = "kardex.xlsx",
+        nome_razao: str = "razao.xlsx"
+    ) -> Dict[str, Dict[str, str]]:
+        """
+        Salva arquivos de conciliação de estoque (originais + resultado JSON).
+
+        Returns:
+            Dicionário com estrutura:
+            {
+                "kardex": {"original": "path"},
+                "razao": {"original": "path"},
+                "relatorio": {"json": "path"}
+            }
+        """
+        caminhos = {"relatorio": {}}
+
+        if arquivo_kardex:
+            caminhos["kardex"] = {}
+            caminhos["kardex"]["original"] = self.save_original_file(
+                arquivo_kardex, empresa_id, ano, mes, conta_contabil,
+                "kardex", nome_kardex, "estoque"
+            )
+
+        if arquivo_razao:
+            caminhos["razao"] = {}
+            caminhos["razao"]["original"] = self.save_original_file(
+                arquivo_razao, empresa_id, ano, mes, conta_contabil,
+                "razao", nome_razao, "estoque"
+            )
+
+        caminhos["relatorio"]["json"] = self.save_json_result(
+            resultado, empresa_id, ano, mes, conta_contabil, "estoque"
+        )
+
+        logger.info(f"Arquivos de estoque salvos para empresa {empresa_id}, período {ano}-{mes:02d}, conta {conta_contabil}")
+        return caminhos
+
     def file_exists(self, file_path: str) -> bool:
         """Verifica se um arquivo existe."""
         return Path(file_path).exists()

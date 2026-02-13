@@ -20,6 +20,7 @@ class Conciliacao(Base):
 
     # Colunas de Efetivação
     status = Column(String(20), nullable=False, default="PROCESSADA", index=True)  # PROCESSADA, EFETIVADA
+    tipo_conciliacao = Column(String(20), nullable=True, default="receber", index=True)  # receber, pagar, banco, estoque
     usuario_responsavel_id = Column(Integer, ForeignKey("concilia.usuario.id"), nullable=True, index=True)
     data_efetivacao = Column(DateTime(timezone=True), nullable=True)
     resultado_json = Column(JSONB, nullable=True)  # Resultado completo da conciliação

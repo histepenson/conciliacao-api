@@ -1,5 +1,5 @@
 """
-Service para efetivacao de conciliacao bancaria.
+Service para efetivacao de conciliacao de estoque.
 """
 import logging
 from datetime import datetime, timezone
@@ -17,8 +17,8 @@ from services.file_storage_service import FileStorageService
 logger = logging.getLogger(__name__)
 
 
-class ConciliacaoBancariaEfetivacaoService:
-    """Service para efetivar conciliacao bancaria."""
+class ConciliacaoEstoqueEfetivacaoService:
+    """Service para efetivar conciliacao de estoque."""
 
     def __init__(self):
         self.file_storage = FileStorageService()
@@ -58,7 +58,7 @@ class ConciliacaoBancariaEfetivacaoService:
         if (situacao != "CONCILIADO" or int(qtd_divergentes) > 0) and not permite_divergente:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nao e possivel efetivar: conciliacao divergente"
+                detail="Nao e possivel efetivar: conciliacao de estoque divergente"
             )
 
     def efetivar(
@@ -69,9 +69,9 @@ class ConciliacaoBancariaEfetivacaoService:
         data_base: str,
         resultado: Dict[str, Any],
         current_user: CurrentUser,
-        arquivo_extrato: Optional[bytes] = None,
+        arquivo_kardex: Optional[bytes] = None,
         arquivo_razao: Optional[bytes] = None,
-        nome_extrato: str = "extrato.xlsx",
+        nome_kardex: str = "kardex.xlsx",
         nome_razao: str = "razao.xlsx"
     ) -> Conciliacao:
         periodo = self._normalize_periodo(data_base)
@@ -80,7 +80,7 @@ class ConciliacaoBancariaEfetivacaoService:
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Conciliacao ja efetivada em {existing.data_efetivacao}"
+                detail=f"Conciliacao de estoque ja efetivada em {existing.data_efetivacao}"
             )
 
         # Consultar parâmetro da empresa
@@ -94,9 +94,7 @@ class ConciliacaoBancariaEfetivacaoService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conta contabil nao encontrada")
 
         resumo = resultado.get("resumo", {})
-        dif_total_entradas = resumo.get("dif_total_entradas", 0) or 0
-        dif_total_saidas = resumo.get("dif_total_saidas", 0) or 0
-        saldo = float(dif_total_entradas) + float(dif_total_saidas)
+        saldo = float(resumo.get("dif_total", 0) or 0)
 
         # Ao efetivar, situação é sempre CONCILIADO
         resultado_para_salvar = {**resultado}
@@ -106,15 +104,15 @@ class ConciliacaoBancariaEfetivacaoService:
 
         # Salvar arquivos no volume
         ano, mes = self._parse_periodo(data_base)
-        caminhos_arquivos = self.file_storage.save_bank_files(
+        caminhos_arquivos = self.file_storage.save_stock_files(
             empresa_id=empresa_id,
             ano=ano,
             mes=mes,
             conta_contabil=conta.conta_contabil,
             resultado=resultado_para_salvar,
-            arquivo_extrato=arquivo_extrato,
+            arquivo_kardex=arquivo_kardex,
             arquivo_razao=arquivo_razao,
-            nome_extrato=nome_extrato,
+            nome_kardex=nome_kardex,
             nome_razao=nome_razao
         )
 
@@ -124,7 +122,7 @@ class ConciliacaoBancariaEfetivacaoService:
             periodo=periodo,
             saldo=saldo,
             status=StatusConciliacao.EFETIVADA.value,
-            tipo_conciliacao="banco",
+            tipo_conciliacao="estoque",
             usuario_responsavel_id=current_user.user_id,
             data_efetivacao=now,
             resultado_json=resultado_para_salvar,
@@ -135,5 +133,5 @@ class ConciliacaoBancariaEfetivacaoService:
         db.commit()
         db.refresh(conciliacao)
 
-        logger.info(f"Conciliacao bancaria {conciliacao.id} efetivada por usuario {current_user.user_id}")
+        logger.info(f"Conciliacao de estoque {conciliacao.id} efetivada por usuario {current_user.user_id}")
         return conciliacao

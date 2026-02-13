@@ -30,6 +30,17 @@ class EfetivacaoService:
     def __init__(self):
         self.file_storage = FileStorageService()
 
+    @staticmethod
+    def _detectar_tipo_por_resultado(resultado_json: dict | None) -> str:
+        """Fallback: detecta tipo de conciliação pela estrutura do resultado JSON (registros antigos sem coluna)."""
+        if not resultado_json:
+            return "receber"
+        if "movimentos_por_dia" in resultado_json:
+            return "banco"
+        if "movimentos_por_grupo" in resultado_json:
+            return "estoque"
+        return "receber"
+
     def _parse_periodo(self, periodo: str) -> Tuple[int, int]:
         """
         Converte string de período para (ano, mes).
@@ -50,7 +61,9 @@ class EfetivacaoService:
         ano, mes = self._parse_periodo(periodo)
         return f"{ano}-{mes:02d}"
 
-    def _validate_no_divergencias(self, resultado: Dict[str, Any]) -> ValidacaoEfetivacaoResponse:
+    def _validate_no_divergencias(
+        self, resultado: Dict[str, Any], permite_divergente: bool = False
+    ) -> ValidacaoEfetivacaoResponse:
         """Valida se não há divergências antes de efetivar."""
         resumo = resultado.get("resumo", {})
         situacao = resumo.get("situacao", "DIVERGENTE")
@@ -68,6 +81,17 @@ class EfetivacaoService:
                 pode_efetivar=True,
                 motivo=None,
                 divergencias=0,
+                alertas=alertas
+            )
+
+        # Há divergências - verificar se a empresa permite efetivar mesmo assim
+        if permite_divergente:
+            alertas = list(alertas)
+            alertas.append(f"Efetivada com divergências (permitido pela configuração da empresa)")
+            return ValidacaoEfetivacaoResponse(
+                pode_efetivar=True,
+                motivo=None,
+                divergencias=total_divergencias,
                 alertas=alertas
             )
 
@@ -121,8 +145,12 @@ class EfetivacaoService:
                 alertas=["Período já possui conciliação efetivada"]
             )
 
-        # Valida se não há divergências
-        return self._validate_no_divergencias(request.resultado)
+        # Consultar parâmetro da empresa
+        empresa = db.query(Empresa).filter(Empresa.id == request.empresa_id).first()
+        permite_divergente = empresa.permite_efetivar_divergente if empresa else False
+
+        # Valida se não há divergências (ou se a empresa permite)
+        return self._validate_no_divergencias(request.resultado, permite_divergente)
 
     def efetivar(
         self,
@@ -201,6 +229,10 @@ class EfetivacaoService:
         resumo = request.resultado.get("resumo", {})
         saldo = resumo.get("diferenca", 0) or 0
 
+        # Ao efetivar, situação é sempre CONCILIADO
+        resultado_para_salvar = {**request.resultado}
+        resultado_para_salvar["resumo"] = {**resumo, "situacao": "CONCILIADO"}
+
         now = datetime.now(timezone.utc)
 
         # Criar registro de conciliação
@@ -210,9 +242,10 @@ class EfetivacaoService:
             periodo=periodo_normalizado,
             saldo=saldo,
             status=StatusConciliacao.EFETIVADA.value,
+            tipo_conciliacao=request.tipo_conciliacao,
             usuario_responsavel_id=current_user.user_id,
             data_efetivacao=now,
-            resultado_json=request.resultado,
+            resultado_json=resultado_para_salvar,
             caminhos_arquivos=caminhos
         )
 
@@ -284,9 +317,8 @@ class EfetivacaoService:
         for c in conciliacoes:
             resumo_json = c.resultado_json.get("resumo", {}) if c.resultado_json else {}
 
-            # Detectar tipo de conciliação
-            resultado_json_full = c.resultado_json or {}
-            tipo_conc = "banco" if "movimentos_por_dia" in resultado_json_full else "contabil"
+            # Tipo de conciliação: coluna explícita ou fallback por heurística (registros antigos)
+            tipo_conc = c.tipo_conciliacao or self._detectar_tipo_por_resultado(c.resultado_json)
 
             item = ConciliacaoEfetivadaResumo(
                 id=c.id,
@@ -333,9 +365,8 @@ class EfetivacaoService:
 
         resumo_json = conciliacao.resultado_json.get("resumo", {}) if conciliacao.resultado_json else {}
 
-        # Detectar tipo de conciliação
-        resultado_json_full = conciliacao.resultado_json or {}
-        tipo_conc = "banco" if "movimentos_por_dia" in resultado_json_full else "contabil"
+        # Tipo de conciliação: coluna explícita ou fallback por heurística (registros antigos)
+        tipo_conc = conciliacao.tipo_conciliacao or self._detectar_tipo_por_resultado(conciliacao.resultado_json)
 
         return ConciliacaoEfetivadaDetalhe(
             id=conciliacao.id,
@@ -440,9 +471,8 @@ class EfetivacaoService:
                 ).first()
                 conta_contabil = conta.conta_contabil if conta else "desconhecida"
                 ano, mes = self._parse_periodo(conciliacao.periodo)
-                # Detectar tipo para salvar no path correto
-                resultado_full = conciliacao.resultado_json or {}
-                tipo_conc = "banco" if "movimentos_por_dia" in resultado_full else "receber"
+                # Tipo de conciliação: coluna explícita ou fallback
+                tipo_conc = conciliacao.tipo_conciliacao or self._detectar_tipo_por_resultado(conciliacao.resultado_json)
                 caminho_regenerado = self.file_storage.save_json_result(
                     conciliacao.resultado_json, empresa_id, ano, mes, conta_contabil, tipo_conc
                 )
@@ -506,9 +536,8 @@ class EfetivacaoService:
         ano, mes = self._parse_periodo(conciliacao.periodo)
         conta_contabil = conciliacao.conta_contabil.conta_contabil if conciliacao.conta_contabil else ""
 
-        # Detectar tipo para saber qual diretório remover
-        resultado_full = conciliacao.resultado_json or {}
-        tipo_conc = "banco" if "movimentos_por_dia" in resultado_full else "receber"
+        # Tipo de conciliação: coluna explícita ou fallback
+        tipo_conc = conciliacao.tipo_conciliacao or self._detectar_tipo_por_resultado(conciliacao.resultado_json)
 
         self.file_storage.delete_reconciliation_files(
             empresa_id=empresa_id,

@@ -18,6 +18,7 @@ from routers.admin_perfis_router import router as admin_perfis_router
 from routers.efetivacao_router import router as efetivacao_router
 from routers.dashboard_router import router as dashboard_router
 from routers.conciliacao_bancaria_router import router as conciliacao_bancaria_router
+from routers.conciliacao_estoque_router import router as conciliacao_estoque_router
 
 app = FastAPI(
     title="Conciliação API",
@@ -74,3 +75,4 @@ app.include_router(admin_perfis_router, prefix="/api")
 app.include_router(efetivacao_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(conciliacao_bancaria_router, prefix="/api")
+app.include_router(conciliacao_estoque_router, prefix="/api")
