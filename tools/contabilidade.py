@@ -59,7 +59,14 @@ def normalizar_planilha_contabilidade(entrada):
     # ==========================
     # 4️⃣ CÓDIGO (JÁ VEM FORMATADO DA CONTABILIDADE)
     # ==========================
-    df_norm["codigo"] = df_norm["codigo_raw"].astype(str).str.strip()
+    # Remove espaços internos: "F01133510 0002" → "F011335100002"
+    # para garantir matching com os códigos gerados pelo financeiro.
+    df_norm["codigo"] = (
+        df_norm["codigo_raw"]
+        .astype(str)
+        .str.strip()
+        .str.replace(r"\s+", "", regex=True)
+    )
     df_norm = df_norm[df_norm["codigo"].str.len() > 0].copy()
 
     # ==========================
