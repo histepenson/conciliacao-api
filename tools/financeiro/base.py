@@ -75,6 +75,63 @@ class ResultadoValidacaoLayout:
 
 
 # =============================================================================
+# CORREÇÃO DE LINHA DE TÍTULO
+# =============================================================================
+
+def corrigir_header_titulo(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Corrige DataFrames onde a primeira linha é um título de relatório.
+
+    Isso ocorre quando o frontend lê um Excel com título na linha 1
+    (ex: "Títulos a Pagar", "Razão Geral") e envia as colunas como
+    'empty', 'empty_1', etc. A linha real de cabeçalhos fica como
+    primeiro registro de dados.
+
+    Aplica a correção apenas quando mais de 50% das colunas têm nomes
+    genéricos E a primeira linha de dados contém nomes reais.
+
+    Args:
+        df: DataFrame com possível linha de título
+
+    Returns:
+        DataFrame com os cabeçalhos reais (ou o original se não detectado)
+    """
+    if df is None or df.empty or len(df) < 2:
+        return df
+
+    colunas = list(df.columns)
+    # Padrões genéricos incluem:
+    # - empty, empty_1 ... (pandas renomeia duplicatas)
+    # - __EMPTY, __EMPTY_1 ... (XLSX.js usa este padrão para células de header vazias)
+    # - nan, nan0, nan1 ...
+    # - unnamed..., _0, _1 ...
+    padrao_generica = re.compile(
+        r'^(_+empty(_\d+)?|empty(_\d+)?|nan(\d+)?|unnamed.*|_\d+)$', re.IGNORECASE
+    )
+    qtd_generica = sum(1 for c in colunas if padrao_generica.match(str(c)))
+
+    if qtd_generica < max(1, len(colunas) * 0.5):
+        return df
+
+    primeira_linha = df.iloc[0].tolist()
+    novos_nomes = []
+    for i, val in enumerate(primeira_linha):
+        val_str = str(val).strip() if pd.notna(val) else ''
+        if val_str and val_str.lower() not in ('nan', 'none', ''):
+            novos_nomes.append(val_str)
+        else:
+            novos_nomes.append(f'_sem_nome_{i}')
+
+    qtd_com_nome = sum(1 for n in novos_nomes if not n.startswith('_sem_nome_'))
+    if qtd_com_nome < max(1, len(novos_nomes) * 0.3):
+        return df
+
+    df = df.iloc[1:].copy().reset_index(drop=True)
+    df.columns = novos_nomes
+    return df
+
+
+# =============================================================================
 # FUNÇÕES DE NORMALIZAÇÃO DE COLUNAS
 # =============================================================================
 
@@ -457,6 +514,7 @@ class ProcessadorFinanceiroBase(ABC):
         else:
             df = pd.read_excel(entrada)
 
+        df = corrigir_header_titulo(df)
         self.logger.info(f"Total de registros lidos: {len(df)}")
         return df
 

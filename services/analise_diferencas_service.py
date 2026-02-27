@@ -25,6 +25,22 @@ class AnaliseDiferencasService:
     def _status(self, diferenca: float) -> str:
         return "verde" if abs(diferenca) <= 0.01 else "vermelho"
 
+    def _parse_valor(self, valor: object) -> float:
+        """Converte valor numérico ou string em formato BR para float."""
+        if valor is None:
+            return 0.0
+        if isinstance(valor, (int, float)):
+            return 0.0 if pd.isna(valor) else float(valor)
+        s = str(valor).strip()
+        if not s or s.lower() in ('nan', 'none', ''):
+            return 0.0
+        if ',' in s:
+            s = s.replace('.', '').replace(',', '.')
+        try:
+            return float(s)
+        except (ValueError, TypeError):
+            return 0.0
+
     def processar_analise_detalhada(
         self,
         df_financeiro: pd.DataFrame,
@@ -85,6 +101,13 @@ class AnaliseDiferencasService:
             col_itemconta_geral = self._encontrar_coluna(
                 df_razao_geral,
                 [
+                    # COD CL VAL é a coluna específica de código de cliente/fornecedor
+                    # no novo layout CTBR480 (formato: '11419013 -0002-NOME')
+                    "COD CL VAL",
+                    "cod_cl_val",
+                    "COD_CL_VAL",
+                    "CODCLVAL",
+                    # ITEM CONTA era a coluna no layout antigo (formato: 'C01704361-81-NOME')
                     "ITEMCONTA",
                     "itemconta",
                     "item_conta",
@@ -102,7 +125,7 @@ class AnaliseDiferencasService:
             if col_itemconta_geral:
                 df_razao_geral_norm = df_razao_geral.copy()
                 df_razao_geral_norm["itemconta_normalizado"] = df_razao_geral_norm[col_itemconta_geral].apply(
-                    self._normalizar_codigo_numerico
+                    self._normalizar_item_conta_razao
                 )
                 lancamentos_razao_geral = (
                     df_razao_geral_norm.groupby("itemconta_normalizado").size().to_dict()
@@ -268,20 +291,14 @@ class AnaliseDiferencasService:
                             try:
                                 val = r.get(col_debito_geral, 0)
                                 if pd.notna(val):
-                                    valor_debito = float(
-                                        str(val).replace(".", "").replace(",", ".")
-                                        or 0
-                                    )
+                                    valor_debito = self._parse_valor(val)
                             except (ValueError, TypeError):
                                 valor_debito = 0.0
                         if col_credito_geral:
                             try:
                                 val = r.get(col_credito_geral, 0)
                                 if pd.notna(val):
-                                    valor_credito = float(
-                                        str(val).replace(".", "").replace(",", ".")
-                                        or 0
-                                    )
+                                    valor_credito = self._parse_valor(val)
                             except (ValueError, TypeError):
                                 valor_credito = 0.0
 
@@ -333,10 +350,12 @@ class AnaliseDiferencasService:
                     lancamentos_razao_geral.get(codigo_normalizado, 0)
                 )
 
-                # Em SO_CONTABILIDADE, listar apenas o que explica a diferenca
-                lancamentos_razao_detalhes = self._selecionar_por_diferenca(
+                # Em SO_CONTABILIDADE: tenta selecionar subconjunto que explica a diferença.
+                # Se não encontrar match exato, mostra TODOS os lançamentos encontrados.
+                _filtrados = self._selecionar_por_diferenca(
                     lancamentos_razao_detalhes, diferenca, "D"
                 )
+                lancamentos_razao_detalhes = _filtrados if _filtrados else lancamentos_razao_detalhes
 
             if (
                 valor_cont > valor_fin
@@ -354,18 +373,14 @@ class AnaliseDiferencasService:
                         try:
                             val = r.get(col_debito_geral, 0)
                             if pd.notna(val):
-                                valor_debito = float(
-                                    str(val).replace(".", "").replace(",", ".") or 0
-                                )
+                                valor_debito = self._parse_valor(val)
                         except (ValueError, TypeError):
                             valor_debito = 0.0
                     if col_credito_geral:
                         try:
                             val = r.get(col_credito_geral, 0)
                             if pd.notna(val):
-                                valor_credito = float(
-                                    str(val).replace(".", "").replace(",", ".") or 0
-                                )
+                                valor_credito = self._parse_valor(val)
                         except (ValueError, TypeError):
                             valor_credito = 0.0
 
@@ -496,18 +511,14 @@ class AnaliseDiferencasService:
                         try:
                             val = r.get(col_debito_geral, 0)
                             if pd.notna(val):
-                                valor_debito = float(
-                                    str(val).replace(".", "").replace(",", ".") or 0
-                                )
+                                valor_debito = self._parse_valor(val)
                         except (ValueError, TypeError):
                             valor_debito = 0.0
                     if col_credito_geral:
                         try:
                             val = r.get(col_credito_geral, 0)
                             if pd.notna(val):
-                                valor_credito = float(
-                                    str(val).replace(".", "").replace(",", ".") or 0
-                                )
+                                valor_credito = self._parse_valor(val)
                         except (ValueError, TypeError):
                             valor_credito = 0.0
 
@@ -640,7 +651,14 @@ class AnaliseDiferencasService:
     # ==================================================
 
     def _normalizar_codigo_razao(self, valor: object) -> str:
-        """Normaliza código do razão geral para formato C{base}{loja}."""
+        """
+        Normaliza código do razão geral (COD CL VAL) para formato {base}{loja}.
+
+        Suporta:
+        - '11419013 -0002-NOME' → '110419130002'  (8 dígitos espaço-traço 4 dígitos)
+        - 'C01704361-81-NOME'   → '0170436181'    (prefixo C/F removido)
+        - '33041260 -1358-NOME' → '330412601358'  (4 dígitos de loja)
+        """
         if pd.isna(valor):
             return ""
         s = str(valor).strip()
@@ -648,9 +666,12 @@ class AnaliseDiferencasService:
             return ""
 
         # Usa separador '-' para dividir base e loja (tamanho variável)
-        # Sem separador: todos os caracteres formam o código completo
         partes = s.split("-")
         base = re.sub(r"[^a-zA-Z0-9]", "", partes[0])
+
+        # Remove prefixo C/F para matching agnóstico (receber/pagar)
+        if base and base[0].upper() in ("C", "F"):
+            base = base[1:]
 
         if not base:
             return ""
@@ -659,18 +680,52 @@ class AnaliseDiferencasService:
         if len(partes) >= 2:
             loja = re.sub(r"\D+", "", partes[1])
 
-        return f"C{base}{loja}"
+        return f"{base}{loja}"
 
     def _normalizar_codigo_numerico(self, valor: object) -> str:
-        """Normaliza código preservando prefixo C/F e letras, removendo apenas caracteres especiais."""
+        """
+        Normaliza código removendo caracteres especiais e prefixo C/F.
+
+        Garante matching agnóstico entre códigos do financeiro (F...) e do razão sem prefixo.
+        Ex: 'F110419130002' → '110419130002'
+            'C0170436181'   → '0170436181'
+            '110419130002'  → '110419130002'
+        """
         if pd.isna(valor):
             return ""
         s = str(valor).strip()
         if not s:
             return ""
-        # Mantém letras + dígitos (incluindo prefixo C/F que faz parte do código)
         clean = re.sub(r"[^a-zA-Z0-9]", "", s)
+        # Remove prefixo C/F para matching agnóstico
+        if clean and clean[0].upper() in ("C", "F"):
+            clean = clean[1:]
         return clean
+
+    def _normalizar_item_conta_razao(self, valor: object) -> str:
+        """
+        Normaliza ITEM CONTA / COD CL VAL do razão geral (CTBR480).
+
+        Suporta:
+        - 'C01704361-81-NOME CLIENTE'  → '0170436181'   (prefixo C removido)
+        - 'F11419013-0002-NOME'        → '110419130002' (prefixo F removido)
+        - '11419013 -0002-NOME'        → '110419130002' (sem prefixo, novo padrão)
+        - '33041260 -1358-VIA VAREJO'  → '330412601358' (4 dígitos de loja)
+        """
+        if pd.isna(valor):
+            return ""
+        s = str(valor).strip()
+        if not s:
+            return ""
+        partes = s.split("-")
+        base = re.sub(r"[^a-zA-Z0-9]", "", partes[0])
+        # Remove prefixo C/F para matching agnóstico
+        if base and base[0].upper() in ("C", "F"):
+            base = base[1:]
+        loja = ""
+        if len(partes) >= 2:
+            loja = re.sub(r"\D+", "", partes[1])
+        return f"{base}{loja}"
 
     def _gerar_variacoes_codigo(self, codigo: str) -> List[str]:
         """
@@ -693,7 +748,7 @@ class AnaliseDiferencasService:
         return list(set(variacoes))
 
     def _formatar_data(self, valor: object) -> str:
-        """Formata datas em dd/mm/aaaa, tratando serial do Excel."""
+        """Formata datas em dd/mm/aaaa, tratando serial do Excel e strings MM/DD/AAAA."""
         if pd.isna(valor):
             return ""
 
@@ -713,6 +768,8 @@ class AnaliseDiferencasService:
 
         if isinstance(valor, str):
             valor_str = valor.strip()
+
+            # Serial numérico como string (ex: "45306")
             if valor_str and re.fullmatch(r"\d+([.,]\d+)?", valor_str):
                 try:
                     numero = float(valor_str.replace(",", "."))
@@ -722,8 +779,31 @@ class AnaliseDiferencasService:
                 except Exception:
                     pass
 
+            # Tenta formatos explícitos em ordem de prioridade.
+            # MM/DD/AAAA é tentado antes de DD/MM/AAAA para lidar com datas do razão
+            # que chegam no padrão americano (ex: "01/15/2024").
+            # Para datas ambíguas (ex: "05/03/2024"), prefere MM/DD por ser o padrão
+            # do CTBR480. Se preferir DD/MM em ambíguos, trocar a ordem.
+            _FORMATOS = [
+                "%Y-%m-%dT%H:%M:%S.%fZ",  # ISO com microssegundos e Z
+                "%Y-%m-%dT%H:%M:%SZ",      # ISO com Z
+                "%Y-%m-%dT%H:%M:%S",       # ISO sem Z
+                "%Y-%m-%d",                # ISO curto
+                "%m/%d/%Y",                # MM/DD/AAAA (padrão americano/razão)
+                "%d/%m/%Y",                # DD/MM/AAAA (padrão brasileiro)
+                "%d-%m-%Y",                # DD-MM-AAAA
+                "%m-%d-%Y",                # MM-DD-AAAA
+            ]
+            for fmt in _FORMATOS:
+                try:
+                    dt = datetime.strptime(valor_str, fmt)
+                    return dt.strftime("%d/%m/%Y")
+                except ValueError:
+                    continue
+
+        # Último recurso: pandas genérico
         try:
-            dt = pd.to_datetime(str(valor), dayfirst=True, errors="coerce")
+            dt = pd.to_datetime(str(valor), errors="coerce")
             if pd.notna(dt):
                 return dt.strftime("%d/%m/%Y")
         except Exception:
@@ -1029,7 +1109,7 @@ class AnaliseDiferencasService:
 
         if col_conta:
             df_razao["itemconta_normalizado"] = df_razao[col_conta].apply(
-                self._normalizar_codigo_numerico
+                self._normalizar_item_conta_razao
             )
         else:
             df_razao["itemconta_normalizado"] = ""
@@ -1056,10 +1136,24 @@ class AnaliseDiferencasService:
 
             origens = []
 
+            # Normalizar o código do registro para matching agnóstico (remove prefixo C/F)
+            codigo_normalizado = self._normalizar_codigo_numerico(codigo)
+
             # Buscar TODOS os lançamentos no razão geral para ITEMCONTA = CODIGO
+            # Prioridade 1: COD CL VAL (novo formato CTBR480, "codigo_normalizado")
             matches_codigo = pd.DataFrame()
-            if col_conta:
-                codigo_normalizado = self._normalizar_codigo_numerico(codigo)
+            if col_codigo and "codigo_normalizado" in df_razao.columns:
+                matches_codigo = df_razao[
+                    df_razao["codigo_normalizado"] == codigo_normalizado
+                ]
+                logger.info(
+                    "[ANÁLISE PROFUNDA] Registros encontrados por COD CL VAL=%s: %d",
+                    codigo_normalizado,
+                    len(matches_codigo),
+                )
+
+            # Prioridade 2: ITEM CONTA (formato antigo CTBR480, "itemconta_normalizado")
+            if matches_codigo.empty and col_conta:
                 matches_codigo = df_razao[
                     df_razao["itemconta_normalizado"] == codigo_normalizado
                 ]
@@ -1069,27 +1163,21 @@ class AnaliseDiferencasService:
                     len(matches_codigo),
                 )
 
-            # Se não há coluna ITEMCONTA, manter fallback para o campo de código
+            # Prioridade 3: Busca flexível por variações no campo de código original
             if matches_codigo.empty and col_codigo:
-                # Gerar variações do código para busca flexível
                 variacoes = self._gerar_variacoes_codigo(codigo)
                 logger.info(
                     "[ANÁLISE PROFUNDA] Variações do código %s: %s", codigo, variacoes
                 )
 
-                # Primeiro tenta match exato pelo código normalizado
-                matches_codigo = df_razao[df_razao["codigo_normalizado"] == codigo]
-
-                # Se não encontrou, tenta pelas variações no código original
-                if matches_codigo.empty:
-                    for var in variacoes:
-                        matches_codigo = df_razao[df_razao["codigo_original"] == var]
-                        if not matches_codigo.empty:
-                            logger.info(
-                                "[ANÁLISE PROFUNDA] Match encontrado com variação '%s'",
-                                var,
-                            )
-                            break
+                for var in variacoes:
+                    matches_codigo = df_razao[df_razao["codigo_original"] == var]
+                    if not matches_codigo.empty:
+                        logger.info(
+                            "[ANÁLISE PROFUNDA] Match encontrado com variação '%s'",
+                            var,
+                        )
+                        break
 
                 logger.info(
                     "[ANÁLISE PROFUNDA] Registros encontrados para %s: %d",
@@ -1116,18 +1204,14 @@ class AnaliseDiferencasService:
                         try:
                             val = row.get(col_debito, 0)
                             if pd.notna(val):
-                                valor_debito = float(
-                                    str(val).replace(".", "").replace(",", ".") or 0
-                                )
+                                valor_debito = self._parse_valor(val)
                         except (ValueError, TypeError):
                             valor_debito = 0.0
                     if col_credito:
                         try:
                             val = row.get(col_credito, 0)
                             if pd.notna(val):
-                                valor_credito = float(
-                                    str(val).replace(".", "").replace(",", ".") or 0
-                                )
+                                valor_credito = self._parse_valor(val)
                         except (ValueError, TypeError):
                             valor_credito = 0.0
 

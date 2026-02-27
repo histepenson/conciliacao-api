@@ -17,6 +17,7 @@ from tools.financeiro.factory import (
     TipoFinanceiro,
     validar_layout_planilha,
 )
+from tools.financeiro.base import corrigir_header_titulo
 from tools.mappers import map_origem_maior
 
 logger = logging.getLogger(__name__)
@@ -101,6 +102,10 @@ class ConciliacaoService:
         # ==========================
         df_financeiro_raw = pd.DataFrame(request.base_origem.registros)
         logger.info("📊 Registros origem recebidos: %s", len(df_financeiro_raw))
+
+        # Corrigir header caso o arquivo tenha linha de título (ex: "Títulos a Pagar")
+        df_financeiro_raw = corrigir_header_titulo(df_financeiro_raw)
+        logger.info("📊 Registros após corrigir header: %s colunas: %s", len(df_financeiro_raw), list(df_financeiro_raw.columns)[:5])
 
         # Detectar tipo financeiro (contas_receber ou contas_pagar)
         tipo_financeiro = request.parametros.get("tipo_financeiro", "contas_receber")
@@ -246,6 +251,7 @@ class ConciliacaoService:
         resumo_analise = self._gerar_resumo_analise_fallback(df_completo)
         try:
             df_razao_geral = pd.DataFrame(request.base_contabil_geral.registros)
+            df_razao_geral = corrigir_header_titulo(df_razao_geral)
             df_razao_filtrado = self._filtrar_razao_por_conta(df_razao_geral, conta_contabil)
 
             analise_service = AnaliseDiferencasService()
