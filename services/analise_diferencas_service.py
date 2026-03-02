@@ -199,15 +199,15 @@ class AnaliseDiferencasService:
         else:
             df_merge["lancamentos_razao"] = 0
 
-        df_merge["valor_financeiro"] = df_merge["valor_financeiro"].fillna(0.0)
-        df_merge["valor_contabilidade"] = df_merge["valor_contabilidade"].fillna(0.0)
+        df_merge["valor_financeiro"] = df_merge["valor_financeiro"].fillna(0.0).abs()
+        df_merge["valor_contabilidade"] = df_merge["valor_contabilidade"].fillna(0.0).abs()
         df_merge["lancamentos_razao"] = (
             df_merge["lancamentos_razao"].fillna(0).astype(int)
         )
 
         df_merge["nome"] = df_merge["nome_fin"].fillna(df_merge["nome_cont"])
         df_merge["diferenca"] = (
-            df_merge["valor_contabilidade"] - df_merge["valor_financeiro"]
+            df_merge["valor_financeiro"] - df_merge["valor_contabilidade"]
         )
 
         financeiro_match_map: Dict[tuple[str, str], List[float]] = {}
