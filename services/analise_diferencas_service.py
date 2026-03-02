@@ -569,6 +569,37 @@ class AnaliseDiferencasService:
                     matches_fin_det = df_financeiro_detalhado[
                         df_financeiro_detalhado["codigo"].astype(str).str.strip() == codigo
                     ]
+
+                    # Para DIVERGENTE_VALOR: construir pool de valores do razão para matching individual.
+                    # Cada registro financeiro será comparado ao razão por valor para identificar
+                    # quais títulos têm correspondência e quais são os "extras" causadores da diferença.
+                    razao_valores_pool: list = []
+                    if tipo == "DIVERGENTE_VALOR" and df_razao_geral_norm is not None and col_itemconta_geral:
+                        codigo_norm_match = self._normalizar_codigo_numerico(codigo)
+                        matches_razao_match = df_razao_geral_norm[
+                            df_razao_geral_norm["itemconta_normalizado"] == codigo_norm_match
+                        ]
+                        for _, rz in matches_razao_match.iterrows():
+                            v_d = 0.0
+                            v_c = 0.0
+                            if col_debito_geral:
+                                try:
+                                    val = rz.get(col_debito_geral, 0)
+                                    if pd.notna(val):
+                                        v_d = self._parse_valor(val)
+                                except (ValueError, TypeError):
+                                    pass
+                            if col_credito_geral:
+                                try:
+                                    val = rz.get(col_credito_geral, 0)
+                                    if pd.notna(val):
+                                        v_c = self._parse_valor(val)
+                                except (ValueError, TypeError):
+                                    pass
+                            v = abs(v_d) if abs(v_d) > 0 else abs(v_c)
+                            if v > 0:
+                                razao_valores_pool.append(round(v, 2))
+
                     for _, r in matches_fin_det.iterrows():
                         prf = r.get("numero_documento", r.get("prf_numero", ""))
                         parcela_val = r.get("parcela", "")
@@ -584,14 +615,37 @@ class AnaliseDiferencasService:
                         if tp_val not in [None, ""] and not pd.isna(tp_val):
                             tp_str2 = str(tp_val).strip()
 
-                        registros_match_financeiro.append({
+                        valor_fin_rec = round(float(r.get("valor", 0) or 0), 2)
+
+                        # Matching individual por valor (apenas para DIVERGENTE_VALOR)
+                        tem_correspondencia: Optional[bool] = None
+                        if tipo == "DIVERGENTE_VALOR" and razao_valores_pool is not None:
+                            for i, rv in enumerate(razao_valores_pool):
+                                if abs(rv - valor_fin_rec) <= 0.01:
+                                    razao_valores_pool.pop(i)
+                                    tem_correspondencia = True
+                                    break
+                            if tem_correspondencia is None:
+                                tem_correspondencia = False
+
+                        status_rec = (
+                            "conciliado" if tem_correspondencia is True
+                            else "divergente" if tem_correspondencia is False
+                            else status_registro
+                        )
+
+                        entry: Dict[str, Any] = {
                             "descricao": str(r.get("cliente", "")).strip(),
-                            "valor": round(float(r.get("valor", 0) or 0), 2),
+                            "valor": valor_fin_rec,
                             "data_emissao": self._formatar_data(r.get("data_emissao", "")),
                             "documento": "-".join(doc_parts),
                             "tipo_titulo": tp_str2,
-                            "status": status_registro,
-                        })
+                            "status": status_rec,
+                        }
+                        if tem_correspondencia is not None:
+                            entry["tem_correspondencia"] = tem_correspondencia
+
+                        registros_match_financeiro.append(entry)
 
             # Contabilidade
             matches_cont_det = df_cont[df_cont["codigo"].astype(str).str.strip() == codigo]
