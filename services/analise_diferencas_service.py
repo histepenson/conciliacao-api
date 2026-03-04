@@ -503,7 +503,7 @@ class AnaliseDiferencasService:
                 matches_item = df_razao_geral_norm[
                     df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado
                 ]
-                lancamentos_credito: List[Dict[str, Any]] = []
+                lancamentos_razao_tmp: List[Dict[str, Any]] = []
                 for _, r in matches_item.iterrows():
                     valor_debito = 0.0
                     valor_credito = 0.0
@@ -522,13 +522,20 @@ class AnaliseDiferencasService:
                         except (ValueError, TypeError):
                             valor_credito = 0.0
 
-                    if abs(valor_credito) <= 0:
+                    # Coleta débito OU crédito (contas a receber usam D; contas a pagar usam C)
+                    if abs(valor_debito) > 0:
+                        valor_lancamento = abs(valor_debito)
+                        tipo_lanc = "D"
+                    elif abs(valor_credito) > 0:
+                        valor_lancamento = abs(valor_credito)
+                        tipo_lanc = "C"
+                    else:
                         continue
 
                     data_lanc = self._formatar_data(
                         r.get(col_data_geral, "") if col_data_geral else ""
                     )
-                    if _tem_match_financeiro(codigo, data_lanc, abs(valor_credito)):
+                    if _tem_match_financeiro(codigo, data_lanc, valor_lancamento):
                         continue
 
                     item_conta = (
@@ -536,15 +543,14 @@ class AnaliseDiferencasService:
                         if col_itemconta_geral
                         else ""
                     )
-                    # Obter nome do cliente do mapa
                     nome_cliente = codigo_nome_map.get(codigo, "")
 
-                    lancamentos_credito.append(
+                    lancamentos_razao_tmp.append(
                         {
                             "conta_origem": item_conta,
                             "descricao_conta": nome_cliente if nome_cliente else "",
-                            "valor": round(abs(valor_credito), 2),
-                            "tipo_lancamento": "C",
+                            "valor": round(valor_lancamento, 2),
+                            "tipo_lancamento": tipo_lanc,
                             "data_lancamento": data_lanc,
                             "documento": str(r.get(col_documento_geral, ""))
                             if col_documento_geral
@@ -556,9 +562,11 @@ class AnaliseDiferencasService:
                         }
                     )
 
-                lancamentos_razao_sem_financeiro = self._selecionar_por_diferenca(
-                    lancamentos_credito, diferenca, "C"
-                )
+                # Tenta selecionar subconjunto por débito (contas a receber) ou crédito (contas a pagar)
+                _filtrado = self._selecionar_por_diferenca(lancamentos_razao_tmp, diferenca, "D")
+                if not _filtrado:
+                    _filtrado = self._selecionar_por_diferenca(lancamentos_razao_tmp, diferenca, "C")
+                lancamentos_razao_sem_financeiro = _filtrado if _filtrado else lancamentos_razao_tmp
 
             # Registros individuais de ambas as bases (para todos os tipos)
             status_registro = "conciliado" if tipo == "CONCILIADO" else "divergente"
