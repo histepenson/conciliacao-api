@@ -200,28 +200,36 @@ def _fazer_matching_registros(
     validacao_final_saidas = False
 
     # Coletar registros nao matched
+    def _sf(v, default=0.0) -> float:
+        """Converte para float, retornando default se NaN."""
+        return float(v) if pd.notna(v) else default
+
+    def _ss(v, default="") -> str:
+        """Converte para str, retornando default se NaN."""
+        return str(v) if pd.notna(v) else default
+
     def _formatar_extrato(row, tipo: str) -> Dict:
         valor = row.get("entrada", 0) if tipo == "entrada" else row.get("saida", 0)
         return {
-            "data": row.get("data", ""),
-            "documento": row.get("documento", ""),
-            "prefixo": row.get("prefixo", ""),
-            "numero": row.get("numero", ""),
-            "descricao": row.get("descricao", ""),
-            "valor": round(float(valor), 2),
+            "data": _ss(row.get("data")),
+            "documento": _ss(row.get("documento")),
+            "prefixo": _ss(row.get("prefixo")),
+            "numero": _ss(row.get("numero")),
+            "descricao": _ss(row.get("descricao")),
+            "valor": round(_sf(valor), 2),
             "tipo": tipo.upper(),
         }
 
     def _formatar_razao(row, tipo: str) -> Dict:
         valor = row.get("debito", 0) if tipo == "debito" else row.get("credito", 0)
         return {
-            "data": row.get("data", ""),
-            "lote_doc": row.get("lote_doc", ""),
-            "historico": row.get("historico", ""),
-            "documento_extraido": row.get("documento_extraido", ""),
-            "prefixo": row.get("prefixo", ""),
-            "numero": row.get("numero", ""),
-            "valor": round(float(valor), 2),
+            "data": _ss(row.get("data")),
+            "lote_doc": _ss(row.get("lote_doc")),
+            "historico": _ss(row.get("historico")),
+            "documento_extraido": _ss(row.get("documento_extraido")),
+            "prefixo": _ss(row.get("prefixo")),
+            "numero": _ss(row.get("numero")),
+            "valor": round(_sf(valor), 2),
             "tipo": tipo.upper(),
         }
 
