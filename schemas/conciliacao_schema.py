@@ -10,13 +10,65 @@ class BaseOrigem(BaseModel):
     tipo: Optional[str] = None  # "contas_receber" ou "contas_pagar"
 
 
+class Ctbr140Params(BaseModel):
+    """
+    Parâmetros para buscar o balancete CTBR140 diretamente do Protheus.
+    Quando presente em BaseContabilFiltrada, o backend busca os dados
+    automaticamente via ZCTBR140API — não é necessário enviar 'registros'.
+    """
+    data_fim: str                              # YYYYMMDD — obrigatório
+    data_ini: Optional[str] = None            # YYYYMMDD — default: 01/01 do ano de data_fim
+    conta_de: Optional[str] = None
+    conta_ate: Optional[str] = None
+    item_de: Optional[str] = None
+    item_ate: Optional[str] = None
+    vlr_zerado: Optional[str] = None          # 1=inclui zeros  2=exclui
+    moeda: Optional[str] = None               # default: 1
+    tp_lanc: Optional[str] = None             # tipo de lançamento (vazio = todos)
+    sld_ant_lp: Optional[str] = None          # 1=usa data_lp  2=usa data_ini−1
+    data_lp: Optional[str] = None             # YYYYMMDD — data base LP
+    consid_filiais: Optional[str] = None      # 1=range  2=filial corrente
+    filial_de: Optional[str] = None
+    filial_ate: Optional[str] = None
+    protheus_url: Optional[str] = None        # sobrescreve PROTHEUS_URL do .env
+
+
 class BaseContabilFiltrada(BaseModel):
-    registros: List[Dict[str, Any]]
+    # registros pode vir vazio quando ctbr140_params estiver preenchido
+    registros: List[Dict[str, Any]] = Field(default_factory=list)
     conta_contabil: str
+    ctbr140_params: Optional[Ctbr140Params] = None  # busca automática via Protheus
+
+
+class Ctbr480Params(BaseModel):
+    """
+    Parâmetros para buscar o razão contábil CTBR480 diretamente do Protheus.
+    Quando presente em BaseContabilGeral, o backend busca os dados
+    automaticamente via ZCTBR480API — não é necessário enviar 'registros'.
+    """
+    data_fim: str                              # YYYYMMDD — obrigatório
+    data_ini: Optional[str] = None            # YYYYMMDD — default: 01/01 do ano de data_fim
+    item_de: Optional[str] = None             # CTD_ITEM início   (par01)
+    item_ate: Optional[str] = None            # CTD_ITEM fim       (par02)
+    conta_de: Optional[str] = None            # CT1_CONTA início  (par12)
+    conta_ate: Optional[str] = None           # CT1_CONTA fim      (par13)
+    custo_de: Optional[str] = None            # CTT_CUSTO início  (par15)
+    custo_ate: Optional[str] = None           # CTT_CUSTO fim      (par16)
+    clvl_de: Optional[str] = None             # CTH_CLVL início   (par18)
+    clvl_ate: Optional[str] = None            # CTH_CLVL fim       (par19)
+    moeda: Optional[str] = None               # default: 1         (par05)
+    saldo: Optional[str] = None               # CQ5_TPSALD default: "1" (par06)
+    vlr_zerado: Optional[str] = None          # 1=inclui zeros 2=exclui (par27)
+    consid_filiais: Optional[str] = None      # 1=range 2=filial corrente (par29)
+    filial_de: Optional[str] = None
+    filial_ate: Optional[str] = None
+    protheus_url: Optional[str] = None        # sobrescreve PROTHEUS_URL do .env
 
 
 class BaseContabilGeral(BaseModel):
-    registros: List[Dict[str, Any]]
+    # registros pode vir vazio quando ctbr480_params estiver preenchido
+    registros: List[Dict[str, Any]] = Field(default_factory=list)
+    ctbr480_params: Optional[Ctbr480Params] = None  # busca automática via Protheus
 
 
 class RequestConciliacao(BaseModel):

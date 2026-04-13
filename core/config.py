@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
+    # Protheus
+    PROTHEUS_URL: str = ""
+    PROTHEUS_USER: str = ""
+    PROTHEUS_PASSWORD: str = ""
+    PROTHEUS_TENANT: str = "02,0201"
+
     # Storage
     STORAGE_DIR: str = "data"
 

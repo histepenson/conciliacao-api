@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+﻿from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -18,6 +18,13 @@ from routers.efetivacao_router import router as efetivacao_router
 from routers.dashboard_router import router as dashboard_router
 from routers.conciliacao_bancaria_router import router as conciliacao_bancaria_router
 from routers.conciliacao_estoque_router import router as conciliacao_estoque_router
+from routers.finr130_router import router as finr130_router
+from routers.ctbr140_router import router as ctbr140_router
+from routers.ctbr480_router import router as ctbr480_router
+from routers.finr470_router import router as finr470_router
+from routers.ctbr400_router import router as ctbr400_router
+from routers.matr900_router import router as matr900_router
+from routers.finr150_router import router as finr150_router
 
 app = FastAPI(
     title="Conciliação API",
@@ -78,3 +85,13 @@ app.include_router(efetivacao_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(conciliacao_bancaria_router, prefix="/api")
 app.include_router(conciliacao_estoque_router, prefix="/api")
+app.include_router(finr130_router, prefix="/api")
+app.include_router(ctbr140_router, prefix="/api")
+app.include_router(ctbr480_router, prefix="/api")
+app.include_router(finr470_router, prefix="/api")
+app.include_router(ctbr400_router, prefix="/api")
+app.include_router(matr900_router, prefix="/api")
+app.include_router(finr150_router, prefix="/api")
+
+
+

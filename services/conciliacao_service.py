@@ -6,6 +6,8 @@ import pandas as pd
 
 from schemas.conciliacao_schema import RequestConciliacao
 from services.analise_diferencas_service import AnaliseDiferencasService
+from services.ctbr480_service import Ctbr480Service
+from core.config import settings
 from tools.calc_diferencas import calcular_diferencas
 from tools.contabilidade import normalizar_planilha_contabilidade
 from tools.financeiro import (
@@ -35,7 +37,13 @@ class ConciliacaoService:
         if not request.base_contabil_filtrada or not request.base_contabil_filtrada.registros:
             return False, "Base contábil filtrada vazia"
 
-        if not request.base_contabil_geral or not request.base_contabil_geral.registros:
+        # base_contabil_geral pode vir vazia quando ctbr480_params está preenchido
+        # (busca automática no Protheus — resolvida em executar_async)
+        tem_registros = bool(request.base_contabil_geral and request.base_contabil_geral.registros)
+        tem_params = bool(
+            request.base_contabil_geral and request.base_contabil_geral.ctbr480_params
+        )
+        if not tem_registros and not tem_params:
             return False, "Base geral da contabilidade vazia"
 
         if not request.parametros or not request.parametros.get("data_base"):
@@ -87,6 +95,74 @@ class ConciliacaoService:
         resumo = self._formatar_resumo_analise(total=total, conciliados=conciliados)
         logger.info("[ANÁLISE DETALHADA] Resumo fallback: %s", resumo)
         return resumo
+
+    # ==================================================
+    # BUSCA AUTOMÁTICA DO CTBR480 (RAZÃO GERAL)
+    # ==================================================
+    async def _buscar_razao_geral_protheus(self, request: RequestConciliacao) -> list[dict]:
+        """
+        Se base_contabil_geral.ctbr480_params estiver preenchido, busca o razão
+        contábil diretamente do Protheus via ZCTBR480API e retorna os registros.
+        Caso contrário, retorna os registros já presentes em base_contabil_geral.registros.
+        """
+        geral = request.base_contabil_geral
+        if not geral:
+            return []
+
+        params = geral.ctbr480_params
+        if not params:
+            return geral.registros
+
+        logger.info("🔗 base_contabil_geral.ctbr480_params detectado — buscando CTBR480 do Protheus")
+        protheus_url = params.protheus_url or getattr(settings, "PROTHEUS_URL", "")
+        if not protheus_url:
+            raise ValueError(
+                "CTBR480 automático requer PROTHEUS_URL no .env ou 'protheus_url' em ctbr480_params"
+            )
+
+        service = Ctbr480Service(
+            protheus_base_url=protheus_url,
+            user=getattr(settings, "PROTHEUS_USER", ""),
+            password=getattr(settings, "PROTHEUS_PASSWORD", ""),
+            tenant_id=getattr(settings, "PROTHEUS_TENANT", "02,0201"),
+        )
+        query = {
+            "data_fim": params.data_fim,
+            "data_ini": params.data_ini,
+            "item_de": params.item_de,
+            "item_ate": params.item_ate,
+            "conta_de": params.conta_de,
+            "conta_ate": params.conta_ate,
+            "custo_de": params.custo_de,
+            "custo_ate": params.custo_ate,
+            "clvl_de": params.clvl_de,
+            "clvl_ate": params.clvl_ate,
+            "moeda": params.moeda,
+            "saldo": params.saldo,
+            "vlr_zerado": params.vlr_zerado,
+            "consid_filiais": params.consid_filiais,
+            "filial_de": params.filial_de,
+            "filial_ate": params.filial_ate,
+        }
+        registros = await service.buscar_como_registros(query)
+        logger.info("✅ CTBR480 Protheus: %s lançamentos recebidos", len(registros))
+        return registros
+
+    # ==================================================
+    # EXECUÇÃO ASSÍNCRONA (suporta ctbr480_params)
+    # ==================================================
+    async def executar_async(self, request: RequestConciliacao) -> dict:
+        """
+        Versão assíncrona do executar() com suporte a busca automática do CTBR480.
+        Quando base_contabil_geral.ctbr480_params estiver preenchido, busca o razão
+        diretamente do Protheus antes de executar a conciliação.
+        """
+        # Injeta registros do Protheus se ctbr480_params estiver presente
+        if request.base_contabil_geral and request.base_contabil_geral.ctbr480_params:
+            registros = await self._buscar_razao_geral_protheus(request)
+            request.base_contabil_geral.registros = registros
+
+        return self.executar(request)
 
     # ==================================================
     # EXECUÇÃO PRINCIPAL
@@ -236,8 +312,8 @@ class ConciliacaoService:
             "diferenca": round(diferenca, 2),
             "situacao": situacao,
             "percentual_divergencia": round(percentual_divergencia, 2),
-            "quantidade_registros_origem": int(resumo_calc.get("total_registros", 0) or 0),
-            "quantidade_registros_destino": int(resumo_calc.get("total_registros", 0) or 0),
+            "quantidade_registros_origem": int(resumo_calc.get("registros_so_financeiro", 0) or 0),
+            "quantidade_registros_destino": int(resumo_calc.get("registros_so_contabilidade", 0) or 0),
             "data_processamento": datetime.now().isoformat(),
         }
 
@@ -262,6 +338,7 @@ class ConciliacaoService:
                 df_financeiro_detalhado=financeiro_detalhado,
                 df_razao_geral=df_razao_geral,
                 conta_contabil=conta_contabil,
+                data_base=request.parametros.get("data_base"),
             )
 
             if analise_detalhada:
@@ -331,3 +408,4 @@ class ConciliacaoService:
         )
 
         return retorno
+

@@ -41,6 +41,31 @@ class AnaliseDiferencasService:
         except (ValueError, TypeError):
             return 0.0
 
+    def _periodo_data_base(self, data_base: Optional[str]) -> Optional[tuple]:
+        """Retorna (mes, ano) da data_base para filtrar o período analisado."""
+        if not data_base:
+            return None
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y"):
+            try:
+                dt = datetime.strptime(str(data_base).strip(), fmt)
+                return (dt.month, dt.year)
+            except ValueError:
+                continue
+        return None
+
+    def _data_no_periodo(self, data_str: str, periodo: tuple) -> bool:
+        """Verifica se data_str pertence ao mesmo mês/ano do período."""
+        if not data_str or data_str == "-":
+            return False
+        mes, ano = periodo
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%y"):
+            try:
+                dt = datetime.strptime(str(data_str).strip(), fmt)
+                return dt.month == mes and dt.year == ano
+            except ValueError:
+                continue
+        return False
+
     def processar_analise_detalhada(
         self,
         df_financeiro: pd.DataFrame,
@@ -49,6 +74,7 @@ class AnaliseDiferencasService:
         conta_contabil: str,
         df_financeiro_detalhado: Optional[pd.DataFrame] = None,
         df_razao_geral: Optional[pd.DataFrame] = None,
+        data_base: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Consolida valores por código e gera uma análise detalhada financeira.
@@ -101,17 +127,16 @@ class AnaliseDiferencasService:
             col_itemconta_geral = self._encontrar_coluna(
                 df_razao_geral,
                 [
-                    # COD CL VAL é a coluna específica de código de cliente/fornecedor
-                    # no novo layout CTBR480 (formato: '11419013 -0002-NOME')
-                    "COD CL VAL",
-                    "cod_cl_val",
-                    "COD_CL_VAL",
-                    "CODCLVAL",
-                    # ITEM CONTA era a coluna no layout antigo (formato: 'C01704361-81-NOME')
+                    # No layout usado pela conciliacao de clientes, ITEM CONTA traz o codigo do cliente/fornecedor.
                     "ITEMCONTA",
                     "itemconta",
                     "item_conta",
                     "ITEM CONTA",
+                    # COD CL VAL fica como fallback porque em alguns layouts ele pode trazer o codigo.
+                    "COD CL VAL",
+                    "cod_cl_val",
+                    "COD_CL_VAL",
+                    "CODCLVAL",
                     "conta_contabil",
                     "Conta Contabil",
                     "conta",
@@ -210,7 +235,14 @@ class AnaliseDiferencasService:
             df_merge["valor_financeiro"] - df_merge["valor_contabilidade"]
         )
 
+        periodo = self._periodo_data_base(data_base)
+        logger.info("[ANALISE DETALHADA] Período analisado: %s", periodo)
+
+        # financeiro_match_map: usado para marcar correspondência em lançamentos do razão
+        # Filtra apenas entradas do período analisado (mês/ano da data_base)
         financeiro_match_map: Dict[tuple[str, str], List[float]] = {}
+        # valor_fin_periodo_map: soma do financeiro apenas no período, por código (para status verde/vermelho)
+        valor_fin_periodo_map: Dict[str, float] = {}
         if df_financeiro_detalhado is not None and not df_financeiro_detalhado.empty:
             if "codigo" in df_financeiro_detalhado.columns:
                 df_fin_match = df_financeiro_detalhado.copy()
@@ -227,10 +259,14 @@ class AnaliseDiferencasService:
                     .astype(float)
                 )
                 for _, row_fin in df_fin_match.iterrows():
-                    key = (row_fin.get("codigo", ""), row_fin.get("data_match", ""))
-                    financeiro_match_map.setdefault(key, []).append(
-                        float(row_fin.get("valor_match", 0.0))
-                    )
+                    data_m = row_fin.get("data_match", "")
+                    cod = row_fin.get("codigo", "")
+                    val = float(row_fin.get("valor_match", 0.0))
+                    # Match map: só entradas do período
+                    if periodo is None or self._data_no_periodo(data_m, periodo):
+                        key = (cod, data_m)
+                        financeiro_match_map.setdefault(key, []).append(val)
+                        valor_fin_periodo_map[cod] = valor_fin_periodo_map.get(cod, 0.0) + val
 
         def _tem_match_financeiro(codigo: str, data_str: str, valor: float) -> bool:
             key = (codigo, data_str)
@@ -249,14 +285,23 @@ class AnaliseDiferencasService:
             valor_fin = float(row.get("valor_financeiro", 0.0))
             valor_cont = float(row.get("valor_contabilidade", 0.0))
             diferenca = float(row.get("diferenca", 0.0))
+
+            # Para status (verde/vermelho): usa apenas o financeiro do período analisado
+            if periodo is not None and codigo in valor_fin_periodo_map:
+                valor_fin_periodo = valor_fin_periodo_map[codigo]
+                diferenca_periodo = valor_fin_periodo - valor_cont
+            else:
+                diferenca_periodo = diferenca
+
             tipo = self._classificar_tipo(valor_fin, valor_cont, diferenca)
-            status = self._status(diferenca)
+            status = self._status(diferenca_periodo)
 
             # A coluna exibida como "Fornecedor" no frontend deve mostrar o código.
             nome_exibicao = codigo or str(row.get("nome") or "").strip()
 
             lancamentos_razao = int(row.get("lancamentos_razao", 0))
             lancamentos_razao_detalhes: List[Dict[str, Any]] = []
+            lancamentos_razao_todos: List[Dict[str, Any]] = []
             lancamentos_financeiro_detalhes: List[Dict[str, Any]] = []
             lancamentos_razao_sem_financeiro: List[Dict[str, Any]] = []
             registros_match_financeiro: List[Dict[str, Any]] = []
@@ -264,19 +309,76 @@ class AnaliseDiferencasService:
             sem_lancamentos_razao = False
             nota_razao = ""
 
+            codigo_normalizado = self._normalizar_codigo_numerico(codigo)
             matches_razao_count = 0
+            matches_item_all = pd.DataFrame()
             if df_razao_geral_norm is not None and col_itemconta_geral:
-                codigo_normalizado = self._normalizar_codigo_numerico(codigo)
-                matches_razao_count = int(
-                    (df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado).sum()
-                )
+                matches_item_all = df_razao_geral_norm[
+                    df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado
+                ]
+                matches_razao_count = int(len(matches_item_all))
+                lancamentos_razao = matches_razao_count
                 if (
                     matches_razao_count == 0
                     and abs(diferenca) > 0.01
                     and tipo == "SO_CONTABILIDADE"
                 ):
                     sem_lancamentos_razao = True
-                    nota_razao = "Sem lançamentos no período."
+                    nota_razao = "Sem lan?amentos no per?odo."
+
+                for _, r in matches_item_all.iterrows():
+                    valor_debito = 0.0
+                    valor_credito = 0.0
+                    if col_debito_geral:
+                        try:
+                            val = r.get(col_debito_geral, 0)
+                            if pd.notna(val):
+                                valor_debito = self._parse_valor(val)
+                        except (ValueError, TypeError):
+                            valor_debito = 0.0
+                    if col_credito_geral:
+                        try:
+                            val = r.get(col_credito_geral, 0)
+                            if pd.notna(val):
+                                valor_credito = self._parse_valor(val)
+                        except (ValueError, TypeError):
+                            valor_credito = 0.0
+
+                    if abs(valor_debito) > 0:
+                        valor_lancamento = abs(valor_debito)
+                        tipo_lancamento = "D"
+                    elif abs(valor_credito) > 0:
+                        valor_lancamento = abs(valor_credito)
+                        tipo_lancamento = "C"
+                    else:
+                        continue
+
+                    item_conta = (
+                        str(r.get(col_itemconta_geral, ""))
+                        if col_itemconta_geral
+                        else ""
+                    )
+                    data_lanc = self._formatar_data(
+                        r.get(col_data_geral, "") if col_data_geral else ""
+                    )
+                    nome_cliente = codigo_nome_map.get(codigo, "")
+
+                    lancamentos_razao_todos.append(
+                        {
+                            "conta_origem": item_conta,
+                            "descricao_conta": nome_cliente if nome_cliente else "",
+                            "valor": round(valor_lancamento, 2),
+                            "tipo_lancamento": tipo_lancamento,
+                            "data_lancamento": data_lanc,
+                            "documento": str(r.get(col_documento_geral, ""))
+                            if col_documento_geral
+                            else "",
+                            "historico": str(r.get(col_historico_geral, ""))
+                            if col_historico_geral
+                            else "",
+                            "tipo_movimento": "NAO_IDENTIFICADO",
+                        }
+                    )
             if tipo == "SO_CONTABILIDADE" and lancamentos_razao_geral:
                 codigo_normalizado = self._normalizar_codigo_numerico(codigo)
                 if df_razao_geral_norm is not None and col_itemconta_geral:
@@ -432,6 +534,15 @@ class AnaliseDiferencasService:
                     lancamentos_razao_sem_financeiro, diferenca, "D"
                 )
 
+            # Lookup de NFs presentes no razão para este código (usado no bloco SO_FINANCEIRO)
+            _NF_PAT = re.compile(r'\bNF\s*(\d+)', re.IGNORECASE)
+            razao_nf_valor_set: set = set()
+            for _lz in lancamentos_razao_todos:
+                _hist = str(_lz.get("historico", ""))
+                _m = _NF_PAT.search(_hist)
+                if _m:
+                    razao_nf_valor_set.add((_m.group(1), round(float(_lz.get("valor", 0) or 0), 2)))
+
             if tipo == "SO_FINANCEIRO" and df_financeiro_detalhado is not None and not df_financeiro_detalhado.empty:
                 if "codigo" in df_financeiro_detalhado.columns:
                     matches_fin = df_financeiro_detalhado[
@@ -480,6 +591,17 @@ class AnaliseDiferencasService:
                     if tipo_titulo not in [None, ""] and not pd.isna(tipo_titulo):
                         tp_str = str(tipo_titulo).strip()
 
+                    # Entradas fora do período analisado não têm correspondência esperada no razão
+                    # (o razão só cobre o período fechado). Nesses casos, não marcar como vermelho.
+                    _data_emissao_fmt = self._formatar_data(data_emissao)
+                    if periodo and not self._data_no_periodo(_data_emissao_fmt, periodo):
+                        tem_corr = None  # fora do período → frontend: neutro (sem cor)
+                    else:
+                        tem_corr = bool(prf_str and any(
+                            nf == prf_str and abs(v - valor_fin_det) <= 0.01
+                            for nf, v in razao_nf_valor_set
+                        ))
+
                     lancamentos_financeiro_detalhes.append(
                         {
                             "conta_origem": codigo,
@@ -491,6 +613,7 @@ class AnaliseDiferencasService:
                             "tipo_titulo": tp_str,
                             "historico": "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
+                            "tem_correspondencia": tem_corr,
                         }
                     )
 
@@ -664,6 +787,14 @@ class AnaliseDiferencasService:
                     "status": status_registro,
                 })
 
+            lancamentos_razao_detalhes = self._aglutinar_por_nf(lancamentos_razao_detalhes)
+            lancamentos_razao_sem_financeiro = self._aglutinar_por_nf(lancamentos_razao_sem_financeiro)
+            lancamentos_razao_todos = self._aglutinar_por_nf(lancamentos_razao_todos)
+
+            lancamentos_financeiro_detalhes.sort(
+                key=lambda x: self._parse_data_ordenacao(x.get("data_lancamento", ""))
+            )
+
             analises.append(
                 {
                     "codigo": codigo,
@@ -675,9 +806,15 @@ class AnaliseDiferencasService:
                     "tipo_diferenca": tipo,
                     "status": status,
                     "lancamentos_razao": lancamentos_razao,
-                    "lancamentos_razao_detalhes": lancamentos_razao_detalhes
-                    if lancamentos_razao_detalhes
-                    else lancamentos_razao_sem_financeiro,
+                    "lancamentos_razao_detalhes": (
+                        lancamentos_razao_detalhes
+                        if lancamentos_razao_detalhes
+                        else (
+                            lancamentos_razao_sem_financeiro
+                            if lancamentos_razao_sem_financeiro
+                            else lancamentos_razao_todos
+                        )
+                    ),
                     "lancamentos_financeiro_detalhes": lancamentos_financeiro_detalhes,
                     "registros_match_financeiro": registros_match_financeiro,
                     "registros_match_contabilidade": registros_match_contabilidade,
@@ -690,6 +827,52 @@ class AnaliseDiferencasService:
 
         logger.info(f"[ANALISE DETALHADA] Total de analises geradas: {len(analises)}")
         return analises
+
+    def _parse_data_ordenacao(self, data_str: str) -> str:
+        """Converte data para YYYY-MM-DD para ordenação correta."""
+        if not data_str or data_str == "-":
+            return "9999-99-99"
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%y"):
+            try:
+                return datetime.strptime(str(data_str).strip(), fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        return "9999-99-99"
+
+    def _aglutinar_por_nf(self, lancamentos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Aglutina lançamentos do razão por NF (extraído do histórico) e tipo D/C."""
+        if not lancamentos:
+            return lancamentos
+
+        NF_PATTERN = re.compile(r'\bNF\s*(\d+)', re.IGNORECASE)
+        agrupados: Dict[tuple, Dict[str, Any]] = {}
+        sem_nf: List[Dict[str, Any]] = []
+
+        for lanc in lancamentos:
+            historico = str(lanc.get("historico", ""))
+            m = NF_PATTERN.search(historico)
+            if not m:
+                sem_nf.append(lanc)
+                continue
+            nf = m.group(1)
+            tipo = lanc.get("tipo_lancamento", "")
+            chave = (nf, tipo)
+            if chave not in agrupados:
+                agrupados[chave] = {
+                    "conta_origem": lanc.get("conta_origem", ""),
+                    "descricao_conta": lanc.get("descricao_conta", ""),
+                    "valor": 0.0,
+                    "tipo_lancamento": tipo,
+                    "data_lancamento": lanc.get("data_lancamento", ""),
+                    "documento": nf,
+                    "historico": lanc.get("historico", ""),
+                    "tipo_movimento": lanc.get("tipo_movimento", ""),
+                }
+            agrupados[chave]["valor"] = round(
+                agrupados[chave]["valor"] + float(lanc.get("valor", 0) or 0), 2
+            )
+
+        return list(agrupados.values()) + sem_nf
 
     def gerar_resumo_analise(self, analises: List[Dict[str, Any]]) -> Dict[str, Any]:
         total = len(analises)

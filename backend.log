@@ -1,0 +1,704 @@
+INFO:     Will watch for changes in these directories: ['C:\\conciliacao-api']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [37080] using StatReload
+2026-04-07 08:29:57,539 - INFO - FileStorageService: UPLOAD_BASE_DIR=C:\conciliacao-api\data
+2026-04-07 08:29:57,729 - INFO - STORAGE_DIR resolvido: C:\conciliacao-api\data (existe: True, railway: False)
+INFO:     Started server process [34732]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+[INFO] Procurando .env em: C:\conciliacao-api\.env
+[INFO] .env existe? True
+[INFO] DATABASE_URL carregada: postgresql://postgres:TEQdHCNkUipWQKsbesMbkvzPvPYf...
+[OK] DATABASE_URL carregada com sucesso!
+INFO:     127.0.0.1:53128 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53178 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61662 - "OPTIONS /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61662 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61662 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64458 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64458 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:61662 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:61662 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64458 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64458 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64458 - "OPTIONS /api/dashboard?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61662 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64458 - "GET /api/dashboard?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61873 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:55606 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:61873 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55606 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55606 - "OPTIONS /api/plano-contas?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55606 - "GET /api/plano-contas?empresa_id=2 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:55606 - "OPTIONS /api/plano-contas/?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55606 - "GET /api/plano-contas/?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53803 - "OPTIONS /api/plano-contas?empresa_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53803 - "GET /api/plano-contas?empresa_id=1 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:53803 - "OPTIONS /api/plano-contas/?empresa_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53803 - "GET /api/plano-contas/?empresa_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53803 - "OPTIONS /api/conciliacoes/contas-efetivadas?empresa_id=1&periodo=2026-01 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53803 - "GET /api/conciliacoes/contas-efetivadas?empresa_id=1&periodo=2026-01 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50294 - "OPTIONS /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 200 OK
+2026-04-07 09:12:56,798 - INFO - FINR150 \u2192 página 1/1  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 09:13:06,425 - ERROR - Erro ao buscar FINR150 como base_pagar
+Traceback (most recent call last):
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_backends\anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\histepenson\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\conciliacao-api\routers\finr150_router.py", line 144, in get_como_base_pagar
+    registros = await service.buscar_como_registros(params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\services\finr150_service.py", line 81, in buscar_como_registros
+    resultado = await self.buscar_todos_titulos(params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\services\finr150_service.py", line 49, in buscar_todos_titulos
+    resp = await client.get(self.endpoint, params=query, headers=headers)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1768, in get
+    return await self.request(
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\histepenson\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadError
+INFO:     127.0.0.1:50294 - "GET /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 502 Bad Gateway
+2026-04-07 09:13:19,437 - INFO - FINR150 \u2192 página 1/1  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 09:13:29,359 - ERROR - Erro ao buscar FINR150 como base_pagar
+Traceback (most recent call last):
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_async\http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_backends\anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\histepenson\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\conciliacao-api\routers\finr150_router.py", line 144, in get_como_base_pagar
+    registros = await service.buscar_como_registros(params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\services\finr150_service.py", line 81, in buscar_como_registros
+    resultado = await self.buscar_todos_titulos(params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\services\finr150_service.py", line 49, in buscar_todos_titulos
+    resp = await client.get(self.endpoint, params=query, headers=headers)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1768, in get
+    return await self.request(
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\histepenson\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadError
+INFO:     127.0.0.1:51488 - "GET /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:51488 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55046 - "OPTIONS /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 200 OK
+2026-04-07 11:05:26,824 - INFO - FINR150 \u2192 página 1/1  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 11:05:41,254 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2&pageSize=500&page=1 "HTTP/1.1 500 Internal Server Error"
+2026-04-07 11:05:41,265 - ERROR - Erro ao buscar FINR150 como base_pagar
+Traceback (most recent call last):
+  File "C:\conciliacao-api\routers\finr150_router.py", line 144, in get_como_base_pagar
+    registros = await service.buscar_como_registros(params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\services\finr150_service.py", line 81, in buscar_como_registros
+    resultado = await self.buscar_todos_titulos(params)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\services\finr150_service.py", line 50, in buscar_todos_titulos
+    resp.raise_for_status()
+  File "C:\conciliacao-api\venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2&pageSize=500&page=1'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+INFO:     127.0.0.1:55046 - "GET /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:63606 - "OPTIONS /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 200 OK
+2026-04-07 11:33:22,151 - INFO - FINR150 \u2192 página 1/1  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 11:33:47,743 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2&pageSize=500&page=1 "HTTP/1.1 200 OK"
+2026-04-07 11:33:47,759 - INFO - FINR150 \u2192 página 2/3  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 11:34:04,423 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2&pageSize=500&page=2 "HTTP/1.1 200 OK"
+2026-04-07 11:34:04,432 - INFO - FINR150 \u2192 página 3/3  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 11:34:22,147 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2&pageSize=500&page=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63606 - "GET /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63606 - "OPTIONS /api/v1/ctbr140/base-contabil?data_fim=20260131&data_ini=20260101&conta_de=11301001&conta_ate=11301001&item_ate=zzzzzzzz&tipo_balancete=1&vlr_zerado=2&moeda=1&imp_mov=2&consid_filiais=1&sld_ant_lp=1&data_lp=20260131 HTTP/1.1" 200 OK
+2026-04-07 11:34:26,802 - INFO - CTBR140 \u2192 página 1/1  endpoint=https://192.168.1.100:8089/rest/zctbr140api/api/v1/ctbr140  tenant=02,0201
+2026-04-07 11:34:28,188 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zctbr140api/api/v1/ctbr140?data_fim=20260131&data_ini=20260101&conta_de=11301001&conta_ate=11301001&item_ate=zzzzzzzz&tipo_balancete=1&vlr_zerado=2&moeda=1&imp_mov=2&sld_ant_lp=1&data_lp=20260131&consid_filiais=1&pageSize=200&page=1 "HTTP/1.1 200 OK"
+2026-04-07 11:34:28,197 - INFO - CTBR140 \u2192 página 2/2  endpoint=https://192.168.1.100:8089/rest/zctbr140api/api/v1/ctbr140  tenant=02,0201
+2026-04-07 11:34:30,702 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zctbr140api/api/v1/ctbr140?data_fim=20260131&data_ini=20260101&conta_de=11301001&conta_ate=11301001&item_ate=zzzzzzzz&tipo_balancete=1&vlr_zerado=2&moeda=1&imp_mov=2&sld_ant_lp=1&data_lp=20260131&consid_filiais=1&pageSize=200&page=2 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:63606 - "GET /api/v1/ctbr140/base-contabil?data_fim=20260131&data_ini=20260101&conta_de=11301001&conta_ate=11301001&item_ate=zzzzzzzz&tipo_balancete=1&vlr_zerado=2&moeda=1&imp_mov=2&consid_filiais=1&sld_ant_lp=1&data_lp=20260131 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59056 - "OPTIONS /api/v1/ctbr480/base-contabil-geral?data_fim=20260131&data_ini=20260101&item_ate=zzzzzzzz&conta_de=11301001&conta_ate=11301001&custo_ate=zzzzzzzz&clvl_ate=zzzz&moeda=1&saldo=1&vlr_zerado=2&consid_filiais=1&filial_ate=zzzzz HTTP/1.1" 200 OK
+2026-04-07 11:34:41,043 - INFO - CTBR480 â†’ pÃ¡gina 1/1  endpoint=https://192.168.1.100:8089/rest/zctbr480api/api/v1/ctbr480  tenant=02,0201
+2026-04-07 11:36:09,664 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zctbr480api/api/v1/ctbr480?data_fim=20260131&data_ini=20260101&item_ate=zzzzzzzz&conta_de=11301001&conta_ate=11301001&custo_ate=zzzzzzzz&clvl_ate=zzzz&moeda=1&saldo=1&vlr_zerado=2&consid_filiais=1&filial_ate=zzzzz&pageSize=2000&page=1 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:59056 - "GET /api/v1/ctbr480/base-contabil-geral?data_fim=20260131&data_ini=20260101&item_ate=zzzzzzzz&conta_de=11301001&conta_ate=11301001&custo_ate=zzzzzzzz&clvl_ate=zzzz&moeda=1&saldo=1&vlr_zerado=2&consid_filiais=1&filial_ate=zzzzz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54532 - "OPTIONS /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 200 OK
+2026-04-07 13:12:25,141 - INFO - FINR150 \u2192 página 1/1  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 13:12:51,365 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2&pageSize=500&page=1 "HTTP/1.1 200 OK"
+2026-04-07 13:12:51,376 - INFO - FINR150 \u2192 página 2/3  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 13:13:10,643 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2&pageSize=500&page=2 "HTTP/1.1 200 OK"
+2026-04-07 13:13:10,650 - INFO - FINR150 \u2192 página 3/3  endpoint=https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150  tenant=02,0201
+2026-04-07 13:13:26,930 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zfinr150api/api/v1/finr150?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2&pageSize=500&page=3 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54532 - "GET /api/v1/finr150/base-pagar?data_base=20260131&fornecedor_ate=zzzzzzz&vencto_de=20000101&vencto_ate=20260131&natureza_ate=zzzzzz&consid_filiais=1&adiantamentos=1&abatimentos=1&titulos_excluidos=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54532 - "OPTIONS /api/v1/ctbr140/base-contabil?data_fim=20260131&data_ini=20260101&conta_de=11301001&conta_ate=11301001&item_ate=zzzzzzzz&tipo_balancete=1&vlr_zerado=2&moeda=1&imp_mov=2&consid_filiais=1&sld_ant_lp=1&data_lp=20260131 HTTP/1.1" 200 OK
+2026-04-07 13:13:29,939 - INFO - CTBR140 \u2192 página 1/1  endpoint=https://192.168.1.100:8089/rest/zctbr140api/api/v1/ctbr140  tenant=02,0201
+2026-04-07 13:13:31,221 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zctbr140api/api/v1/ctbr140?data_fim=20260131&data_ini=20260101&conta_de=11301001&conta_ate=11301001&item_ate=zzzzzzzz&tipo_balancete=1&vlr_zerado=2&moeda=1&imp_mov=2&sld_ant_lp=1&data_lp=20260131&consid_filiais=1&pageSize=200&page=1 "HTTP/1.1 200 OK"
+2026-04-07 13:13:31,235 - INFO - CTBR140 \u2192 página 2/2  endpoint=https://192.168.1.100:8089/rest/zctbr140api/api/v1/ctbr140  tenant=02,0201
+2026-04-07 13:13:32,438 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zctbr140api/api/v1/ctbr140?data_fim=20260131&data_ini=20260101&conta_de=11301001&conta_ate=11301001&item_ate=zzzzzzzz&tipo_balancete=1&vlr_zerado=2&moeda=1&imp_mov=2&sld_ant_lp=1&data_lp=20260131&consid_filiais=1&pageSize=200&page=2 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54532 - "GET /api/v1/ctbr140/base-contabil?data_fim=20260131&data_ini=20260101&conta_de=11301001&conta_ate=11301001&item_ate=zzzzzzzz&tipo_balancete=1&vlr_zerado=2&moeda=1&imp_mov=2&consid_filiais=1&sld_ant_lp=1&data_lp=20260131 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54532 - "OPTIONS /api/v1/ctbr480/base-contabil-geral?data_fim=20260131&data_ini=20260101&item_ate=zzzzzzzz&conta_de=11301001&conta_ate=11301001&custo_ate=zzzzzzzz&clvl_ate=zzzz&moeda=1&saldo=1&vlr_zerado=2&consid_filiais=1&filial_ate=zzzzz HTTP/1.1" 200 OK
+2026-04-07 13:13:34,681 - INFO - CTBR480 â†’ pÃ¡gina 1/1  endpoint=https://192.168.1.100:8089/rest/zctbr480api/api/v1/ctbr480  tenant=02,0201
+2026-04-07 13:15:03,018 - INFO - HTTP Request: GET https://192.168.1.100:8089/rest/zctbr480api/api/v1/ctbr480?data_fim=20260131&data_ini=20260101&item_ate=zzzzzzzz&conta_de=11301001&conta_ate=11301001&custo_ate=zzzzzzzz&clvl_ate=zzzz&moeda=1&saldo=1&vlr_zerado=2&consid_filiais=1&filial_ate=zzzzz&pageSize=2000&page=1 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:54532 - "GET /api/v1/ctbr480/base-contabil-geral?data_fim=20260131&data_ini=20260101&item_ate=zzzzzzzz&conta_de=11301001&conta_ate=11301001&custo_ate=zzzzzzzz&clvl_ate=zzzz&moeda=1&saldo=1&vlr_zerado=2&consid_filiais=1&filial_ate=zzzzz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57076 - "OPTIONS /api/conciliacoes/contabil HTTP/1.1" 200 OK
+2026-04-07 13:15:33,413 - INFO - \U0001f4e5 Recebendo requisição de conciliação
+2026-04-07 13:15:33,416 - INFO - \U0001f4ca Origem: 1259 registros
+2026-04-07 13:15:33,418 - INFO - \U0001f4ca Contábil: 258 registros
+2026-04-07 13:15:33,421 - INFO - \U0001f4ca Geral: 1232 registros (ctbr480_params=False)
+2026-04-07 13:15:33,433 - INFO - \u2699\ufe0f Executando conciliação contábil
+2026-04-07 13:15:33,666 - INFO - \U0001f4ca Registros origem recebidos: 1259
+2026-04-07 13:15:33,675 - INFO - \U0001f4ca Registros após corrigir header: 1259 colunas: ['codigo_nome_do_fornecedor', 'tit_vencidos_valor_corrigido', 'titulos_a_vencer_valor_nominal', 'vencto_real', 'dias_atraso']
+2026-04-07 13:15:33,676 - INFO - \U0001f4cb Tipo financeiro: contas_pagar
+2026-04-07 13:15:33,679 - INFO - Criado processador para: contas_pagar
+2026-04-07 13:15:33,683 - INFO - Total de registros lidos: 1259
+2026-04-07 13:15:33,722 - INFO - Validação de layout: VÁLIDO
+2026-04-07 13:15:33,722 - INFO - Colunas encontradas: ['Código/Cliente: codigo_nome_do_fornecedor', 'Valor Vencido: tit_vencidos_valor_corrigido', 'Valor a Vencer: titulos_a_vencer_valor_nominal', 'Data Vencimento: vencto_real']
+2026-04-07 13:15:33,722 - INFO - Avisos: ['Coluna de data de emissão não encontrada (opcional)', 'Coluna de número do documento não encontrada (opcional)']
+2026-04-07 13:15:33,724 - WARNING - \u26a0\ufe0f Coluna de data de emissão não encontrada (opcional)
+2026-04-07 13:15:33,724 - WARNING - \u26a0\ufe0f Coluna de número do documento não encontrada (opcional)
+2026-04-07 13:15:33,725 - INFO - Total de registros lidos: 1259
+2026-04-07 13:15:33,738 - INFO - Valor será calculado por soma: tit_vencidos_valor_corrigido + titulos_a_vencer_valor_nominal
+2026-04-07 13:15:33,803 - INFO - Soma vencido: 42743650.34 | Soma a vencer: 0.00 | Total: 42743650.34
+2026-04-07 13:15:33,990 - INFO - contas_pagar normalizado: 241 códigos | total valor: 42743650.34
+2026-04-07 13:15:33,991 - INFO - Total de registros lidos: 1259
+2026-04-07 13:15:33,994 - INFO - Valor será calculado por soma: tit_vencidos_valor_corrigido + titulos_a_vencer_valor_nominal
+2026-04-07 13:15:34,000 - INFO - Soma vencido: 42743650.34 | Soma a vencer: 0.00 | Total: 42743650.34
+2026-04-07 13:15:34,036 - INFO - \u2705 CONTAS_PAGAR normalizado via factory: 241 registros
+2026-04-07 13:15:34,040 - INFO - \U0001f4ca Registros contábeis recebidos: 258
+2026-04-07 13:15:34,074 - INFO - \u2705 Contabilidade normalizada: 258 registros
+2026-04-07 13:15:34,140 - INFO - \U0001f4c8 Resumo calculado: {'total_registros': 316, 'registros_ambos': 183, 'registros_so_financeiro': 130, 'registros_so_contabilidade': 3, 'registros_com_diferenca': 68, 'registros_sem_diferenca': 248, 'diferenca_total': -32883271.830000002, 'diferenca_absoluta_total': 33185273.990000002, 'maior_diferenca': 21052800.34, 'valor_total_financeiro': 42743650.34, 'valor_total_contabilidade': 9860378.510000002}
+2026-04-07 13:15:34,141 - INFO - \U0001f50d Colunas do df_completo: ['Código', 'Cliente', 'Valor Financeiro', 'Valor Contabilidade', 'Diferença', 'Diferença Absoluta', 'Diferença %', 'Origem', 'Tipo Diferença']
+2026-04-07 13:15:34,144 - INFO - \U0001f4ca Diferenças Origem > Contábil: 6
+2026-04-07 13:15:34,145 - INFO - \U0001f4ca Diferenças Contábil > Origem: 7
+2026-04-07 13:15:34,164 - INFO - \u2705 Mapeados: 6 origem_maior, 7 contabil_maior
+2026-04-07 13:15:34,165 - INFO - \u2705 Resumo final: {'total_origem': 42743650.34, 'total_destino': 9860378.51, 'diferenca': -32883271.83, 'situacao': 'DIVERGENTE', 'percentual_divergencia': 76.93, 'quantidade_registros_origem': 130, 'quantidade_registros_destino': 3, 'data_processamento': '2026-04-07T13:15:34.165930'}
+2026-04-07 13:15:34,166 - INFO - [ANÁLISE DETALHADA] Resumo fallback: {'total_registros': 316, 'total': 316, 'conciliados': 248, 'divergentes': 68, 'percentual_conciliacao': 78.48, 'percentual': 78.48}
+2026-04-07 13:15:34,178 - INFO - [ANÁLISE DETALHADA] Razão filtrado por conta 11301001: 1232 -> 1232 registros
+2026-04-07 13:15:34,179 - INFO - [ANALISE DETALHADA] Iniciando processamento
+2026-04-07 13:15:34,287 - INFO - [ANALISE DETALHADA] Período analisado: (1, 2026)
+2026-04-07 13:15:43,057 - INFO - [ANALISE DETALHADA] Total de analises geradas: 316
+2026-04-07 13:15:43,058 - INFO - [ANALISE DETALHADA] Resumo: {'total_registros': 316, 'total': 316, 'conciliados': 248, 'divergentes': 68, 'percentual_conciliacao': 78.48, 'percentual': 78.48}
+2026-04-07 13:15:43,059 - INFO - \U0001f50d Tipos de diferença encontrados: {'SO_FINANCEIRO', 'DIVERGENTE_VALOR', 'CONCILIADO', 'SO_CONTABILIDADE'}
+2026-04-07 13:15:43,059 - INFO - \U0001f50d Registros SO_CONTABILIDADE encontrados: 3
+2026-04-07 13:15:43,060 - INFO - \U0001f50d Iniciando análise profunda de 3 registros SO_CONTABILIDADE
+2026-04-07 13:15:43,060 - INFO - [ANÁLISE PROFUNDA] Iniciando análise de 3 registros SO_CONTABILIDADE
+2026-04-07 13:15:43,060 - INFO - [ANÁLISE PROFUNDA] Colunas disponíveis no razão geral: ['data', 'lote_sub_doc_linha', 'historico', 'complemento_historico', 'xpartida', 'c_custo', 'item_conta', 'cod_cl_val', 'debito', 'credito', 'saldo_anterior', 'saldo_atual', 'conta', 'desc_item', 'desc_conta', 'normal_item', 'normal_cta', 'modo']
+2026-04-07 13:15:43,060 - INFO - [ANÁLISE PROFUNDA] Total de linhas no razão geral: 1232
+2026-04-07 13:15:43,061 - INFO - [ANÁLISE PROFUNDA] Colunas identificadas - codigo: cod_cl_val, conta: item_conta, xpartida: xpartida, debito: debito, credito: credito
+2026-04-07 13:15:43,074 - INFO - [ANÁLISE PROFUNDA] Amostra de códigos no razão: [{'cod_cl_val': '0201', 'codigo_normalizado': '0201'}, {'cod_cl_val': '0209', 'codigo_normalizado': '0209'}, {'cod_cl_val': '0201', 'codigo_normalizado': '0201'}, {'cod_cl_val': '0209', 'codigo_normalizado': '0209'}, {'cod_cl_val': '0201', 'codigo_normalizado': '0201'}, {'cod_cl_val': '0201', 'codigo_normalizado': '0201'}, {'cod_cl_val': '0209', 'codigo_normalizado': '0209'}, {'cod_cl_val': '0209', 'codigo_normalizado': '0209'}, {'cod_cl_val': '0209', 'codigo_normalizado': '0209'}, {'cod_cl_val': '0201', 'codigo_normalizado': '0201'}]
+2026-04-07 13:15:43,075 - INFO - [ANÁLISE PROFUNDA] Analisando código F00171701, valor 309.75
+2026-04-07 13:15:43,077 - INFO - [ANÁLISE PROFUNDA] Registros encontrados por COD CL VAL=00171701: 0
+2026-04-07 13:15:43,078 - INFO - [ANÁLISE PROFUNDA] Registros encontrados por ITEMCONTA=00171701: 0
+2026-04-07 13:15:43,079 - INFO - [ANÁLISE PROFUNDA] Variações do código F00171701: ['171701', '00171701', 'F00171701']
+2026-04-07 13:15:43,083 - INFO - [ANÁLISE PROFUNDA] Registros encontrados para F00171701: 0
+2026-04-07 13:15:43,083 - INFO - [ANÁLISE PROFUNDA] Analisando código F00084401, valor 1466.59
+2026-04-07 13:15:43,086 - INFO - [ANÁLISE PROFUNDA] Registros encontrados por COD CL VAL=00084401: 0
+2026-04-07 13:15:43,089 - INFO - [ANÁLISE PROFUNDA] Registros encontrados por ITEMCONTA=00084401: 2
+2026-04-07 13:15:43,093 - INFO - [ANÁLISE PROFUNDA] Analisando código FSESVAE01, valor 121539.37
+2026-04-07 13:15:43,095 - INFO - [ANÁLISE PROFUNDA] Registros encontrados por COD CL VAL=SESVAE01: 0
+2026-04-07 13:15:43,097 - INFO - [ANÁLISE PROFUNDA] Registros encontrados por ITEMCONTA=SESVAE01: 0
+2026-04-07 13:15:43,097 - INFO - [ANÁLISE PROFUNDA] Variações do código FSESVAE01: ['FSESVAE01', 'SESVAE01']
+2026-04-07 13:15:43,099 - INFO - [ANÁLISE PROFUNDA] Registros encontrados para FSESVAE01: 0
+2026-04-07 13:15:43,099 - INFO - [ANÁLISE PROFUNDA] Concluída: 3 registros, 1 com origem identificada (33.3%)
+2026-04-07 13:15:43,100 - INFO - \u2705 Análise profunda concluída: 3 registros
+2026-04-07 13:15:43,100 - INFO - \u2705 Conciliação executada com sucesso
+2026-04-07 13:15:43,100 - INFO - \U0001f4e6 Retorno final com 6 origem_maior, 7 contabil_maior, 316 análise_detalhada, 3 análise_profunda
+2026-04-07 13:15:43,102 - INFO - \u2705 Conciliação processada com sucesso
+2026-04-07 13:15:43,103 - INFO - \U0001f4ca Resultado: {'total_origem': 42743650.34, 'total_destino': 9860378.51, 'diferenca': -32883271.83, 'situacao': 'DIVERGENTE', 'percentual_divergencia': 76.93, 'quantidade_registros_origem': 130, 'quantidade_registros_destino': 3, 'data_processamento': '2026-04-07T13:15:34.165930'}
+[INFO] Calculando diferencas...
+   [OK] Total de registros analisados: 316
+   [OK] Registros com diferenca: 68
+   [OK] Diferenca total: R$ -32,883,271.83
+INFO:     127.0.0.1:57076 - "POST /api/conciliacoes/contabil HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57639 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59238 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59238 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:57639 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:57639 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59238 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57639 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59238 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59238 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57639 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57639 - "OPTIONS /api/plano-contas/?empresa_id=2&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57639 - "GET /api/plano-contas/?empresa_id=2&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57639 - "OPTIONS /api/plano-contas/?empresa_id=1&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57639 - "GET /api/plano-contas/?empresa_id=1&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62238 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63335 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62238 - "GET /api/plano-contas/?empresa_id=2&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62238 - "GET /api/plano-contas/?empresa_id=1&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52084 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64278 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52084 - "GET /api/plano-contas/?empresa_id=2&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52084 - "GET /api/plano-contas/?empresa_id=1&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50574 - "GET /api/plano-contas/?empresa_id=1&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50216 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:50216 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:50216 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "OPTIONS /api/dashboard?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50216 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "GET /api/dashboard?empresa_id=2 HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:55378 - "OPTIONS /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:64940 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:64940 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55378 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64940 - "GET /api/dashboard?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:56810 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:51942 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "OPTIONS /api/plano-contas?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "GET /api/plano-contas?empresa_id=2 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:51942 - "OPTIONS /api/plano-contas/?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56810 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "GET /api/plano-contas/?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "OPTIONS /api/plano-contas?empresa_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "GET /api/plano-contas?empresa_id=1 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:51942 - "OPTIONS /api/plano-contas/?empresa_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "GET /api/plano-contas/?empresa_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51942 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:51784 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:51942 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51784 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49947 - "OPTIONS /api/empresas/6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49947 - "DELETE /api/empresas/6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49947 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:49947 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51974 - "OPTIONS /api/empresas/7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51472 - "OPTIONS /api/empresas/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64711 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:64711 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50964 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:64474 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:50964 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50964 - "GET /api/plano-contas?empresa_id=2 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:64474 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50964 - "GET /api/plano-contas/?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50964 - "GET /api/plano-contas?empresa_id=1 HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:50964 - "GET /api/plano-contas/?empresa_id=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50964 - "OPTIONS /api/conciliacoes/contas-efetivadas?empresa_id=1&periodo=2026-01 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50964 - "GET /api/conciliacoes/contas-efetivadas?empresa_id=1&periodo=2026-01 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59584 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:61053 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:59584 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61053 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59584 - "GET /api/dashboard?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51472 - "DELETE /api/empresas/5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59041 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59041 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:59041 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59041 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51974 - "DELETE /api/empresas/7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63606 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63606 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:63606 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63606 - "GET /api/empresas/ HTTP/1.1" 200 OK
+C:\conciliacao-api\services\empresa_services.py:66: SAWarning: DELETE statement on table 'plano_contas' expected to delete 2299 row(s); 0 were matched.  Please set confirm_deleted_rows=False within the mapper configuration to prevent this warning.
+  db.commit()
+C:\conciliacao-api\services\empresa_services.py:66: SAWarning: DELETE statement on table 'usuario_empresa' expected to delete 1 row(s); 0 were matched.  Please set confirm_deleted_rows=False within the mapper configuration to prevent this warning.
+  db.commit()
+C:\conciliacao-api\services\empresa_services.py:66: SAWarning: DELETE statement on table 'empresa' expected to delete 1 row(s); 0 were matched.  Please set confirm_deleted_rows=False within the mapper configuration to prevent this warning.
+  db.commit()
+INFO:     127.0.0.1:64711 - "DELETE /api/empresas/7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64266 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:64266 - "GET /api/empresas/ HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1936, in _exec_single_context
+    self.dialect.do_executemany(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\dialects\postgresql\psycopg2.py", line 800, in do_executemany
+    cursor.executemany(statement, parameters)
+psycopg2.OperationalError: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\cors.py", line 91, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\cors.py", line 146, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\conciliacao-api\venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\fastapi\routing.py", line 193, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\concurrency.py", line 40, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\anyio\to_thread.py", line 61, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 2525, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\routers\empresa_router.py", line 44, in excluir
+    sucesso = deletar_empresa(db, empresa_id)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\services\empresa_services.py", line 66, in deletar_empresa
+    db.commit()
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 679, in execute
+    util.preloaded.orm_persistence.delete_obj(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 193, in delete_obj
+    _emit_delete_statements(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1471, in _emit_delete_statements
+    c = connection.execute(
+        ^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1936, in _exec_single_context
+    self.dialect.do_executemany(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\dialects\postgresql\psycopg2.py", line 800, in do_executemany
+    cursor.executemany(statement, parameters)
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+[SQL: DELETE FROM concilia.plano_contas WHERE concilia.plano_contas.id = %(id)s]
+[parameters: [{'id': 2883}, {'id': 2884}, {'id': 2885}, {'id': 2886}, {'id': 2887}, {'id': 2888}, {'id': 2889}, {'id': 2890}  ... displaying 10 of 2299 total bound parameter sets ...  {'id': 5180}, {'id': 5181}]]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:63175 - "DELETE /api/empresas/7 HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1936, in _exec_single_context
+    self.dialect.do_executemany(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\dialects\postgresql\psycopg2.py", line 800, in do_executemany
+    cursor.executemany(statement, parameters)
+psycopg2.OperationalError: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\conciliacao-api\venv\Lib\site-packages\uvicorn\protocols\http\h11_impl.py", line 404, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\applications.py", line 123, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\errors.py", line 186, in __call__
+    raise exc
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\cors.py", line 91, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\cors.py", line 146, in simple_response
+    await self.app(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\fastapi\routing.py", line 299, in app
+    raise e
+  File "C:\conciliacao-api\venv\Lib\site-packages\fastapi\routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\fastapi\routing.py", line 193, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\starlette\concurrency.py", line 40, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\anyio\to_thread.py", line 61, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 2525, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\routers\empresa_router.py", line 44, in excluir
+    sucesso = deletar_empresa(db, empresa_id)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\services\empresa_services.py", line 66, in deletar_empresa
+    db.commit()
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2030, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1311, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1286, in _prepare_impl
+    self.session.flush()
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4331, in flush
+    self._flush(objects)
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4466, in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4427, in _flush
+    flush_context.execute()
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 679, in execute
+    util.preloaded.orm_persistence.delete_obj(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 193, in delete_obj
+    _emit_delete_statements(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1471, in _emit_delete_statements
+    c = connection.execute(
+        ^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1936, in _exec_single_context
+    self.dialect.do_executemany(
+  File "C:\conciliacao-api\venv\Lib\site-packages\sqlalchemy\dialects\postgresql\psycopg2.py", line 800, in do_executemany
+    cursor.executemany(statement, parameters)
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+[SQL: DELETE FROM concilia.plano_contas WHERE concilia.plano_contas.id = %(id)s]
+[parameters: [{'id': 2883}, {'id': 2884}, {'id': 2885}, {'id': 2886}, {'id': 2887}, {'id': 2888}, {'id': 2889}, {'id': 2890}  ... displaying 10 of 2299 total bound parameter sets ...  {'id': 5180}, {'id': 5181}]]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:63162 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54544 - "OPTIONS /api/empresas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54544 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:63162 - "GET /api/empresas HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:63162 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54544 - "OPTIONS /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54544 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63162 - "GET /api/empresas/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63162 - "OPTIONS /api/dashboard?empresa_id=2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63162 - "GET /api/dashboard?empresa_id=2 HTTP/1.1" 401 Unauthorized
