@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "ConciliaAI"
-    SMTP_FROM_EMAIL: str = "noreply@conciliaai.com"
+    SMTP_FROM_EMAIL: str = "histepenson@smartconciliacoes.com.br"
     SMTP_USE_TLS: bool = True
 
     # URLs
