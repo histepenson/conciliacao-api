@@ -1,4 +1,4 @@
-﻿import httpx
+import httpx
 import json as _json
 import logging
 from typing import Any
@@ -23,9 +23,9 @@ class Ctbr480Service:
     """
     Proxy/adaptador para o ZCTBR480API do Protheus.
 
-    Busca o RazÃ£o ContÃ¡bil por Item (CTBR480) diretamente do Protheus via REST,
+    Busca o RazAo ContAbil por Item (CTBR480) diretamente do Protheus via REST,
     paginando automaticamente, e entrega os dados prontos para o sistema de
-    conciliaÃ§Ã£o (base_contabil_geral).
+    conciliaAAo (base_contabil_geral).
 
     Campos retornados por lancamento (espelham as colunas do Excel CTBR480):
         data, lote_sub_doc_linha, historico, xpartida, c_custo,
@@ -41,7 +41,7 @@ class Ctbr480Service:
     async def buscar_razao(self, params: dict[str, Any]) -> dict[str, Any]:
         """
         Chama o ZCTBR480API paginando automaticamente.
-        Retorna todos os lanÃ§amentos consolidados com saldo_atual acumulado.
+        Retorna todos os lanAamentos consolidados com saldo_atual acumulado.
         """
         page_size = int(params.get("pageSize") or 500)
         query = {k: v for k, v in params.items() if k in _PARAMS_CTBR480 and v is not None}
@@ -58,7 +58,7 @@ class Ctbr480Service:
             while current_page <= total_pages:
                 query["page"] = current_page
                 logger.info(
-                    "CTBR480 â†’ pÃ¡gina %s/%s  endpoint=%s  tenant=%s",
+                    "CTBR480 a' pAgina %s/%s  endpoint=%s  tenant=%s",
                     current_page, total_pages, self.endpoint, self.tenant_id,
                 )
                 resp = await client.get(self.endpoint, params=query, headers=headers)
@@ -83,11 +83,11 @@ class Ctbr480Service:
 
     async def buscar_como_registros(self, params: dict[str, Any]) -> list[dict]:
         """
-        Busca o razÃ£o contÃ¡bil e retorna os registros no formato esperado pela
-        conciliaÃ§Ã£o (base_contabil_geral.registros).
+        Busca o razAo contAbil e retorna os registros no formato esperado pela
+        conciliaAAo (base_contabil_geral.registros).
 
-        Cada registro mantÃ©m os nomes de coluna do Excel CTBR480, pois o
-        analise_diferencas_service.py jÃ¡ conhece e normaliza esses nomes:
+        Cada registro mantA(c)m os nomes de coluna do Excel CTBR480, pois o
+        analise_diferencas_service.py jA conhece e normaliza esses nomes:
             data, lote_sub_doc_linha, historico, xpartida, c_custo,
             item_conta, cod_cl_val, debito, credito, saldo_atual,
             conta, desc_item, desc_conta, normal_item, normal_cta

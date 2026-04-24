@@ -9,7 +9,7 @@ from datetime import datetime
 # ============================================================
 
 class UsuarioCreate(BaseModel):
-    """Schema para criação de usuário."""
+    """Schema para criacao de usuario."""
     email: EmailStr
     nome: str = Field(..., min_length=2, max_length=255)
     password: str = Field(..., min_length=8)
@@ -19,13 +19,13 @@ class UsuarioCreate(BaseModel):
     @classmethod
     def validate_password(cls, v):
         if len(v) < 8:
-            raise ValueError("Senha deve ter no mínimo 8 caracteres")
+            raise ValueError("Senha deve ter no minimo 8 caracteres")
         if not any(c.isupper() for c in v):
-            raise ValueError("Senha deve conter pelo menos uma letra maiúscula")
+            raise ValueError("Senha deve conter pelo menos uma letra maiuscula")
         if not any(c.islower() for c in v):
-            raise ValueError("Senha deve conter pelo menos uma letra minúscula")
+            raise ValueError("Senha deve conter pelo menos uma letra minuscula")
         if not any(c.isdigit() for c in v):
-            raise ValueError("Senha deve conter pelo menos um número")
+            raise ValueError("Senha deve conter pelo menos um numero")
         return v
 
 
@@ -34,7 +34,7 @@ class UsuarioCreate(BaseModel):
 # ============================================================
 
 class UsuarioUpdate(BaseModel):
-    """Schema para atualização de usuário."""
+    """Schema para atualizacao de usuario."""
     email: Optional[EmailStr] = None
     nome: Optional[str] = Field(None, min_length=2, max_length=255)
     is_admin: Optional[bool] = None
@@ -42,7 +42,7 @@ class UsuarioUpdate(BaseModel):
 
 
 class UsuarioUpdatePassword(BaseModel):
-    """Schema para atualização de senha pelo admin."""
+    """Schema para atualizacao de senha pelo admin."""
     password: str = Field(..., min_length=8)
 
 
@@ -51,7 +51,7 @@ class UsuarioUpdatePassword(BaseModel):
 # ============================================================
 
 class UsuarioOut(BaseModel):
-    """Schema de saída de usuário."""
+    """Schema de saida de usuario."""
     id: int
     email: str
     nome: str
@@ -67,7 +67,7 @@ class UsuarioOut(BaseModel):
 
 
 class UsuarioListOut(BaseModel):
-    """Schema de saída para listagem de usuários."""
+    """Schema de saida para listagem de usuarios."""
     id: int
     email: str
     nome: str
@@ -81,7 +81,7 @@ class UsuarioListOut(BaseModel):
 
 
 class UsuarioDetailOut(BaseModel):
-    """Schema de saída detalhada de usuário."""
+    """Schema de saida detalhada de usuario."""
     id: int
     email: str
     nome: str
@@ -102,19 +102,19 @@ class UsuarioDetailOut(BaseModel):
 # ============================================================
 
 class UsuarioEmpresaCreate(BaseModel):
-    """Schema para adicionar usuário a uma empresa."""
+    """Schema para adicionar usuario a uma empresa."""
     empresa_id: int
     perfil_id: int
 
 
 class UsuarioEmpresaUpdate(BaseModel):
-    """Schema para atualizar associação usuário-empresa."""
+    """Schema para atualizar associacao usuario-empresa."""
     perfil_id: Optional[int] = None
     is_active: Optional[bool] = None
 
 
 class UsuarioEmpresaOut(BaseModel):
-    """Schema de saída de associação usuário-empresa."""
+    """Schema de saida de associacao usuario-empresa."""
     id: int
     usuario_id: int
     usuario_nome: Optional[str] = None
@@ -136,21 +136,21 @@ class UsuarioEmpresaOut(BaseModel):
 # ============================================================
 
 class PerfilCreate(BaseModel):
-    """Schema para criação de perfil."""
+    """Schema para criacao de perfil."""
     nome: str = Field(..., min_length=2, max_length=100)
     descricao: Optional[str] = None
     permissoes: List[str] = []
 
 
 class PerfilUpdate(BaseModel):
-    """Schema para atualização de perfil."""
+    """Schema para atualizacao de perfil."""
     nome: Optional[str] = Field(None, min_length=2, max_length=100)
     descricao: Optional[str] = None
     permissoes: Optional[List[str]] = None
 
 
 class PerfilOut(BaseModel):
-    """Schema de saída de perfil."""
+    """Schema de saida de perfil."""
     id: int
     nome: str
     descricao: Optional[str]
@@ -168,7 +168,7 @@ class PerfilOut(BaseModel):
 # ============================================================
 
 class PaginatedResponse(BaseModel):
-    """Schema genérico para respostas paginadas."""
+    """Schema generico para respostas paginadas."""
     items: List
     total: int
     page: int
@@ -177,7 +177,7 @@ class PaginatedResponse(BaseModel):
 
 
 class UsuariosPaginatedResponse(BaseModel):
-    """Schema para listagem paginada de usuários."""
+    """Schema para listagem paginada de usuarios."""
     items: List[UsuarioListOut]
     total: int
     page: int

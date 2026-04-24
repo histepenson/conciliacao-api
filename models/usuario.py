@@ -6,7 +6,7 @@ from db import Base
 
 
 class Usuario(Base):
-    """Modelo de Usuário do sistema."""
+    """Modelo de Usuario do sistema."""
 
     __tablename__ = "usuario"
     __table_args__ = {"schema": "concilia"}

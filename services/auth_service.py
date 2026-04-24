@@ -110,7 +110,7 @@ def login(
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciais inválidas",
+            detail="Credenciais invalidas",
         )
 
     if not verify_password(password, user.senha_hash):
@@ -118,7 +118,7 @@ def login(
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciais inválidas",
+            detail="Credenciais invalidas",
         )
 
     access_token = create_access_token(user_id=user.id, empresa_id=None, is_admin=user.is_admin)
@@ -127,7 +127,7 @@ def login(
     user.last_login = _now_utc()
     _log_audit(db, user.id, None, AuditAction.LOGIN, "usuario", user.id)
 
-    # Registrar sessão (refresh token)
+    # Registrar sessao (refresh token)
     expires_at = _now_utc() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     session = UserSession(
         usuario_id=user.id,
@@ -153,17 +153,17 @@ def login(
 def refresh_access_token(db: Session, refresh_token: str) -> Dict[str, Any]:
     payload = decode_token(refresh_token)
     if payload is None or payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token inválido")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalido")
 
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token inválido")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalido")
 
     user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário inválido")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario invalido")
 
-    # Validar sessão
+    # Validar sessao
     valid_session = None
     sessions = (
         db.query(UserSession)
@@ -178,7 +178,7 @@ def refresh_access_token(db: Session, refresh_token: str) -> Dict[str, Any]:
             break
 
     if valid_session is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token inválido")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalido")
 
     access_token = create_access_token(user_id=user.id, empresa_id=None, is_admin=user.is_admin)
     return {
@@ -222,7 +222,7 @@ def select_empresa(
 ) -> Dict[str, Any]:
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa or not empresa.status:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa nao encontrada")
 
     if not user.is_admin:
         assoc = (
@@ -235,7 +235,7 @@ def select_empresa(
             .first()
         )
         if not assoc:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem acesso à empresa")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem acesso a empresa")
     else:
         assoc = (
             db.query(UsuarioEmpresa)
@@ -301,7 +301,7 @@ def me(db: Session, user: Usuario, empresa_id: Optional[int]) -> Dict[str, Any]:
 def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
     user = db.query(Usuario).filter(Usuario.email == email).first()
     if not user:
-        return {"message": "Se o email existir, você receberá instruções para redefinir sua senha."}
+        return {"message": "Se o email existir, voce recebera instrucoes para redefinir sua senha."}
 
     token_plain, token_hash = generate_reset_token()
     expires_at = _now_utc() + timedelta(minutes=settings.RESET_TOKEN_EXPIRE_MINUTES)
@@ -317,7 +317,7 @@ def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
 
     # TODO: integrar envio de email (SMTP)
     _ = token_plain
-    return {"message": "Se o email existir, você receberá instruções para redefinir sua senha."}
+    return {"message": "Se o email existir, voce recebera instrucoes para redefinir sua senha."}
 
 
 def reset_password(db: Session, token: str, new_password: str) -> Dict[str, Any]:
@@ -338,11 +338,11 @@ def reset_password(db: Session, token: str, new_password: str) -> Dict[str, Any]
             break
 
     if not reset:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido ou expirado")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token invalido ou expirado")
 
     user = db.query(Usuario).filter(Usuario.id == reset.usuario_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário inválido")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario invalido")
 
     user.senha_hash = hash_password(new_password)
     reset.used_at = _now_utc()

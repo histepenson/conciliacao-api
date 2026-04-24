@@ -30,7 +30,7 @@ class FinR130Service:
         self.tenant_id = tenant_id  # "02,0201"
 
     async def buscar_todos_titulos(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Chama o ZFINR130API paginando automaticamente e retorna todos os títulos."""
+        """Chama o ZFINR130API paginando automaticamente e retorna todos os titulos."""
         page_size = int(params.get("pageSize", 100))
         query = {k: v for k, v in params.items() if k in _PARAMS_FINR130 and v is not None}
         query["pageSize"] = page_size
@@ -45,12 +45,12 @@ class FinR130Service:
         async with httpx.AsyncClient(verify=False, timeout=120.0, auth=self.auth) as client:
             while current_page <= total_pages:
                 query["page"] = current_page
-                logger.info("FINR130 → página %s/%s  endpoint=%s  tenant=%s", current_page, total_pages, self.endpoint, self.tenant_id)
+                logger.info("FINR130 -> pagina %s/%s  endpoint=%s  tenant=%s", current_page, total_pages, self.endpoint, self.tenant_id)
 
                 resp = await client.get(self.endpoint, params=query, headers=headers)
                 resp.raise_for_status()
 
-                # Protheus retorna Windows-1252 (CP1252) por padrão.
+                # Protheus retorna Windows-1252 (CP1252) por padrao.
                 # Tenta UTF-8 primeiro; se falhar, usa windows-1252.
                 raw = resp.content
                 try:

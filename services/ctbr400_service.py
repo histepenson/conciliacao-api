@@ -1,4 +1,4 @@
-﻿import httpx
+import httpx
 import json as _json
 import logging
 from typing import Any

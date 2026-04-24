@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from db import get_db
-from models.arquivoconciliacao import ArquivoConciliacao  # ← Modelo SQLAlchemy
-from schemas.arquivo_conciliacao_schema import (  # ← Schemas Pydantic
+from models.arquivoconciliacao import ArquivoConciliacao  # <- Modelo SQLAlchemy
+from schemas.arquivo_conciliacao_schema import (  # <- Schemas Pydantic
     ArquivoConciliacaoCreate,
     ArquivoConciliacaoUpdate,
     ArquivoConciliacaoResponse
@@ -14,7 +14,7 @@ from core.config import resolve_storage_dir
 
 router = APIRouter(prefix="/arquivos", tags=["Arquivos"])
 
-# Diretório para uploads com fallback automático para /data na Railway.
+# Diretorio para uploads com fallback automatico para /data na Railway.
 UPLOAD_DIR = resolve_storage_dir()
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -42,19 +42,19 @@ def listar_arquivos(
 
 @router.get("/{id}", response_model=ArquivoConciliacaoResponse)
 def buscar_arquivo(id: int, db: Session = Depends(get_db)):
-    """Busca um arquivo específico por ID"""
+    """Busca um arquivo especifico por ID"""
     
     arquivo = db.query(ArquivoConciliacao).filter(ArquivoConciliacao.id == id).first()
     
     if not arquivo:
-        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
     
     return arquivo
 
 
 @router.post("/", response_model=ArquivoConciliacaoResponse, status_code=201)
 def criar_arquivo(
-    arquivo: ArquivoConciliacaoCreate,  # ← Schema Pydantic, não modelo SQLAlchemy
+    arquivo: ArquivoConciliacaoCreate,  # <- Schema Pydantic, nao modelo SQLAlchemy
     db: Session = Depends(get_db)
 ):
     """Cria um novo registro de arquivo"""
@@ -105,7 +105,7 @@ async def upload_arquivo(
 @router.put("/{id}", response_model=ArquivoConciliacaoResponse)
 def atualizar_arquivo(
     id: int,
-    arquivo: ArquivoConciliacaoUpdate,  # ← Schema Pydantic
+    arquivo: ArquivoConciliacaoUpdate,  # <- Schema Pydantic
     db: Session = Depends(get_db)
 ):
     """Atualiza um arquivo existente"""
@@ -113,7 +113,7 @@ def atualizar_arquivo(
     db_arquivo = db.query(ArquivoConciliacao).filter(ArquivoConciliacao.id == id).first()
     
     if not db_arquivo:
-        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
     
     # Atualiza apenas campos enviados
     for key, value in arquivo.model_dump(exclude_unset=True).items():
@@ -132,9 +132,9 @@ def deletar_arquivo(id: int, db: Session = Depends(get_db)):
     db_arquivo = db.query(ArquivoConciliacao).filter(ArquivoConciliacao.id == id).first()
     
     if not db_arquivo:
-        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
     
-    # Remove arquivo físico se existir
+    # Remove arquivo fisico se existir
     if os.path.exists(db_arquivo.caminho_arquivo):
         os.remove(db_arquivo.caminho_arquivo)
     

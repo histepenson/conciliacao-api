@@ -22,7 +22,7 @@ from services.admin_user_service import (
 )
 
 
-router = APIRouter(prefix="/admin/usuarios", tags=["Admin - Usuários"])
+router = APIRouter(prefix="/admin/usuarios", tags=["Admin - Usuarios"])
 
 
 @router.get("/", response_model=list[UsuarioListOut])

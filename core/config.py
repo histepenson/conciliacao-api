@@ -8,9 +8,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Configurações da aplicação."""
+    """Configuracoes da aplicacao."""
 
-    # Aplicação
+    # Aplicacao
     APP_NAME: str = "ConciliaAI"
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Retorna instância cacheada das configurações."""
+    """Retorna instancia cacheada das configuracoes."""
     return Settings()
 
 
@@ -80,12 +80,12 @@ settings = get_settings()
 
 def resolve_storage_dir() -> Path:
     """
-    Resolve diretório de storage com fallback seguro para Railway.
+    Resolve diretorio de storage com fallback seguro para Railway.
 
     Regras:
     - Se STORAGE_DIR estiver definido e diferente de "data", usa valor informado.
     - Se estiver em Railway e STORAGE_DIR estiver ausente ou "data", usa "/data".
-    - Caso contrário, usa "data" (desenvolvimento local).
+    - Caso contrario, usa "data" (desenvolvimento local).
     """
     configured = os.environ.get("STORAGE_DIR", settings.STORAGE_DIR).strip()
     is_railway = os.environ.get("RAILWAY_ENVIRONMENT") is not None

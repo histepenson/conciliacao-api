@@ -11,7 +11,7 @@ class ArquivoConciliacaoBase(BaseModel):
 
 
 class ArquivoConciliacaoCreate(ArquivoConciliacaoBase):
-    """Schema para criar um novo arquivo de conciliação"""
+    """Schema para criar um novo arquivo de conciliacao"""
     pass
 
 

@@ -20,7 +20,7 @@ def listar_planos_de_contas(db: Session, empresa_id: int, skip: int = 0, limit: 
     return db.query(PlanoDeContas).filter(
         PlanoDeContas.empresa_id == empresa_id
     ).order_by(
-        PlanoDeContas.conta_contabil  # ← ADICIONADO: Ordena por código da conta
+        PlanoDeContas.conta_contabil  # <- ADICIONADO: Ordena por codigo da conta
     ).offset(skip).limit(limit).all()
 
 
@@ -60,9 +60,9 @@ def deletar_conta(db: Session, id: int) -> bool:
 def ordenar_contas_hierarquicamente(df: pd.DataFrame) -> pd.DataFrame:
     """
     Ordena as contas respeitando a hierarquia:
-    1. Primeiro por tipo (sintéticas antes de analíticas)
-    2. Depois por nível hierárquico (profundidade)
-    3. Por último pelo código da conta
+    1. Primeiro por tipo (sinteticas antes de analiticas)
+    2. Depois por nivel hierarquico (profundidade)
+    3. Por ultimo pelo codigo da conta
     
     Args:
         df: DataFrame com as contas
@@ -70,13 +70,13 @@ def ordenar_contas_hierarquicamente(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame ordenado
     """
-    # Criar coluna auxiliar com o tamanho do código (nível hierárquico)
+    # Criar coluna auxiliar com o tamanho do codigo (nivel hierarquico)
     df['_nivel'] = df['conta_contabil'].astype(str).str.len()
     
     # Ordenar por:
-    # 1. tipo_conta (1=sintética primeiro, 2=analítica depois)
-    # 2. nível hierárquico (menor nível primeiro - contas mais no topo)
-    # 3. código da conta (ordem numérica)
+    # 1. tipo_conta (1=sintetica primeiro, 2=analitica depois)
+    # 2. nivel hierarquico (menor nivel primeiro - contas mais no topo)
+    # 3. codigo da conta (ordem numerica)
     df_ordenado = df.sort_values(
         by=['tipo_conta', '_nivel', 'conta_contabil'],
         ascending=[True, True, True]
@@ -96,26 +96,26 @@ def validar_estrutura_arquivo(df: pd.DataFrame) -> Tuple[bool, List[str]]:
         df: DataFrame a ser validado
         
     Returns:
-        Tupla (é_válido, lista_de_erros)
+        Tupla (e_valido, lista_de_erros)
     """
     erros = []
     
-    # Verificar colunas obrigatórias
+    # Verificar colunas obrigatorias
     colunas_esperadas = ['conta_contabil', 'descricao', 'conciliavel', 'tipo_conta', 'conta_superior']
     colunas_faltantes = set(colunas_esperadas) - set(df.columns)
     
     if colunas_faltantes:
         erros.append(f"Colunas faltantes: {', '.join(colunas_faltantes)}")
     
-    # Verificar se há registros
+    # Verificar se ha registros
     if df.empty:
-        erros.append("Arquivo não contém registros")
+        erros.append("Arquivo nao contem registros")
     
-    # Verificar tipos de conta válidos
+    # Verificar tipos de conta validos
     if 'tipo_conta' in df.columns:
         tipos_invalidos = df[~df['tipo_conta'].isin(['1', '2', 1, 2])]['tipo_conta'].unique()
         if len(tipos_invalidos) > 0:
-            erros.append(f"Tipos de conta inválidos encontrados: {tipos_invalidos}")
+            erros.append(f"Tipos de conta invalidos encontrados: {tipos_invalidos}")
     
     return len(erros) == 0, erros
 
@@ -123,7 +123,7 @@ def validar_estrutura_arquivo(df: pd.DataFrame) -> Tuple[bool, List[str]]:
 def normalizar_colunas(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normaliza os nomes das colunas do Excel para o formato esperado.
-    Aceita variações com acentos, maiúsculas, espaços, underscores, etc.
+    Aceita variacoes com acentos, maiusculas, espacos, underscores, etc.
     """
     import unicodedata
     import re
@@ -161,8 +161,8 @@ def normalizar_colunas(df: pd.DataFrame) -> pd.DataFrame:
 
 def preparar_dados_importacao(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Separa as contas em sintéticas e analíticas,
-    ordenadas corretamente para importação
+    Separa as contas em sinteticas e analiticas,
+    ordenadas corretamente para importacao
 
     Args:
         df: DataFrame com os dados do plano de contas
@@ -170,7 +170,7 @@ def preparar_dados_importacao(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFr
     Returns:
         Tupla (df_sinteticas, df_analiticas)
     """
-    logger.info(f"Preparando dados para importação...")
+    logger.info(f"Preparando dados para importacao...")
 
     logger.info(f"Total de registros lidos: {len(df)}")
     logger.info(f"Colunas do arquivo: {list(df.columns)}")
@@ -181,16 +181,16 @@ def preparar_dados_importacao(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFr
     # Validar estrutura
     valido, erros = validar_estrutura_arquivo(df)
     if not valido:
-        raise ValueError(f"Erro na validação do arquivo:\n" + "\n".join(erros))
+        raise ValueError(f"Erro na validacao do arquivo:\n" + "\n".join(erros))
 
     # Normalizar conta_contabil como string
     df['conta_contabil'] = df['conta_contabil'].str.strip()
 
-    # Normalizar conta_superior como string (vazio/NaN → None)
+    # Normalizar conta_superior como string (vazio/NaN -> None)
     df['conta_superior'] = df['conta_superior'].str.strip()
     df.loc[df['conta_superior'].isna() | (df['conta_superior'] == ''), 'conta_superior'] = None
 
-    # Remover contas duplicadas (manter a última ocorrência)
+    # Remover contas duplicadas (manter a ultima ocorrencia)
     total_antes = len(df)
     df = df.drop_duplicates(subset=['conta_contabil'], keep='last')
     duplicatas_removidas = total_antes - len(df)
@@ -203,12 +203,12 @@ def preparar_dados_importacao(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFr
     # Normalizar tipo_conta para string
     df_ordenado['tipo_conta'] = df_ordenado['tipo_conta'].astype(str).str.strip()
 
-    # Separar sintéticas e analíticas
+    # Separar sinteticas e analiticas
     df_sinteticas = df_ordenado[df_ordenado['tipo_conta'] == '1'].copy()
     df_analiticas = df_ordenado[df_ordenado['tipo_conta'] == '2'].copy()
 
-    logger.info(f"Contas sintéticas: {len(df_sinteticas)}")
-    logger.info(f"Contas analíticas: {len(df_analiticas)}")
+    logger.info(f"Contas sinteticas: {len(df_sinteticas)}")
+    logger.info(f"Contas analiticas: {len(df_analiticas)}")
 
     return df_sinteticas, df_analiticas
 
@@ -226,35 +226,35 @@ def converter_conciliavel(valor) -> bool:
 
     if valor_str in ("1", "SIM", "S", "YES", "Y", "TRUE", "VERDADEIRO"):
         return True
-    if valor_str in ("0", "NAO", "NÃO", "N", "NO", "FALSE", "FALSO", ""):
+    if valor_str in ("0", "NAO", "NAO", "N", "NO", "FALSE", "FALSO", ""):
         return False
 
     raise ValueError(
-        f"Valor inválido para conciliavel: '{valor}'. "
-        "Use: 1/0, Sim/Não, S/N, True/False."
+        f"Valor invalido para conciliavel: '{valor}'. "
+        "Use: 1/0, Sim/Nao, S/N, True/False."
     )
 
 
 
 def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFrame, empresa_id: int, db: Session) -> Dict:
     """
-    Função principal de importação do plano de contas
+    Funcao principal de importacao do plano de contas
     
     Processo:
-    1. Importa primeiro as contas sintéticas
-    2. Importa depois as contas analíticas
+    1. Importa primeiro as contas sinteticas
+    2. Importa depois as contas analiticas
     
     Args:
-        df_sinteticas: DataFrame com as contas sintéticas
-        df_analiticas: DataFrame com as contas analíticas
+        df_sinteticas: DataFrame com as contas sinteticas
+        df_analiticas: DataFrame com as contas analiticas
         empresa_id: ID da empresa
-        db: Sessão do banco de dados
+        db: Sessao do banco de dados
         
     Returns:
-        Dicionário com estatísticas da importação
+        Dicionario com estatisticas da importacao
     """
     logger.info("="*80)
-    logger.info("INICIANDO IMPORTAÇÃO DO PLANO DE CONTAS")
+    logger.info("INICIANDO IMPORTACAO DO PLANO DE CONTAS")
     logger.info("="*80)
     
     try:
@@ -264,24 +264,24 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
         ).count()
 
         if contas_existentes > 0:
-            # Verificar se há conciliações vinculadas antes de deletar
+            # Verificar se ha conciliacoes vinculadas antes de deletar
             conciliacoes_vinculadas = db.query(Conciliacao).filter(
                 Conciliacao.empresa_id == empresa_id
             ).count()
 
             if conciliacoes_vinculadas > 0:
                 raise ValueError(
-                    f"Não é possível reimportar o plano de contas: existem {conciliacoes_vinculadas} "
-                    f"conciliação(ões) vinculada(s) a esta empresa. "
-                    f"Remova as conciliações antes de reimportar."
+                    f"Nao e possivel reimportar o plano de contas: existem {conciliacoes_vinculadas} "
+                    f"conciliacao(oes) vinculada(s) a esta empresa. "
+                    f"Remova as conciliacoes antes de reimportar."
                 )
 
-            logger.info(f"Removendo {contas_existentes} contas existentes da empresa {empresa_id} para reimportação...")
+            logger.info(f"Removendo {contas_existentes} contas existentes da empresa {empresa_id} para reimportacao...")
             db.query(PlanoDeContas).filter(
                 PlanoDeContas.empresa_id == empresa_id
             ).delete(synchronize_session=False)
             db.flush()
-            logger.info(f"✓ Contas existentes removidas")
+            logger.info(f"v Contas existentes removidas")
 
         estatisticas = {
             'total_contas': len(df_sinteticas) + len(df_analiticas),
@@ -291,21 +291,21 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
             'erros': []
         }
         
-        # FASE 1: Importar contas sintéticas
+        # FASE 1: Importar contas sinteticas
         logger.info("\n" + "="*80)
-        logger.info("FASE 1: IMPORTANDO CONTAS SINTÉTICAS")
+        logger.info("FASE 1: IMPORTANDO CONTAS SINTETICAS")
         logger.info("="*80)
         
         for idx, conta in df_sinteticas.iterrows():
             try:
-                # Preparar conta_superior (código contábil da conta superior)
+                # Preparar conta_superior (codigo contabil da conta superior)
                 conta_superior = None
                 if pd.notna(conta['conta_superior']) and str(conta['conta_superior']).strip():
                     conta_superior = str(conta['conta_superior']).strip()
                 
-                logger.info(f"Importando sintética: {conta['conta_contabil']} - {conta['descricao']}")
+                logger.info(f"Importando sintetica: {conta['conta_contabil']} - {conta['descricao']}")
                 
-                # Criar conta no banco - atribuição direta
+                # Criar conta no banco - atribuicao direta
                 db_conta = PlanoDeContas()
                 db_conta.conta_contabil = str(conta['conta_contabil'])
                 db_conta.descricao = conta['descricao']
@@ -324,25 +324,25 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
                 estatisticas['erros'].append(erro_msg)
                 db.rollback()  # Rollback apenas desta conta com erro
         
-        # Commit das contas sintéticas
+        # Commit das contas sinteticas
         db.commit()
-        logger.info(f"✓ Commit de {estatisticas['sinteticas_importadas']} contas sintéticas")
+        logger.info(f"v Commit de {estatisticas['sinteticas_importadas']} contas sinteticas")
         
-        # FASE 2: Importar contas analíticas
+        # FASE 2: Importar contas analiticas
         logger.info("\n" + "="*80)
-        logger.info("FASE 2: IMPORTANDO CONTAS ANALÍTICAS")
+        logger.info("FASE 2: IMPORTANDO CONTAS ANALITICAS")
         logger.info("="*80)
         
         for idx, conta in df_analiticas.iterrows():
             try:
-                # Preparar conta_superior (código contábil da conta superior)
+                # Preparar conta_superior (codigo contabil da conta superior)
                 conta_superior = None
                 if pd.notna(conta['conta_superior']) and str(conta['conta_superior']).strip():
                     conta_superior = str(conta['conta_superior']).strip()
                 
-                logger.info(f"Importando analítica: {conta['conta_contabil']} - {conta['descricao']}")
+                logger.info(f"Importando analitica: {conta['conta_contabil']} - {conta['descricao']}")
                 
-                # Criar conta no banco - atribuição direta
+                # Criar conta no banco - atribuicao direta
                 db_conta = PlanoDeContas()
                 db_conta.conta_contabil = str(conta['conta_contabil'])
                 db_conta.descricao = conta['descricao']
@@ -361,17 +361,17 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
                 estatisticas['erros'].append(erro_msg)
                 db.rollback()  # Rollback apenas desta conta com erro
         
-        # Commit das contas analíticas
+        # Commit das contas analiticas
         db.commit()
-        logger.info(f"✓ Commit de {estatisticas['analiticas_importadas']} contas analíticas")
+        logger.info(f"v Commit de {estatisticas['analiticas_importadas']} contas analiticas")
         
         # Resumo final
         logger.info("\n" + "="*80)
-        logger.info("RESUMO DA IMPORTAÇÃO")
+        logger.info("RESUMO DA IMPORTACAO")
         logger.info("="*80)
         logger.info(f"Total de contas no arquivo: {estatisticas['total_contas']}")
-        logger.info(f"Contas sintéticas importadas: {estatisticas['sinteticas_importadas']}")
-        logger.info(f"Contas analíticas importadas: {estatisticas['analiticas_importadas']}")
+        logger.info(f"Contas sinteticas importadas: {estatisticas['sinteticas_importadas']}")
+        logger.info(f"Contas analiticas importadas: {estatisticas['analiticas_importadas']}")
         logger.info(f"Total importado: {estatisticas['sinteticas_importadas'] + estatisticas['analiticas_importadas']}")
         
         if estatisticas['erros']:
@@ -379,11 +379,11 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
             for erro in estatisticas['erros']:
                 logger.warning(f"  - {erro}")
         else:
-            logger.info("\n✓ Importação concluída com sucesso!")
+            logger.info("\nv Importacao concluida com sucesso!")
         
         return estatisticas
         
     except Exception as e:
-        logger.error(f"\nERRO FATAL na importação: {str(e)}")
+        logger.error(f"\nERRO FATAL na importacao: {str(e)}")
         db.rollback()  # Rollback completo em caso de erro fatal
         raise

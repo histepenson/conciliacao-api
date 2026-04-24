@@ -6,7 +6,7 @@ from db import Base
 
 
 class UsuarioEmpresa(Base):
-    """Modelo de associação Usuário-Empresa com perfil de permissões."""
+    """Modelo de associacao Usuario-Empresa com perfil de permissoes."""
 
     __tablename__ = "usuario_empresa"
     __table_args__ = (

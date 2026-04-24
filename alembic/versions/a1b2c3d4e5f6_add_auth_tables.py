@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema - Add authentication tables."""
 
-    # Tabela de Usuários
+    # Tabela de Usuarios
     op.create_table(
         'usuario',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
@@ -56,15 +56,15 @@ def upgrade() -> None:
     )
     op.create_index('ix_perfil_nome', 'perfil', ['nome'], unique=True, schema='concilia')
 
-    # Inserir perfis padrão do sistema
+    # Inserir perfis padrao do sistema
     op.execute("""
         INSERT INTO concilia.perfil (nome, descricao, permissoes, is_system) VALUES
         ('admin_empresa', 'Administrador da Empresa', '["*"]', true),
-        ('analista', 'Analista de Conciliação', '["conciliacao:read", "conciliacao:write", "arquivo:read", "arquivo:upload", "relatorio:read", "relatorio:export", "plano_contas:read"]', true),
-        ('visualizador', 'Apenas Visualização', '["conciliacao:read", "relatorio:read", "plano_contas:read"]', true)
+        ('analista', 'Analista de Conciliacao', '["conciliacao:read", "conciliacao:write", "arquivo:read", "arquivo:upload", "relatorio:read", "relatorio:export", "plano_contas:read"]', true),
+        ('visualizador', 'Apenas Visualizacao', '["conciliacao:read", "relatorio:read", "plano_contas:read"]', true)
     """)
 
-    # Tabela de Associação Usuário-Empresa
+    # Tabela de Associacao Usuario-Empresa
     op.create_table(
         'usuario_empresa',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
@@ -104,7 +104,7 @@ def upgrade() -> None:
     op.create_index('ix_password_reset_token', 'password_reset', ['token_hash'], unique=False, schema='concilia')
     op.create_index('ix_password_reset_expires', 'password_reset', ['expires_at'], unique=False, schema='concilia')
 
-    # Tabela de Sessões
+    # Tabela de Sessoes
     op.create_table(
         'user_session',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),

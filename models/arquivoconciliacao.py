@@ -5,7 +5,7 @@ from db import Base
 
 
 class ArquivoConciliacao(Base):
-    """Modelo de Arquivo de Conciliação"""
+    """Modelo de Arquivo de Conciliacao"""
     __tablename__ = "arquivos_conciliacao"
     __table_args__ = {"schema": "concilia"}
 
@@ -16,7 +16,7 @@ class ArquivoConciliacao(Base):
     caminho_arquivo = Column(String(300), nullable=False)
     data_conciliacao = Column(DateTime, nullable=False)
 
-    # Timestamps - padrão snake_case
+    # Timestamps - padrao snake_case
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -24,7 +24,7 @@ class ArquivoConciliacao(Base):
     # RELACIONAMENTOS
     # ============================================================
 
-    # 1 arquivo → 1 conciliação
+    # 1 arquivo -> 1 conciliacao
     conciliacao = relationship(
         "Conciliacao",
         back_populates="arquivo"

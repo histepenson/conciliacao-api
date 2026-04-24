@@ -12,7 +12,7 @@ from .auth import CurrentUser, get_current_user
 
 
 class EmpresaContext:
-    """Contexto completo do usuário com empresa e permissões."""
+    """Contexto completo do usuario com empresa e permissoes."""
 
     def __init__(
         self,
@@ -37,8 +37,8 @@ class EmpresaContext:
         self.permissoes = permissoes
 
     def has_permission(self, permission: str) -> bool:
-        """Verifica se o contexto tem uma permissão específica."""
-        # Admin tem todas as permissões
+        """Verifica se o contexto tem uma permissao especifica."""
+        # Admin tem todas as permissoes
         if self.is_admin:
             return True
 
@@ -64,11 +64,11 @@ async def get_empresa_context(
     db: Session = Depends(get_db),
 ) -> EmpresaContext:
     """
-    Dependency que obtém o contexto completo do usuário com empresa e permissões.
+    Dependency que obtem o contexto completo do usuario com empresa e permissoes.
 
     Raises:
-        HTTPException 400: Se nenhuma empresa selecionada (para não-admins)
-        HTTPException 403: Se usuário não tem acesso à empresa
+        HTTPException 400: Se nenhuma empresa selecionada (para nao-admins)
+        HTTPException 403: Se usuario nao tem acesso a empresa
     """
     empresa_id = current_user.empresa_id
 
@@ -86,14 +86,14 @@ async def get_empresa_context(
             permissoes=["*"],
         )
 
-    # Usuário normal deve ter empresa selecionada
+    # Usuario normal deve ter empresa selecionada
     if not empresa_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Nenhuma empresa selecionada. Por favor, selecione uma empresa.",
         )
 
-    # Verificar se usuário tem acesso à empresa
+    # Verificar se usuario tem acesso a empresa
     usuario_empresa = (
         db.query(UsuarioEmpresa)
         .filter(
@@ -107,7 +107,7 @@ async def get_empresa_context(
     if not usuario_empresa and not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem acesso a esta empresa.",
+            detail="Voce nao tem acesso a esta empresa.",
         )
 
     # Buscar empresa
@@ -115,13 +115,13 @@ async def get_empresa_context(
     if not empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Empresa não encontrada.",
+            detail="Empresa nao encontrada.",
         )
 
     if not empresa.status:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Esta empresa está desativada.",
+            detail="Esta empresa esta desativada.",
         )
 
     # Admin acessando qualquer empresa
@@ -138,7 +138,7 @@ async def get_empresa_context(
             permissoes=["*"],
         )
 
-    # Buscar perfil e permissões
+    # Buscar perfil e permissoes
     perfil = db.query(Perfil).filter(Perfil.id == usuario_empresa.perfil_id).first()
     permissoes = perfil.permissoes if perfil else []
 
@@ -160,8 +160,8 @@ async def get_optional_empresa_context(
     db: Session = Depends(get_db),
 ) -> EmpresaContext:
     """
-    Similar a get_empresa_context, mas não exige empresa selecionada.
-    Útil para endpoints que funcionam com ou sem empresa.
+    Similar a get_empresa_context, mas nao exige empresa selecionada.
+    Util para endpoints que funcionam com ou sem empresa.
     """
     empresa_id = current_user.empresa_id
 

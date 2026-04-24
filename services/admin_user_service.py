@@ -51,7 +51,7 @@ def listar_usuarios(db: Session) -> List[dict]:
 def obter_usuario(db: Session, usuario_id: int) -> dict:
     user = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario nao encontrado")
 
     associacoes = (
         db.query(UsuarioEmpresa)
@@ -97,7 +97,7 @@ def criar_usuario(db: Session, data: dict) -> dict:
     is_admin = bool(data.get("is_admin", False))
 
     if db.query(Usuario).filter(Usuario.email == email).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email já cadastrado")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ja cadastrado")
 
     valid, msg = validate_password_strength(password)
     if not valid:
@@ -132,7 +132,7 @@ def criar_usuario(db: Session, data: dict) -> dict:
 def atualizar_usuario(db: Session, usuario_id: int, data: dict) -> dict:
     user = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario nao encontrado")
 
     for field in ["email", "nome", "is_admin", "is_active"]:
         if field in data and data[field] is not None:
@@ -158,27 +158,27 @@ def atualizar_usuario(db: Session, usuario_id: int, data: dict) -> dict:
 def desativar_usuario(db: Session, usuario_id: int) -> dict:
     user = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario nao encontrado")
 
     user.is_active = False
     user.updated_at = _now_utc()
     _log_audit(db, None, None, AuditAction.USER_DEACTIVATE, "usuario", user.id)
     db.commit()
-    return {"message": "Usuário desativado"}
+    return {"message": "Usuario desativado"}
 
 
 def adicionar_usuario_empresa(db: Session, usuario_id: int, empresa_id: int, perfil_id: int) -> dict:
     user = db.query(Usuario).filter(Usuario.id == usuario_id).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario nao encontrado")
 
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa nao encontrada")
 
     perfil = db.query(Perfil).filter(Perfil.id == perfil_id).first()
     if not perfil:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil nao encontrado")
 
     existentes = (
         db.query(UsuarioEmpresa)
@@ -216,7 +216,7 @@ def adicionar_usuario_empresa(db: Session, usuario_id: int, empresa_id: int, per
             detail="Usuario ja vinculado a esta empresa",
         )
     _log_audit(db, usuario_id, empresa_id, AuditAction.PERMISSION_GRANT, "usuario_empresa", assoc.id)
-    return {"message": "Usuário adicionado à empresa"}
+    return {"message": "Usuario adicionado a empresa"}
 
 
 def remover_usuario_empresa(db: Session, usuario_id: int, empresa_id: int) -> dict:
@@ -226,9 +226,9 @@ def remover_usuario_empresa(db: Session, usuario_id: int, empresa_id: int) -> di
         .first()
     )
     if not assoc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Associação não encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Associacao nao encontrada")
 
     db.delete(assoc)
     db.commit()
     _log_audit(db, usuario_id, empresa_id, AuditAction.PERMISSION_REVOKE, "usuario_empresa", assoc.id)
-    return {"message": "Usuário removido da empresa"}
+    return {"message": "Usuario removido da empresa"}

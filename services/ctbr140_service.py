@@ -20,7 +20,7 @@ class Ctbr140Service:
     Proxy/adaptador para o ZCTBR140API do Protheus.
 
     Busca o Balancete de Conta/Item (CTBR140) diretamente do Protheus via REST,
-    paginando automaticamente, e entrega os dados prontos para normalização.
+    paginando automaticamente, e entrega os dados prontos para normalizacao.
     """
 
     def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = ""):
@@ -48,13 +48,13 @@ class Ctbr140Service:
             while current_page <= total_pages:
                 query["page"] = current_page
                 logger.info(
-                    "CTBR140 → página %s/%s  endpoint=%s  tenant=%s",
+                    "CTBR140 -> pagina %s/%s  endpoint=%s  tenant=%s",
                     current_page, total_pages, self.endpoint, self.tenant_id,
                 )
                 resp = await client.get(self.endpoint, params=query, headers=headers)
                 resp.raise_for_status()
 
-                # Protheus retorna Windows-1252 (CP1252) por padrão.
+                # Protheus retorna Windows-1252 (CP1252) por padrao.
                 # Tenta UTF-8 primeiro; se falhar, usa windows-1252.
                 raw = resp.content
                 try:
@@ -79,13 +79,13 @@ class Ctbr140Service:
 
             [{"Codigo": <item_code>, "Descricao": <desc_item>, "Saldo atual": <valor>}]
 
-        Lógica de sinal do "Saldo atual":
-        - normal_cta = "1" (débito-normal):  valor =  saldo_atu  (positivo = saldo devedor)
-        - normal_cta = "2" (crédito-normal): valor = -saldo_atu  (inverte para positivo = saldo credor)
+        Logica de sinal do "Saldo atual":
+        - normal_cta = "1" (debito-normal):  valor =  saldo_atu  (positivo = saldo devedor)
+        - normal_cta = "2" (credito-normal): valor = -saldo_atu  (inverte para positivo = saldo credor)
 
-        Isso replica o comportamento de ValorCTB no relatório, que exibe o saldo
-        sempre na direção normal da conta (positivo = saldo esperado).
-        Clientes com saldo inverso aparecem como negativo, preservando a informação.
+        Isso replica o comportamento de ValorCTB no relatorio, que exibe o saldo
+        sempre na direcao normal da conta (positivo = saldo esperado).
+        Clientes com saldo inverso aparecem como negativo, preservando a informacao.
         """
         resultado = await self.buscar_balancete(params)
         return [self._linha_para_registro(linha) for linha in resultado["linhas"]]
@@ -95,13 +95,13 @@ class Ctbr140Service:
         normal_cta = str(linha.get("normal_cta") or "1").strip()
         saldo_atu = float(linha.get("saldo_atu") or 0)
 
-        # Conta crédito-normal (passivo, receita, contas a pagar):
-        # saldo_atu negativo = créditos > débitos = saldo na direção certa.
-        # Invertemos para que o valor fique positivo, igual ao que o relatório exibe.
+        # Conta credito-normal (passivo, receita, contas a pagar):
+        # saldo_atu negativo = creditos > debitos = saldo na direcao certa.
+        # Invertemos para que o valor fique positivo, igual ao que o relatorio exibe.
         value = -saldo_atu if normal_cta == "2" else saldo_atu
 
         return {
-            "Codigo": linha.get("item", ""),         # CT2_ITEM → código do item/CC
-            "Descricao": linha.get("desc_item", ""), # Descrição do item
-            "Saldo atual": value,                    # Valor na direção normal da conta
+            "Codigo": linha.get("item", ""),         # CT2_ITEM -> codigo do item/CC
+            "Descricao": linha.get("desc_item", ""), # Descricao do item
+            "Saldo atual": value,                    # Valor na direcao normal da conta
         }

@@ -83,7 +83,7 @@ class ConciliacaoBancariaEfetivacaoService:
                 detail=f"Conciliacao ja efetivada em {existing.data_efetivacao}"
             )
 
-        # Consultar parâmetro da empresa
+        # Consultar parametro da empresa
         empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
         permite_divergente = empresa.permite_efetivar_divergente if empresa else False
 
@@ -98,7 +98,7 @@ class ConciliacaoBancariaEfetivacaoService:
         dif_total_saidas = resumo.get("dif_total_saidas", 0) or 0
         saldo = float(dif_total_entradas) + float(dif_total_saidas)
 
-        # Ao efetivar, situação é sempre CONCILIADO
+        # Ao efetivar, situacao e sempre CONCILIADO
         resultado_para_salvar = {**resultado}
         resultado_para_salvar["resumo"] = {**resumo, "situacao": "CONCILIADO"}
 

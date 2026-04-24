@@ -1,6 +1,6 @@
 # middleware/permission.py
 """
-Middleware de permissões - Verificação de autorização.
+Middleware de permissoes - Verificacao de autorizacao.
 """
 from functools import wraps
 from typing import Callable, List, Union
@@ -13,7 +13,7 @@ from .tenant import EmpresaContext, get_empresa_context
 
 def require_permission(permission: Union[str, List[str]]):
     """
-    Dependency factory que verifica se o usuário tem a(s) permissão(ões) requerida(s).
+    Dependency factory que verifica se o usuario tem a(s) permissao(oes) requerida(s).
 
     Uso:
         @router.get("/items")
@@ -22,7 +22,7 @@ def require_permission(permission: Union[str, List[str]]):
         ):
             ...
 
-        # Múltiplas permissões (OR - qualquer uma)
+        # Multiplas permissoes (OR - qualquer uma)
         @router.post("/items")
         async def create_item(
             context: EmpresaContext = Depends(require_permission(["item:write", "item:create"]))
@@ -34,17 +34,17 @@ def require_permission(permission: Union[str, List[str]]):
     async def _check_permission(
         context: EmpresaContext = Depends(get_empresa_context),
     ) -> EmpresaContext:
-        # Admin tem todas as permissões
+        # Admin tem todas as permissoes
         if context.is_admin:
             return context
 
-        # Verificar se tem pelo menos uma das permissões
+        # Verificar se tem pelo menos uma das permissoes
         has_any = any(context.has_permission(p) for p in permissions)
 
         if not has_any:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permissão negada. Requer: {', '.join(permissions)}",
+                detail=f"Permissao negada. Requer: {', '.join(permissions)}",
             )
 
         return context
@@ -54,7 +54,7 @@ def require_permission(permission: Union[str, List[str]]):
 
 def require_all_permissions(permissions: List[str]):
     """
-    Dependency factory que verifica se o usuário tem TODAS as permissões requeridas.
+    Dependency factory que verifica se o usuario tem TODAS as permissoes requeridas.
 
     Uso:
         @router.delete("/items/{id}")
@@ -67,17 +67,17 @@ def require_all_permissions(permissions: List[str]):
     async def _check_all_permissions(
         context: EmpresaContext = Depends(get_empresa_context),
     ) -> EmpresaContext:
-        # Admin tem todas as permissões
+        # Admin tem todas as permissoes
         if context.is_admin:
             return context
 
-        # Verificar se tem todas as permissões
+        # Verificar se tem todas as permissoes
         missing = [p for p in permissions if not context.has_permission(p)]
 
         if missing:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permissão negada. Faltam: {', '.join(missing)}",
+                detail=f"Permissao negada. Faltam: {', '.join(missing)}",
             )
 
         return context
@@ -89,7 +89,7 @@ async def require_admin(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> CurrentUser:
     """
-    Dependency que verifica se o usuário é admin master.
+    Dependency que verifica se o usuario e admin master.
 
     Uso:
         @router.get("/admin/users")
@@ -108,7 +108,7 @@ async def require_admin(
 
 def require_empresa_admin():
     """
-    Dependency factory que verifica se o usuário é admin da empresa atual.
+    Dependency factory que verifica se o usuario e admin da empresa atual.
 
     Uso:
         @router.post("/empresa/users")
@@ -125,7 +125,7 @@ def require_empresa_admin():
         if context.is_admin:
             return context
 
-        # Verificar se tem permissão de admin da empresa
+        # Verificar se tem permissao de admin da empresa
         if not context.has_permission("*"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -138,13 +138,13 @@ def require_empresa_admin():
 
 
 # ============================================================
-# CONSTANTES DE PERMISSÕES
+# CONSTANTES DE PERMISSOES
 # ============================================================
 
 class Permissions:
-    """Constantes de permissões do sistema."""
+    """Constantes de permissoes do sistema."""
 
-    # Administração
+    # Administracao
     ADMIN_USERS = "admin:users"
     ADMIN_COMPANIES = "admin:companies"
     ADMIN_ROLES = "admin:roles"
@@ -158,7 +158,7 @@ class Permissions:
     PLANO_CONTAS_WRITE = "plano_contas:write"
     PLANO_CONTAS_IMPORT = "plano_contas:import"
 
-    # Conciliação
+    # Conciliacao
     CONCILIACAO_READ = "conciliacao:read"
     CONCILIACAO_WRITE = "conciliacao:write"
     CONCILIACAO_DELETE = "conciliacao:delete"
@@ -169,7 +169,7 @@ class Permissions:
     ARQUIVO_UPLOAD = "arquivo:upload"
     ARQUIVO_DELETE = "arquivo:delete"
 
-    # Relatórios
+    # Relatorios
     RELATORIO_READ = "relatorio:read"
     RELATORIO_EXPORT = "relatorio:export"
 
@@ -177,7 +177,7 @@ class Permissions:
     ALL = "*"
 
 
-# Lista de todas as permissões disponíveis (para validação)
+# Lista de todas as permissoes disponiveis (para validacao)
 ALL_PERMISSIONS = [
     Permissions.ADMIN_USERS,
     Permissions.ADMIN_COMPANIES,

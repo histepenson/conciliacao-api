@@ -1,5 +1,5 @@
 """
-Schemas para efetivação de conciliações.
+Schemas para efetivacao de conciliacoes.
 """
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Dict, Any, Optional
@@ -9,7 +9,7 @@ from enum import Enum
 
 
 class StatusConciliacao(str, Enum):
-    """Status possíveis de uma conciliação."""
+    """Status possiveis de uma conciliacao."""
     PROCESSADA = "PROCESSADA"
     EFETIVADA = "EFETIVADA"
 
@@ -19,14 +19,14 @@ class StatusConciliacao(str, Enum):
 # ===================
 
 class EfetivarConciliacaoRequest(BaseModel):
-    """Request para efetivar uma conciliação (dados JSON do FormData)."""
+    """Request para efetivar uma conciliacao (dados JSON do FormData)."""
     empresa_id: int
     conta_contabil_id: int
-    conta_contabil: str  # código da conta
+    conta_contabil: str  # codigo da conta
     periodo: str  # "YYYY-MM"
     tipo_conciliacao: str = "receber"  # receber, pagar
 
-    # Dados já processados (normalizados)
+    # Dados ja processados (normalizados)
     base_origem: Dict[str, Any]  # { registros: [...] }
     base_contabil_filtrada: Dict[str, Any]  # { conta_contabil, registros: [...] }
     base_contabil_geral: Dict[str, Any]  # { registros: [...] }
@@ -38,7 +38,7 @@ class EfetivarConciliacaoRequest(BaseModel):
 # ===================
 
 class EfetivarConciliacaoResponse(BaseModel):
-    """Response após efetivar uma conciliação."""
+    """Response apos efetivar uma conciliacao."""
     id: int
     message: str
     status: StatusConciliacao
@@ -46,7 +46,7 @@ class EfetivarConciliacaoResponse(BaseModel):
 
 
 class ConciliacaoEfetivadaResumo(BaseModel):
-    """Resumo de uma conciliação efetivada para listagem."""
+    """Resumo de uma conciliacao efetivada para listagem."""
     id: int
     empresa_id: int
     empresa_nome: Optional[str] = None
@@ -73,7 +73,7 @@ class ConciliacaoEfetivadaResumo(BaseModel):
 
 
 class ConciliacaoEfetivadaDetalhe(ConciliacaoEfetivadaResumo):
-    """Detalhes completos de uma conciliação efetivada."""
+    """Detalhes completos de uma conciliacao efetivada."""
     saldo: Decimal
     resultado_json: Optional[Dict[str, Any]] = None
     caminhos_arquivos: Optional[Dict[str, Dict[str, str]]] = None
@@ -87,7 +87,7 @@ class ConciliacaoEfetivadaDetalhe(ConciliacaoEfetivadaResumo):
 
 
 class ListaConciliacoesEfetivadas(BaseModel):
-    """Lista paginada de conciliações efetivadas."""
+    """Lista paginada de conciliacoes efetivadas."""
     items: List[ConciliacaoEfetivadaResumo]
     total: int
     skip: int
@@ -96,12 +96,12 @@ class ListaConciliacoesEfetivadas(BaseModel):
 
 
 class ContasEfetivadas(BaseModel):
-    """Lista de IDs de contas já efetivadas para um período."""
+    """Lista de IDs de contas ja efetivadas para um periodo."""
     contas_efetivadas: List[int]
 
 
 class ArquivoDownloadInfo(BaseModel):
-    """Informações sobre arquivo disponível para download."""
+    """Informacoes sobre arquivo disponivel para download."""
     tipo_arquivo: str
     formato: str
     nome_arquivo: str
@@ -111,7 +111,7 @@ class ArquivoDownloadInfo(BaseModel):
 
 
 class ValidacaoEfetivacaoResponse(BaseModel):
-    """Response para validação antes de efetivar."""
+    """Response para validacao antes de efetivar."""
     pode_efetivar: bool
     motivo: Optional[str] = None
     divergencias: int = 0

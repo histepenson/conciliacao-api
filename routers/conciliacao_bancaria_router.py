@@ -82,7 +82,7 @@ async def efetivar_conciliacao_bancaria(
     try:
         dados_json = json.loads(dados)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="JSON inválido no campo 'dados'")
+        raise HTTPException(status_code=400, detail="JSON invalido no campo 'dados'")
 
     extrato_bytes = await arquivo_extrato.read()
     razao_bytes = await arquivo_razao.read()

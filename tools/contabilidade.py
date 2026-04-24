@@ -1,10 +1,10 @@
-﻿import pandas as pd
+import pandas as pd
 import re
 
 
 def normalizar_planilha_contabilidade(entrada):
     """
-    Normaliza relatório de CONTABILIDADE (Balancete).
+    Normaliza relatorio de CONTABILIDADE (Balancete).
 
     Layout esperado:
     Codigo | Descricao | ... | Saldo atual
@@ -14,7 +14,7 @@ def normalizar_planilha_contabilidade(entrada):
     """
 
     # ==========================
-    # 1️⃣ CARREGAR DATAFRAME
+    # 1 CARREGAR DATAFRAME
     # ==========================
     if isinstance(entrada, pd.DataFrame):
         df = entrada.copy()
@@ -24,7 +24,7 @@ def normalizar_planilha_contabilidade(entrada):
         raise ValueError("entrada deve ser DataFrame ou caminho de arquivo")
 
     # ==========================
-    # 2️⃣ MAPEAR COLUNAS (FLEXÍVEL)
+    # 2 MAPEAR COLUNAS (FLEXIVEL)
     # ==========================
     def normalizar_nome(col: str) -> str:
         return re.sub(r"[^a-z0-9]+", "_", str(col).strip().lower()).strip("_")
@@ -39,28 +39,28 @@ def normalizar_planilha_contabilidade(entrada):
         if norm == "saldo_atual" or norm.startswith("saldo_atual")
     ]
 
-    # Quando há duplicidade de Codigo/Descricao, a primeira costuma ser a conta contábil.
+    # Quando ha duplicidade de Codigo/Descricao, a primeira costuma ser a conta contabil.
     col_codigo = codigo_cols[1] if len(codigo_cols) > 1 else (codigo_cols[0] if codigo_cols else None)
     col_cliente = descricao_cols[1] if len(descricao_cols) > 1 else (descricao_cols[0] if descricao_cols else None)
     col_valor = saldo_cols[0] if saldo_cols else None
 
     if not col_codigo or not col_valor:
         raise ValueError(
-            f"Layout contábil inválido. Colunas encontradas: {list(df.columns)}"
+            f"Layout contabil invalido. Colunas encontradas: {list(df.columns)}"
         )
 
     # ==========================
-    # 3️⃣ NORMALIZAR
+    # 3 NORMALIZAR
     # ==========================
     df_norm = pd.DataFrame()
     df_norm["codigo_raw"] = df[col_codigo]
     df_norm["cliente"] = df[col_cliente] if col_cliente else None
 
     # ==========================
-    # 4️⃣ CÓDIGO (JÁ VEM FORMATADO DA CONTABILIDADE)
+    # 4 CODIGO (JA VEM FORMATADO DA CONTABILIDADE)
     # ==========================
-    # Remove espaços internos: "F01133510 0002" → "F011335100002"
-    # para garantir matching com os códigos gerados pelo financeiro.
+    # Remove espacos internos: "F01133510 0002" -> "F011335100002"
+    # para garantir matching com os codigos gerados pelo financeiro.
     df_norm["codigo"] = (
         df_norm["codigo_raw"]
         .astype(str)
@@ -70,7 +70,7 @@ def normalizar_planilha_contabilidade(entrada):
     df_norm = df_norm[df_norm["codigo"].str.len() > 0].copy()
 
     # ==========================
-    # 5️⃣ CONVERTER VALOR
+    # 5 CONVERTER VALOR
     # ==========================
     def converter_valor(v: object) -> float:
         if pd.isna(v):
@@ -113,11 +113,11 @@ def normalizar_planilha_contabilidade(entrada):
     df_norm["valor"] = df[col_valor].apply(converter_valor)
 
     # ==========================
-    # 6️⃣ LIMPAR E AGRUPAR
+    # 6 LIMPAR E AGRUPAR
     # ==========================
     df_norm = df_norm[df_norm["codigo"].astype(str).str.len() > 0].copy()
 
-    # IMPORTANTE: agrupar apenas por codigo evita duplicação no merge por codigo
+    # IMPORTANTE: agrupar apenas por codigo evita duplicacao no merge por codigo
     df_agrupado = (
         df_norm.groupby(["codigo"], dropna=False, as_index=False)
         .agg(

@@ -1,7 +1,7 @@
 import httpx
 import json
 
-# Configurações
+# Configuracoes
 PROTHEUS_URL  = "https://192.168.1.100:8089"
 PROTHEUS_USER = "histepenson.ribeiro"
 PROTHEUS_PASS = "010101"

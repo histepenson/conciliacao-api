@@ -7,7 +7,7 @@ from services.conciliacao_service import ConciliacaoService
 from services.ctbr140_service import Ctbr140Service
 from core.config import settings
 
-router = APIRouter(prefix="/conciliacoes", tags=["Conciliações"])
+router = APIRouter(prefix="/conciliacoes", tags=["Conciliacoes"])
 logger = logging.getLogger(__name__)
 
 
@@ -15,7 +15,7 @@ async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConcili
     """
     Se base_contabil_filtrada.ctbr140_params estiver preenchido, busca os registros
     diretamente do Protheus (ZCTBR140API) e substitui registros no request.
-    Caso contrário, retorna o request inalterado.
+    Caso contrario, retorna o request inalterado.
     """
     params = request.base_contabil_filtrada.ctbr140_params
     if not params:
@@ -26,7 +26,7 @@ async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConcili
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
-                "ctbr140_params fornecido mas PROTHEUS_URL não configurado. "
+                "ctbr140_params fornecido mas PROTHEUS_URL nao configurado. "
                 "Informe 'protheus_url' dentro de ctbr140_params ou defina PROTHEUS_URL no .env"
             ),
         )
@@ -37,7 +37,7 @@ async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConcili
     ctbr140_svc = Ctbr140Service(url, user, password, tenant_id)
 
     logger.info(
-        "🔗 Buscando CTBR140 do Protheus — data_fim=%s  conta_de=%s  conta_ate=%s",
+        " Buscando CTBR140 do Protheus -- data_fim=%s  conta_de=%s  conta_ate=%s",
         params.data_fim,
         params.conta_de,
         params.conta_ate,
@@ -46,7 +46,7 @@ async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConcili
     registros = await ctbr140_svc.buscar_como_registros(
         params.model_dump(exclude_none=True)
     )
-    logger.info("📊 CTBR140 retornou %s registros do Protheus", len(registros))
+    logger.info(" CTBR140 retornou %s registros do Protheus", len(registros))
 
     base_filtrada = request.base_contabil_filtrada.model_copy(
         update={"registros": registros}
@@ -57,27 +57,27 @@ async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConcili
 @router.post("/contabil")
 async def processar_conciliacao(request: RequestConciliacao):
     """
-    Processa uma conciliação contábil comparando origem vs contabilidade.
+    Processa uma conciliacao contabil comparando origem vs contabilidade.
 
-    **Modos de fornecer a base contábil filtrada (CTBR140):**
+    **Modos de fornecer a base contabil filtrada (CTBR140):**
 
-    1. **Upload manual** — envie `base_contabil_filtrada.registros` com os dados
-       exportados do relatório CTBR140 (comportamento original).
+    1. **Upload manual** -- envie `base_contabil_filtrada.registros` com os dados
+       exportados do relatorio CTBR140 (comportamento original).
 
-    2. **Busca automática via Protheus** — preencha `base_contabil_filtrada.ctbr140_params`
-       com os parâmetros do período/conta e deixe `registros` vazio (ou omita).
-       O backend buscará os dados diretamente da API ZCTBR140API.
+    2. **Busca automatica via Protheus** -- preencha `base_contabil_filtrada.ctbr140_params`
+       com os parametros do periodo/conta e deixe `registros` vazio (ou omita).
+       O backend buscara os dados diretamente da API ZCTBR140API.
 
-    **Modos de fornecer a base geral contábil (CTBR480):**
+    **Modos de fornecer a base geral contabil (CTBR480):**
 
-    1. **Upload manual** — envie `base_contabil_geral.registros` com os dados
-       exportados do relatório CTBR480 (comportamento original).
+    1. **Upload manual** -- envie `base_contabil_geral.registros` com os dados
+       exportados do relatorio CTBR480 (comportamento original).
 
-    2. **Busca automática via Protheus** — preencha `base_contabil_geral.ctbr480_params`
-       com os parâmetros do período/item e deixe `registros` vazio (ou omita).
-       O backend buscará os dados diretamente da API ZCTBR480API.
+    2. **Busca automatica via Protheus** -- preencha `base_contabil_geral.ctbr480_params`
+       com os parametros do periodo/item e deixe `registros` vazio (ou omita).
+       O backend buscara os dados diretamente da API ZCTBR480API.
 
-    Exemplo com busca automática de ambos:
+    Exemplo com busca automatica de ambos:
     ```json
     {
       "base_contabil_filtrada": {
@@ -95,15 +95,15 @@ async def processar_conciliacao(request: RequestConciliacao):
     ```
     """
     try:
-        logger.info("📥 Recebendo requisição de conciliação")
+        logger.info(" Recebendo requisicao de conciliacao")
 
-        # Resolve base contábil filtrada: busca do Protheus se ctbr140_params presente
+        # Resolve base contabil filtrada: busca do Protheus se ctbr140_params presente
         request = await _resolver_base_contabil(request)
 
-        logger.info("📊 Origem: %s registros", len(request.base_origem.registros))
-        logger.info("📊 Contábil: %s registros", len(request.base_contabil_filtrada.registros))
+        logger.info(" Origem: %s registros", len(request.base_origem.registros))
+        logger.info(" Contabil: %s registros", len(request.base_contabil_filtrada.registros))
         logger.info(
-            "📊 Geral: %s registros (ctbr480_params=%s)",
+            " Geral: %s registros (ctbr480_params=%s)",
             len(request.base_contabil_geral.registros),
             bool(request.base_contabil_geral.ctbr480_params),
         )
@@ -112,17 +112,17 @@ async def processar_conciliacao(request: RequestConciliacao):
 
         valido, mensagem = service.validar_dados(request)
         if not valido:
-            logger.error("❌ Validação falhou: %s", mensagem)
+            logger.error(" Validacao falhou: %s", mensagem)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=mensagem,
             )
 
-        # Usa executar_async para suportar busca automática do CTBR480
+        # Usa executar_async para suportar busca automatica do CTBR480
         resultado = await service.executar_async(request)
 
-        logger.info("✅ Conciliação processada com sucesso")
-        logger.info("📊 Resultado: %s", resultado.get("resumo", {}))
+        logger.info(" Conciliacao processada com sucesso")
+        logger.info(" Resultado: %s", resultado.get("resumo", {}))
 
         return resultado
 
@@ -130,8 +130,8 @@ async def processar_conciliacao(request: RequestConciliacao):
         raise
 
     except Exception as e:
-        logger.error("❌ Erro ao processar conciliação: %s", str(e), exc_info=True)
+        logger.error(" Erro ao processar conciliacao: %s", str(e), exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao processar conciliação: {str(e)}",
+            detail=f"Erro ao processar conciliacao: {str(e)}",
         )

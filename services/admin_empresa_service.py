@@ -29,13 +29,13 @@ def listar_empresas(db: Session) -> List[Empresa]:
 def obter_empresa(db: Session, empresa_id: int) -> Empresa:
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa nao encontrada")
     return empresa
 
 
 def criar_empresa(db: Session, data: dict, created_by: Optional[int] = None) -> Empresa:
     if db.query(Empresa).filter(Empresa.cnpj == data.get("cnpj")).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CNPJ já cadastrado")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CNPJ ja cadastrado")
 
     empresa = Empresa(
         nome=data.get("nome"),

@@ -29,7 +29,7 @@ def route_listar_planos(empresa_id: int, skip: int = 0, limit: int = 1000, db: S
 def route_buscar_conta(id: int, db: Session = Depends(get_db)):
     conta = buscar_conta(db, id)
     if not conta:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
     return conta
 
 
@@ -42,7 +42,7 @@ def route_criar_conta(conta: PlanoDeContasCreate, db: Session = Depends(get_db))
 def route_atualizar_conta(id: int, conta: PlanoDeContasUpdate, db: Session = Depends(get_db)):
     updated = atualizar_conta(db, id, conta.model_dump(exclude_unset=True))
     if not updated:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
     return updated
 
 
@@ -50,7 +50,7 @@ def route_atualizar_conta(id: int, conta: PlanoDeContasUpdate, db: Session = Dep
 def route_deletar_conta(id: int, db: Session = Depends(get_db)):
     sucesso = deletar_conta(db, id)
     if not sucesso:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
     return None
 
 

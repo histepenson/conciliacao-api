@@ -14,7 +14,7 @@ def _get_service(protheus_url: Optional[str]) -> FinR130Service:
     if not url:
         raise HTTPException(
             status_code=422,
-            detail="URL do Protheus não configurada. Informe o parâmetro 'protheus_url' ou defina PROTHEUS_URL no .env",
+            detail="URL do Protheus nao configurada. Informe o parametro 'protheus_url' ou defina PROTHEUS_URL no .env",
         )
     user = getattr(settings, "PROTHEUS_USER", "")
     password = getattr(settings, "PROTHEUS_PASSWORD", "")
@@ -63,14 +63,14 @@ async def get_titulos_receber(
     emissao_futura: Optional[str] = Query(None),
     taxa_moeda: Optional[str] = Query(None),
     considera_data: Optional[str] = Query(None),
-    # URL do Protheus — usa env PROTHEUS_URL se não informado
+    # URL do Protheus -- usa env PROTHEUS_URL se nao informado
     protheus_url: Optional[str] = Query(None, description="URL base do servidor Protheus (ex: https://192.168.1.100:8089)"),
 ):
     """
-    Proxy para o ZFINR130API do Protheus (Posição dos Títulos a Receber).
+    Proxy para o ZFINR130API do Protheus (Posicao dos Titulos a Receber).
 
-    Busca automaticamente todas as páginas e retorna o resultado consolidado.
-    Configura PROTHEUS_URL no .env para não precisar passar o parâmetro a cada chamada.
+    Busca automaticamente todas as paginas e retorna o resultado consolidado.
+    Configura PROTHEUS_URL no .env para nao precisar passar o parametro a cada chamada.
     """
     params = {
         "data_base": data_base,

@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -27,15 +27,15 @@ from routers.matr900_router import router as matr900_router
 from routers.finr150_router import router as finr150_router
 
 app = FastAPI(
-    title="Conciliação API",
+    title="Conciliacao API",
     description="""
-API para conciliação contábil e financeira.
+API para conciliacao contabil e financeira.
 
 Fluxo:
 1. Cadastro de empresa
 2. Plano de contas
 3. Upload de arquivos
-4. Conciliação mensal
+4. Conciliacao mensal
 """,
     version="1.0.0",
     docs_url="/docs",
@@ -57,7 +57,7 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Captura exceções não tratadas para que a resposta 500
+    """Captura excecoes nao tratadas para que a resposta 500
     passe pelo CORSMiddleware e inclua os headers corretos."""
     traceback.print_exc()
     return JSONResponse(

@@ -10,7 +10,7 @@ from pathlib import Path
 # CARREGAMENTO DO .env - CORRIGIDO
 # ============================================================
 
-# Obtém o diretório do arquivo atual (backend/)
+# Obtem o diretorio do arquivo atual (backend/)
 load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 Base = declarative_base()
@@ -27,13 +27,13 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 print(f"[INFO] DATABASE_URL carregada: {DATABASE_URL[:50] if DATABASE_URL else 'NONE'}...")
 
-# Verifica se a variável foi carregada
+# Verifica se a variavel foi carregada
 if not DATABASE_URL:
     print(f"\n[ERRO] DATABASE_URL nao encontrada!")
     print(f"[INFO] Verifique se existe o arquivo: {env_path}")
     print(f"[INFO] O arquivo .env deve conter: DATABASE_URL=postgresql://...")
     raise ValueError(
-        f"A variável DATABASE_URL não está definida.\n"
+        f"A variavel DATABASE_URL nao esta definida.\n"
         f"Esperado em: {env_path}\n"
         f"Arquivo existe? {env_path.exists()}"
     )
@@ -41,19 +41,19 @@ if not DATABASE_URL:
 print("[OK] DATABASE_URL carregada com sucesso!")
 
 # ============================================================
-# CONFIGURAÇÃO DO SQLAlchemy
+# CONFIGURACAO DO SQLAlchemy
 # ============================================================
 
 # Cria o engine do banco
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,  # Verifica conexão antes de usar
-    pool_size=10,        # Pool de conexões
-    max_overflow=20,     # Conexões extras quando necessário
+    pool_pre_ping=True,  # Verifica conexao antes de usar
+    pool_size=10,        # Pool de conexoes
+    max_overflow=20,     # Conexoes extras quando necessario
     echo=False           # Mude para True para ver queries SQL
 )
 
-# Cria a sessão
+# Cria a sessao
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Base para os modelos
@@ -65,8 +65,8 @@ Base = declarative_base()
 
 def get_db():
     """
-    Cria uma sessão do banco de dados para cada requisição.
-    Fecha automaticamente após o uso.
+    Cria uma sessao do banco de dados para cada requisicao.
+    Fecha automaticamente apos o uso.
     """
     db = SessionLocal()
     try:
@@ -75,11 +75,11 @@ def get_db():
         db.close()
 
 # ============================================================
-# FUNÇÃO AUXILIAR PARA TESTAR CONEXÃO
+# FUNCAO AUXILIAR PARA TESTAR CONEXAO
 # ============================================================
 
 def test_connection():
-    """Testa se a conexão com o banco está funcionando"""
+    """Testa se a conexao com o banco esta funcionando"""
     try:
         with engine.connect() as connection:
             print("[OK] Conexao com o banco de dados OK!")
@@ -90,6 +90,6 @@ def test_connection():
 
 
 if __name__ == "__main__":
-    # Testa a conexão quando executar diretamente
+    # Testa a conexao quando executar diretamente
     print("\n[TEST] Testando conexao com o banco...")
     test_connection()

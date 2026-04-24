@@ -19,7 +19,7 @@ from datetime import datetime
 def criar_empresa(db: Session, emp: EmpresaCreate):
     # Verifica duplicidade
     if db.query(Empresa).filter(Empresa.cnpj == emp.cnpj).first():
-        raise HTTPException(status_code=400, detail="CNPJ já cadastrado")
+        raise HTTPException(status_code=400, detail="CNPJ ja cadastrado")
 
     now = datetime.now(timezone.utc)  # datetime aware em UTC
     nova_empresa = Empresa(

@@ -14,7 +14,7 @@ def _get_service(protheus_url: Optional[str]) -> FinR150Service:
     if not url:
         raise HTTPException(
             status_code=422,
-            detail="URL do Protheus não configurada. Informe o parâmetro 'protheus_url' ou defina PROTHEUS_URL no .env",
+            detail="URL do Protheus nao configurada. Informe o parametro 'protheus_url' ou defina PROTHEUS_URL no .env",
         )
     user = getattr(settings, "PROTHEUS_USER", "")
     password = getattr(settings, "PROTHEUS_PASSWORD", "")
@@ -65,9 +65,9 @@ async def get_titulos_pagar(
     protheus_url: Optional[str] = Query(None, description="URL base do servidor Protheus"),
 ):
     """
-    Proxy para o ZFINR150API do Protheus (Posição dos Títulos a Pagar).
+    Proxy para o ZFINR150API do Protheus (Posicao dos Titulos a Pagar).
 
-    Busca automaticamente todas as páginas e retorna o resultado consolidado.
+    Busca automaticamente todas as paginas e retorna o resultado consolidado.
     """
     params = {
         "data_base": data_base, "page": page, "pageSize": pageSize,
@@ -103,8 +103,8 @@ async def get_titulos_pagar(
     "/base-pagar",
     summary="FINR150 formatado como base financeira de contas a pagar",
     description=(
-        "Retorna os títulos do FINR150 já no formato de registros esperado pelo "
-        "ProcessadorContasPagar, prontos para uso na conciliação."
+        "Retorna os titulos do FINR150 ja no formato de registros esperado pelo "
+        "ProcessadorContasPagar, prontos para uso na conciliacao."
     ),
 )
 async def get_como_base_pagar(

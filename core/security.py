@@ -25,20 +25,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def validate_password_strength(password: str) -> tuple[bool, str]:
     """
-    Valida a força da senha conforme política definida.
-    Retorna (válido, mensagem_erro).
+    Valida a forca da senha conforme politica definida.
+    Retorna (valido, mensagem_erro).
     """
     if len(password) < settings.PASSWORD_MIN_LENGTH:
-        return False, f"Senha deve ter no mínimo {settings.PASSWORD_MIN_LENGTH} caracteres"
+        return False, f"Senha deve ter no minimo {settings.PASSWORD_MIN_LENGTH} caracteres"
 
     if settings.PASSWORD_REQUIRE_UPPERCASE and not any(c.isupper() for c in password):
-        return False, "Senha deve conter pelo menos uma letra maiúscula"
+        return False, "Senha deve conter pelo menos uma letra maiuscula"
 
     if settings.PASSWORD_REQUIRE_LOWERCASE and not any(c.islower() for c in password):
-        return False, "Senha deve conter pelo menos uma letra minúscula"
+        return False, "Senha deve conter pelo menos uma letra minuscula"
 
     if settings.PASSWORD_REQUIRE_DIGIT and not any(c.isdigit() for c in password):
-        return False, "Senha deve conter pelo menos um número"
+        return False, "Senha deve conter pelo menos um numero"
 
     if settings.PASSWORD_REQUIRE_SPECIAL:
         special_chars = "!@#$%^&*()_+-=[]{}|;:,.<>?/"
@@ -58,10 +58,10 @@ def create_access_token(
     Cria token JWT de acesso.
 
     Args:
-        user_id: ID do usuário
+        user_id: ID do usuario
         empresa_id: ID da empresa selecionada (opcional)
-        is_admin: Se o usuário é admin master
-        expires_delta: Tempo de expiração customizado
+        is_admin: Se o usuario e admin master
+        expires_delta: Tempo de expiracao customizado
 
     Returns:
         Token JWT codificado
@@ -87,7 +87,7 @@ def create_refresh_token(user_id: int) -> str:
     Cria refresh token JWT (validade maior).
 
     Args:
-        user_id: ID do usuário
+        user_id: ID do usuario
 
     Returns:
         Refresh token JWT codificado
@@ -112,7 +112,7 @@ def decode_token(token: str) -> Optional[dict]:
         token: Token JWT
 
     Returns:
-        Payload do token ou None se inválido
+        Payload do token ou None se invalido
     """
     try:
         payload = jwt.decode(
@@ -144,15 +144,15 @@ def verify_reset_token(plain_token: str, hashed_token: str) -> bool:
     Verifica se o token de reset corresponde ao hash.
 
     Args:
-        plain_token: Token recebido do usuário
+        plain_token: Token recebido do usuario
         hashed_token: Hash armazenado no banco
 
     Returns:
-        True se válido
+        True se valido
     """
     return pwd_context.verify(plain_token, hashed_token)
 
 
 def generate_session_id() -> str:
-    """Gera ID único para sessão."""
+    """Gera ID unico para sessao."""
     return secrets.token_urlsafe(32)

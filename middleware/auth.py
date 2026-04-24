@@ -1,6 +1,6 @@
 # middleware/auth.py
 """
-Middleware de autenticação - Validação de JWT e usuário.
+Middleware de autenticacao - Validacao de JWT e usuario.
 """
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -16,7 +16,7 @@ security = HTTPBearer(auto_error=False)
 
 
 class CurrentUser:
-    """Contexto do usuário atual."""
+    """Contexto do usuario atual."""
 
     def __init__(
         self,
@@ -41,15 +41,15 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> CurrentUser:
     """
-    Dependency que valida o token JWT e retorna o usuário atual.
+    Dependency que valida o token JWT e retorna o usuario atual.
 
     Raises:
-        HTTPException 401: Se token inválido ou usuário não encontrado
+        HTTPException 401: Se token invalido ou usuario nao encontrado
     """
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de autenticação não fornecido",
+            detail="Token de autenticacao nao fornecido",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -60,7 +60,7 @@ async def get_current_user(
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido ou expirado",
+            detail="Token invalido ou expirado",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -69,7 +69,7 @@ async def get_current_user(
     if token_type != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Tipo de token inválido",
+            detail="Tipo de token invalido",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -78,24 +78,24 @@ async def get_current_user(
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido",
+            detail="Token invalido",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Buscar usuário no banco
+    # Buscar usuario no banco
     user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado",
+            detail="Usuario nao encontrado",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Verificar se usuário está ativo
+    # Verificar se usuario esta ativo
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário desativado",
+            detail="Usuario desativado",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -112,8 +112,8 @@ async def get_current_active_user(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> CurrentUser:
     """
-    Dependency que garante que o usuário está ativo.
-    (Redundante com get_current_user, mas pode ser útil para clareza)
+    Dependency que garante que o usuario esta ativo.
+    (Redundante com get_current_user, mas pode ser util para clareza)
     """
     return current_user
 
@@ -123,8 +123,8 @@ async def get_optional_current_user(
     db: Session = Depends(get_db),
 ) -> Optional[CurrentUser]:
     """
-    Dependency que retorna o usuário atual se autenticado, ou None.
-    Útil para endpoints públicos que têm comportamento diferente para usuários logados.
+    Dependency que retorna o usuario atual se autenticado, ou None.
+    Util para endpoints publicos que tem comportamento diferente para usuarios logados.
     """
     if credentials is None:
         return None

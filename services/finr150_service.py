@@ -29,7 +29,7 @@ class FinR150Service:
         self.tenant_id = tenant_id
 
     async def buscar_todos_titulos(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Chama o ZFINR150API paginando automaticamente e retorna todos os títulos."""
+        """Chama o ZFINR150API paginando automaticamente e retorna todos os titulos."""
         page_size = int(params.get("pageSize", 100))
         query = {k: v for k, v in params.items() if k in _PARAMS_FINR150 and v is not None}
         query["pageSize"] = page_size
@@ -44,7 +44,7 @@ class FinR150Service:
         async with httpx.AsyncClient(verify=False, timeout=120.0, auth=self.auth) as client:
             while current_page <= total_pages:
                 query["page"] = current_page
-                logger.info("FINR150 → página %s/%s  endpoint=%s  tenant=%s", current_page, total_pages, self.endpoint, self.tenant_id)
+                logger.info("FINR150 -> pagina %s/%s  endpoint=%s  tenant=%s", current_page, total_pages, self.endpoint, self.tenant_id)
 
                 resp = await client.get(self.endpoint, params=query, headers=headers)
                 resp.raise_for_status()
@@ -68,15 +68,15 @@ class FinR150Service:
 
     async def buscar_como_registros(self, params: dict[str, Any]) -> list[dict]:
         """
-        Retorna os títulos no formato esperado por ProcessadorContasPagar.
+        Retorna os titulos no formato esperado por ProcessadorContasPagar.
 
         Colunas geradas:
-          - codigo_nome_do_fornecedor: "FORNECE-LOJA-NOME" → normalizado para F{base}{loja}
+          - codigo_nome_do_fornecedor: "FORNECE-LOJA-NOME" -> normalizado para F{base}{loja}
           - tit_vencidos_valor_corrigido: saldo_na_data quando dias_vencidos > 0
           - titulos_a_vencer_valor_nominal: saldo_na_data quando dias_vencidos <= 0
           - vencto_real: data de vencimento real
           - dias_atraso: dias vencidos (negativo = a vencer)
-          - tp: tipo do título (para filtro opcional)
+          - tp: tipo do titulo (para filtro opcional)
         """
         resultado = await self.buscar_todos_titulos(params)
         registros = []

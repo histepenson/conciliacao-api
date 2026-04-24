@@ -41,11 +41,11 @@ PlanoDeContasOut = PlanoDeContasResponse
 
 
 # ============================================================
-# SCHEMAS PARA IMPORTAÇÃO
+# SCHEMAS PARA IMPORTACAO
 # ============================================================
 
 class ImportacaoResultado(BaseModel):
-    """Resultado da importação de plano de contas"""
+    """Resultado da importacao de plano de contas"""
     mensagem: str
     total_linhas: int
     importados: int
@@ -57,7 +57,7 @@ class ImportacaoResultado(BaseModel):
 
 
 class ImportacaoErro(BaseModel):
-    """Detalhes de erro durante importação"""
+    """Detalhes de erro durante importacao"""
     linha: int
     codigo_conta: Optional[str] = None
     erro: str

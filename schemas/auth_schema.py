@@ -9,7 +9,7 @@ from datetime import datetime
 # ============================================================
 
 class LoginRequest(BaseModel):
-    """Schema para requisição de login."""
+    """Schema para requisicao de login."""
     email: EmailStr
     password: str = Field(..., min_length=1)
 
@@ -29,7 +29,7 @@ class LoginResponse(BaseModel):
 # ============================================================
 
 class RefreshTokenRequest(BaseModel):
-    """Schema para renovação de token."""
+    """Schema para renovacao de token."""
     refresh_token: str
 
 
@@ -45,17 +45,17 @@ class TokenResponse(BaseModel):
 # ============================================================
 
 class ForgotPasswordRequest(BaseModel):
-    """Schema para solicitação de reset de senha."""
+    """Schema para solicitacao de reset de senha."""
     email: EmailStr
 
 
 class ForgotPasswordResponse(BaseModel):
-    """Schema para resposta de solicitação de reset."""
-    message: str = "Se o email existir, você receberá instruções para redefinir sua senha."
+    """Schema para resposta de solicitacao de reset."""
+    message: str = "Se o email existir, voce recebera instrucoes para redefinir sua senha."
 
 
 class ResetPasswordRequest(BaseModel):
-    """Schema para redefinição de senha."""
+    """Schema para redefinicao de senha."""
     token: str
     new_password: str = Field(..., min_length=8)
 
@@ -63,23 +63,23 @@ class ResetPasswordRequest(BaseModel):
     @classmethod
     def validate_password(cls, v):
         if len(v) < 8:
-            raise ValueError("Senha deve ter no mínimo 8 caracteres")
+            raise ValueError("Senha deve ter no minimo 8 caracteres")
         if not any(c.isupper() for c in v):
-            raise ValueError("Senha deve conter pelo menos uma letra maiúscula")
+            raise ValueError("Senha deve conter pelo menos uma letra maiuscula")
         if not any(c.islower() for c in v):
-            raise ValueError("Senha deve conter pelo menos uma letra minúscula")
+            raise ValueError("Senha deve conter pelo menos uma letra minuscula")
         if not any(c.isdigit() for c in v):
-            raise ValueError("Senha deve conter pelo menos um número")
+            raise ValueError("Senha deve conter pelo menos um numero")
         return v
 
 
 class ResetPasswordResponse(BaseModel):
-    """Schema para resposta de redefinição de senha."""
+    """Schema para resposta de redefinicao de senha."""
     message: str = "Senha redefinida com sucesso."
 
 
 class ChangePasswordRequest(BaseModel):
-    """Schema para alteração de senha (usuário logado)."""
+    """Schema para alteracao de senha (usuario logado)."""
     current_password: str
     new_password: str = Field(..., min_length=8)
 
@@ -87,7 +87,7 @@ class ChangePasswordRequest(BaseModel):
     @classmethod
     def validate_password(cls, v):
         if len(v) < 8:
-            raise ValueError("Senha deve ter no mínimo 8 caracteres")
+            raise ValueError("Senha deve ter no minimo 8 caracteres")
         return v
 
 
@@ -96,12 +96,12 @@ class ChangePasswordRequest(BaseModel):
 # ============================================================
 
 class SelectEmpresaRequest(BaseModel):
-    """Schema para seleção de empresa."""
+    """Schema para selecao de empresa."""
     empresa_id: int
 
 
 class SelectEmpresaResponse(BaseModel):
-    """Schema para resposta de seleção de empresa."""
+    """Schema para resposta de selecao de empresa."""
     access_token: str
     token_type: str = "bearer"
     expires_in: int
@@ -114,7 +114,7 @@ class SelectEmpresaResponse(BaseModel):
 # ============================================================
 
 class UserInfo(BaseModel):
-    """Informações básicas do usuário."""
+    """Informacoes basicas do usuario."""
     id: int
     email: str
     nome: str
@@ -125,7 +125,7 @@ class UserInfo(BaseModel):
 
 
 class UserMe(BaseModel):
-    """Informações completas do usuário logado."""
+    """Informacoes completas do usuario logado."""
     id: int
     email: str
     nome: str
@@ -143,12 +143,12 @@ class UserMe(BaseModel):
 
 
 class EmpresaInfo(BaseModel):
-    """Informações básicas da empresa."""
+    """Informacoes basicas da empresa."""
     id: int
     nome: str
     cnpj: str
     status: bool
-    perfil: Optional[str] = None  # Nome do perfil do usuário nesta empresa
+    perfil: Optional[str] = None  # Nome do perfil do usuario nesta empresa
 
     class Config:
         from_attributes = True
@@ -159,7 +159,7 @@ class EmpresaInfo(BaseModel):
 # ============================================================
 
 class PerfilInfo(BaseModel):
-    """Informações do perfil."""
+    """Informacoes do perfil."""
     id: int
     nome: str
     descricao: Optional[str]
