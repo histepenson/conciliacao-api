@@ -65,7 +65,20 @@ def _user_info(user: Usuario) -> Dict[str, Any]:
     }
 
 
-def _get_user_empresas(db: Session, user_id: int) -> List[Dict[str, Any]]:
+def _get_user_empresas(db: Session, user_id: int, is_admin: bool = False) -> List[Dict[str, Any]]:
+    if is_admin:
+        empresas = db.query(Empresa).filter(Empresa.status == True).order_by(Empresa.nome).all()
+        return [
+            {
+                "id": empresa.id,
+                "nome": empresa.nome,
+                "cnpj": empresa.cnpj,
+                "status": empresa.status,
+                "perfil": "Admin Master",
+            }
+            for empresa in empresas
+        ]
+
     associacoes = (
         db.query(UsuarioEmpresa)
         .join(Empresa, UsuarioEmpresa.empresa_id == Empresa.id)
@@ -138,7 +151,7 @@ def login(
     db.add(session)
     db.commit()
 
-    empresas = _get_user_empresas(db, user.id)
+    empresas = _get_user_empresas(db, user.id, user.is_admin)
 
     return {
         "access_token": access_token,
@@ -270,7 +283,7 @@ def select_empresa(
 
 
 def me(db: Session, user: Usuario, empresa_id: Optional[int]) -> Dict[str, Any]:
-    empresas = _get_user_empresas(db, user.id)
+    empresas = _get_user_empresas(db, user.id, user.is_admin)
     empresa_atual = None
     if empresa_id:
         empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()

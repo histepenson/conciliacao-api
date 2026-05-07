@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -25,8 +26,37 @@ from routers.finr470_router import router as finr470_router
 from routers.ctbr400_router import router as ctbr400_router
 from routers.matr900_router import router as matr900_router
 from routers.finr150_router import router as finr150_router
+from routers.produto_router import router as produto_router
+from routers.produto_fornecedor_router import router as produto_fornecedor_router
+from routers.certificado_router import router as certificado_router
+from routers.nfe_router import router as nfe_router
+from routers.estoque_router import router as estoque_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from db import SessionLocal
+    from services.fechamento_service import job_fechar_mes_anterior
+
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(
+        job_fechar_mes_anterior,
+        trigger="cron",
+        day=1,
+        hour=2,
+        minute=0,
+        args=[SessionLocal],
+        id="fechar_mes_anterior",
+        replace_existing=True,
+    )
+    scheduler.start()
+    yield
+    scheduler.shutdown(wait=False)
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title="Conciliacao API",
     description="""
 API para conciliacao contabil e financeira.
@@ -40,7 +70,8 @@ Fluxo:
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
+    redirect_slashes=False,
 )
 
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
@@ -92,6 +123,8 @@ app.include_router(finr470_router, prefix="/api")
 app.include_router(ctbr400_router, prefix="/api")
 app.include_router(matr900_router, prefix="/api")
 app.include_router(finr150_router, prefix="/api")
-
-
-
+app.include_router(produto_router, prefix="/api")
+app.include_router(produto_fornecedor_router, prefix="/api")
+app.include_router(certificado_router, prefix="/api")
+app.include_router(nfe_router, prefix="/api")
+app.include_router(estoque_router)

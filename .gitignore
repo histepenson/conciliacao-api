@@ -17,3 +17,16 @@ venv/
 .DS_Store
 nul
 NUL
+
+# Logs
+*.log
+uvicorn_*.log
+
+# Docs — dependências e capturas locais
+docs/node_modules/
+docs/package-lock.json
+docs/screenshots/
+
+# Arquivos temporários / artefatos
+=*
+data/

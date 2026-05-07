@@ -52,7 +52,7 @@ def criar_empresa(db: Session, data: dict, created_by: Optional[int] = None) -> 
 
 def atualizar_empresa(db: Session, empresa_id: int, data: dict, updated_by: Optional[int] = None) -> Empresa:
     empresa = obter_empresa(db, empresa_id)
-    for field in ["nome", "cnpj", "status", "permite_efetivar_divergente"]:
+    for field in ["nome", "cnpj", "status", "permite_efetivar_divergente", "protheus_tenant"]:
         if field in data and data[field] is not None:
             setattr(empresa, field, data[field])
     empresa.updated_by = updated_by

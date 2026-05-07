@@ -19,7 +19,7 @@ UPLOAD_DIR = resolve_storage_dir()
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-@router.get("/", response_model=List[ArquivoConciliacaoResponse])
+@router.get("", response_model=List[ArquivoConciliacaoResponse])
 def listar_arquivos(
     empresa_id: Optional[int] = None,
     tipo_arquivo: Optional[str] = None,
@@ -52,7 +52,7 @@ def buscar_arquivo(id: int, db: Session = Depends(get_db)):
     return arquivo
 
 
-@router.post("/", response_model=ArquivoConciliacaoResponse, status_code=201)
+@router.post("", response_model=ArquivoConciliacaoResponse, status_code=201)
 def criar_arquivo(
     arquivo: ArquivoConciliacaoCreate,  # <- Schema Pydantic, nao modelo SQLAlchemy
     db: Session = Depends(get_db)

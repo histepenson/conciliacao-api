@@ -26,6 +26,7 @@ def criar_empresa(db: Session, emp: EmpresaCreate):
         nome=emp.nome,
         cnpj=emp.cnpj,
         status=emp.status,
+        protheus_tenant=emp.protheus_tenant,
         updated_at=now,
         created_at=now
     )
@@ -44,12 +45,16 @@ def obter_empresa(db: Session, empresa_id: int):
     return db.query(Empresa).filter(Empresa.id == empresa_id).first()
 
 
-def atualizar_empresa(db: Session, empresa_id: int, dados: EmpresaUpdate):
+def atualizar_empresa(db: Session, empresa_id: int, dados: EmpresaUpdate, is_admin: bool = False):
     empresa = obter_empresa(db, empresa_id)
     if not empresa:
         return None
 
-    for campo, valor in dados.model_dump(exclude_unset=True).items():
+    campos = dados.model_dump(exclude_unset=True)
+    if not is_admin:
+        campos.pop("protheus_tenant", None)
+
+    for campo, valor in campos.items():
         setattr(empresa, campo, valor)
 
     db.commit()

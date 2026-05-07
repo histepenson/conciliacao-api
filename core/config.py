@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # Storage
     STORAGE_DIR: str = "data"
 
+    # Certificado Digital
+    CERT_ENCRYPTION_KEY: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

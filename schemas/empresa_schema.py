@@ -8,6 +8,7 @@ class EmpresaBase(BaseModel):
     cnpj: str
     status: bool = True
     permite_efetivar_divergente: bool = False
+    protheus_tenant: Optional[str] = None
 
 class EmpresaCreate(EmpresaBase):
     pass
@@ -18,6 +19,7 @@ class EmpresaUpdate(BaseModel):
     cnpj: Optional[str] = None
     status: Optional[bool] = None
     permite_efetivar_divergente: Optional[bool] = None
+    protheus_tenant: Optional[str] = None
 
 
 class EmpresaResponse(EmpresaBase):

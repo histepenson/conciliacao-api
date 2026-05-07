@@ -173,6 +173,10 @@ class Permissions:
     RELATORIO_READ = "relatorio:read"
     RELATORIO_EXPORT = "relatorio:export"
 
+    # Estoque
+    ESTOQUE_READ = "estoque:read"
+    ESTOQUE_WRITE = "estoque:write"
+
     # Wildcard
     ALL = "*"
 
@@ -196,5 +200,7 @@ ALL_PERMISSIONS = [
     Permissions.ARQUIVO_DELETE,
     Permissions.RELATORIO_READ,
     Permissions.RELATORIO_EXPORT,
+    Permissions.ESTOQUE_READ,
+    Permissions.ESTOQUE_WRITE,
     Permissions.ALL,
 ]

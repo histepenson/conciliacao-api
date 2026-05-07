@@ -1,15 +1,19 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 import logging
 
+from sqlalchemy.orm import Session
+
+from db import get_db
 from services.finr130_service import FinR130Service
 from core.config import settings
+from core.protheus import resolve_protheus_tenant
 
 router = APIRouter(prefix="/v1/finr130", tags=["FINR130"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(protheus_url: Optional[str]) -> FinR130Service:
+def _get_service(protheus_url: Optional[str], tenant_id: str) -> FinR130Service:
     url = protheus_url or getattr(settings, "PROTHEUS_URL", None)
     if not url:
         raise HTTPException(
@@ -18,7 +22,6 @@ def _get_service(protheus_url: Optional[str]) -> FinR130Service:
         )
     user = getattr(settings, "PROTHEUS_USER", "")
     password = getattr(settings, "PROTHEUS_PASSWORD", "")
-    tenant_id = getattr(settings, "PROTHEUS_TENANT", "02,0201")
     return FinR130Service(url, user, password, tenant_id)
 
 
@@ -63,8 +66,9 @@ async def get_titulos_receber(
     emissao_futura: Optional[str] = Query(None),
     taxa_moeda: Optional[str] = Query(None),
     considera_data: Optional[str] = Query(None),
-    # URL do Protheus -- usa env PROTHEUS_URL se nao informado
     protheus_url: Optional[str] = Query(None, description="URL base do servidor Protheus (ex: https://192.168.1.100:8089)"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    db: Session = Depends(get_db),
 ):
     """
     Proxy para o ZFINR130API do Protheus (Posicao dos Titulos a Receber).
@@ -114,7 +118,8 @@ async def get_titulos_receber(
         "considera_data": considera_data,
     }
 
-    service = _get_service(protheus_url)
+    tenant_id = resolve_protheus_tenant(empresa_id, db)
+    service = _get_service(protheus_url, tenant_id)
 
     try:
         resultado = await service.buscar_todos_titulos(params)

@@ -1,15 +1,19 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 import logging
 
+from sqlalchemy.orm import Session
+
+from db import get_db
 from services.matr900_service import Matr900Service
 from core.config import settings
+from core.protheus import resolve_protheus_tenant
 
 router = APIRouter(prefix="/v1/matr900", tags=["MATR900"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(protheus_url: Optional[str]) -> Matr900Service:
+def _get_service(protheus_url: Optional[str], tenant_id: str) -> Matr900Service:
     url = protheus_url or getattr(settings, "PROTHEUS_URL", None)
     if not url:
         raise HTTPException(
@@ -21,7 +25,6 @@ def _get_service(protheus_url: Optional[str]) -> Matr900Service:
         )
     user = getattr(settings, "PROTHEUS_USER", "")
     password = getattr(settings, "PROTHEUS_PASSWORD", "")
-    tenant_id = getattr(settings, "PROTHEUS_TENANT", "02,0201")
     return Matr900Service(url, user, password, tenant_id)
 
 
@@ -52,6 +55,8 @@ async def get_kardex(
     considera_filiais: Optional[str] = Query("2"),
     tipo_custo: Optional[str] = Query("1", description="1=Medio 2=Reposicao"),
     protheus_url: Optional[str] = Query(None),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    db: Session = Depends(get_db),
 ):
     params = {
         "data_ini": data_ini,
@@ -73,7 +78,8 @@ async def get_kardex(
         "tipo_custo": tipo_custo,
     }
 
-    service = _get_service(protheus_url)
+    tenant_id = resolve_protheus_tenant(empresa_id, db)
+    service = _get_service(protheus_url, tenant_id)
     try:
         return await service.buscar_kardex(params)
     except Exception as exc:
@@ -107,6 +113,8 @@ async def get_como_base_kardex(
     considera_filiais: Optional[str] = Query("2"),
     tipo_custo: Optional[str] = Query("1"),
     protheus_url: Optional[str] = Query(None),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    db: Session = Depends(get_db),
 ):
     params = {
         "data_ini": data_ini,
@@ -128,7 +136,8 @@ async def get_como_base_kardex(
         "pageSize": 2000,
     }
 
-    service = _get_service(protheus_url)
+    tenant_id = resolve_protheus_tenant(empresa_id, db)
+    service = _get_service(protheus_url, tenant_id)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}

@@ -16,7 +16,7 @@ from services.admin_perfil_service import (
 router = APIRouter(prefix="/admin/perfis", tags=["Admin - Perfis"])
 
 
-@router.get("/", response_model=list[PerfilOut])
+@router.get("", response_model=list[PerfilOut])
 def admin_listar_perfis(
     db: Session = Depends(get_db),
     _admin=Depends(require_admin),
@@ -33,7 +33,7 @@ def admin_obter_perfil(
     return obter_perfil(db, perfil_id)
 
 
-@router.post("/", response_model=PerfilOut)
+@router.post("", response_model=PerfilOut)
 def admin_criar_perfil(
     payload: PerfilCreate,
     db: Session = Depends(get_db),

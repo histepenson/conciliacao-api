@@ -37,6 +37,14 @@ from .password_reset import PasswordReset
 from .user_session import UserSession
 from .audit_log import AuditLog, AuditAction
 
+# 8. Modelos de estoque
+from .produto import Produto
+from .produto_fornecedor import ProdutoFornecedor
+from .certificado_digital import CertificadoDigital
+from .nfe import NfeEntrada, NfeEntradaItem, NfeSaida, NfeSaidaItem
+from .estoque_alerta import EstoqueAlerta
+from .estoque import EstoqueSaldo, EstoqueMovimentacao
+
 # Lista todos os modelos exportados
 __all__ = [
     "Base",
@@ -53,4 +61,15 @@ __all__ = [
     "PlanoDeContas",
     "Conciliacao",
     "ArquivoConciliacao",
+    # Estoque
+    "Produto",
+    "ProdutoFornecedor",
+    "CertificadoDigital",
+    "NfeEntrada",
+    "NfeEntradaItem",
+    "NfeSaida",
+    "NfeSaidaItem",
+    "EstoqueAlerta",
+    "EstoqueSaldo",
+    "EstoqueMovimentacao",
 ]

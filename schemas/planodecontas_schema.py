@@ -5,7 +5,7 @@ from datetime import datetime
 
 class PlanoDeContasBase(BaseModel):
     """Schema base para Plano de Contas - alinhado com o modelo SQLAlchemy"""
-    empresa_id: int
+    empresa_id: Optional[int] = None
     conta_contabil: str
     descricao: str
     tipo_conta: str

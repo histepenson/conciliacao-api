@@ -59,6 +59,36 @@ class EmpresaContext:
         return f"<EmpresaContext(user_id={self.user_id}, empresa_id={self.empresa_id}, permissoes={len(self.permissoes)})>"
 
 
+def resolve_empresa_id(
+    context: EmpresaContext,
+    empresa_id: Optional[int] = None,
+) -> int:
+    """
+    Resolve a empresa operacional da requisicao.
+
+    Usuarios comuns sempre usam a empresa do token. Admins podem usar a
+    empresa do token ou informar uma empresa explicitamente em rotas antigas.
+    """
+    if context.is_admin and empresa_id:
+        return empresa_id
+
+    if context.empresa_id:
+        if empresa_id and empresa_id != context.empresa_id and not context.is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Voce nao tem acesso a esta empresa.",
+            )
+        return context.empresa_id
+
+    if empresa_id and context.is_admin:
+        return empresa_id
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Nenhuma empresa selecionada. Por favor, selecione uma empresa.",
+    )
+
+
 async def get_empresa_context(
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),

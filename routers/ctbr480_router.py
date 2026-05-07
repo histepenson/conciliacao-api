@@ -1,15 +1,19 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 import logging
 
+from sqlalchemy.orm import Session
+
+from db import get_db
 from services.ctbr480_service import Ctbr480Service
 from core.config import settings
+from core.protheus import resolve_protheus_tenant
 
 router = APIRouter(prefix="/v1/ctbr480", tags=["CTBR480"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(protheus_url: Optional[str]) -> Ctbr480Service:
+def _get_service(protheus_url: Optional[str], tenant_id: str) -> Ctbr480Service:
     url = protheus_url or getattr(settings, "PROTHEUS_URL", None)
     if not url:
         raise HTTPException(
@@ -21,7 +25,6 @@ def _get_service(protheus_url: Optional[str]) -> Ctbr480Service:
         )
     user = getattr(settings, "PROTHEUS_USER", "")
     password = getattr(settings, "PROTHEUS_PASSWORD", "")
-    tenant_id = getattr(settings, "PROTHEUS_TENANT", "02,0201")
     return Ctbr480Service(url, user, password, tenant_id)
 
 
@@ -54,6 +57,8 @@ async def get_razao(
     filial_de: Optional[str] = Query(None),
     filial_ate: Optional[str] = Query(None),
     protheus_url: Optional[str] = Query(None, description="URL base do Protheus (ex: https://192.168.1.100:8089)"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    db: Session = Depends(get_db),
 ):
     """
     Retorna o razao contabil bruto do CTBR480 com campos:
@@ -83,7 +88,8 @@ async def get_razao(
         "filial_ate": filial_ate,
     }
 
-    service = _get_service(protheus_url)
+    tenant_id = resolve_protheus_tenant(empresa_id, db)
+    service = _get_service(protheus_url, tenant_id)
     try:
         return await service.buscar_razao(params)
     except Exception as exc:
@@ -117,6 +123,8 @@ async def get_como_base_contabil_geral(
     filial_de: Optional[str] = Query(None),
     filial_ate: Optional[str] = Query(None),
     protheus_url: Optional[str] = Query(None),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    db: Session = Depends(get_db),
 ):
     """
     Cada registro retornado tem os mesmos campos do Excel CTBR480:
@@ -146,7 +154,8 @@ async def get_como_base_contabil_geral(
         "pageSize": 2000,  # traz tudo em uma unica chamada ao Protheus
     }
 
-    service = _get_service(protheus_url)
+    tenant_id = resolve_protheus_tenant(empresa_id, db)
+    service = _get_service(protheus_url, tenant_id)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}

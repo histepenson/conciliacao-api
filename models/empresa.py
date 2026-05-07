@@ -17,6 +17,7 @@ class Empresa(Base):
     cnpj = Column(String(20), nullable=False, unique=True, index=True)
     status = Column(Boolean, default=True, nullable=False)
     permite_efetivar_divergente = Column(Boolean, default=False, nullable=False)
+    protheus_tenant = Column(String(100), nullable=True)
 
     # Timestamps - padrao snake_case
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"), nullable=False)
