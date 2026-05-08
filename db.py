@@ -7,18 +7,23 @@ import os
 from pathlib import Path
 
 # ============================================================
-# CARREGAMENTO DO .env - CORRIGIDO
+# CARREGAMENTO DO .env - MULTI-AMBIENTE
 # ============================================================
 
-# Obtem o diretorio do arquivo atual (backend/)
-load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
-Base = declarative_base()
 
-# Carrega o .env da pasta backend
-env_path = BASE_DIR / '.env'
-load_dotenv(dotenv_path=env_path)
+# Detecta o ambiente: APP_ENV=develop | production (default)
+APP_ENV = os.getenv("APP_ENV", "production")
+env_file = f".env.{APP_ENV}" if APP_ENV != "production" else ".env"
+env_path = BASE_DIR / env_file
 
+# Fallback para .env se o arquivo especifico nao existir
+if not env_path.exists():
+    env_path = BASE_DIR / ".env"
+
+load_dotenv(dotenv_path=env_path, override=True)
+
+print(f"[INFO] Ambiente: {APP_ENV.upper()}")
 print(f"[INFO] Procurando .env em: {env_path}")
 print(f"[INFO] .env existe? {env_path.exists()}")
 

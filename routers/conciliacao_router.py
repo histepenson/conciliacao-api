@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 import logging
 
@@ -6,6 +6,8 @@ from schemas.conciliacao_schema import RequestConciliacao
 from services.conciliacao_service import ConciliacaoService
 from services.ctbr140_service import Ctbr140Service
 from core.config import settings
+from middleware.permission import Permissions, require_permission
+from middleware.tenant import EmpresaContext
 
 router = APIRouter(prefix="/conciliacoes", tags=["Conciliacoes"])
 logger = logging.getLogger(__name__)
@@ -55,7 +57,10 @@ async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConcili
 
 
 @router.post("/contabil")
-async def processar_conciliacao(request: RequestConciliacao):
+async def processar_conciliacao(
+    request: RequestConciliacao,
+    _: EmpresaContext = Depends(require_permission(Permissions.CONCILIACAO_WRITE)),
+):
     """
     Processa uma conciliacao contabil comparando origem vs contabilidade.
 

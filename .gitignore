@@ -30,3 +30,7 @@ docs/screenshots/
 # Arquivos temporários / artefatos
 =*
 data/
+
+# Scripts locais com credenciais
+copy_db.py
+dump_prod.dump

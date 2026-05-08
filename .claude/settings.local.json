@@ -122,7 +122,11 @@
       "Bash(Get-ChildItem -Path \"c:\\\\conciliacao-api\" -Filter \"*.prw\" -Recurse)",
       "Bash(Select-Object -ExpandProperty FullName)",
       "PowerShell(Get-ChildItem -Path \"c:\\\\conciliacao-api\" -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"^\\(advpl|protheus|erp\\)$\" } | Select-Object -ExpandProperty FullName)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\conciliacao-app\" -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"^\\(advpl|protheus|erp\\)$\" } | Select-Object -ExpandProperty FullName)"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\conciliacao-app\" -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"^\\(advpl|protheus|erp\\)$\" } | Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"c:\\\\conciliacao-api\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Format-Table FullName)",
+      "PowerShell(winget --version 2>&1)"
     ]
   }
 }

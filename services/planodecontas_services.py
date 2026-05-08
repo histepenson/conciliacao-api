@@ -24,8 +24,11 @@ def listar_planos_de_contas(db: Session, empresa_id: int, skip: int = 0, limit: 
     ).offset(skip).limit(limit).all()
 
 
-def buscar_conta(db: Session, id: int) -> Optional[PlanoDeContas]:
-    return db.query(PlanoDeContas).filter(PlanoDeContas.id == id).first()
+def buscar_conta(db: Session, id: int, empresa_id: Optional[int] = None) -> Optional[PlanoDeContas]:
+    query = db.query(PlanoDeContas).filter(PlanoDeContas.id == id)
+    if empresa_id is not None:
+        query = query.filter(PlanoDeContas.empresa_id == empresa_id)
+    return query.first()
 
 
 def criar_conta(db: Session, dados: dict) -> PlanoDeContas:
@@ -36,8 +39,8 @@ def criar_conta(db: Session, dados: dict) -> PlanoDeContas:
     return db_conta
 
 
-def atualizar_conta(db: Session, id: int, dados: dict) -> Optional[PlanoDeContas]:
-    db_conta = buscar_conta(db, id)
+def atualizar_conta(db: Session, id: int, dados: dict, empresa_id: Optional[int] = None) -> Optional[PlanoDeContas]:
+    db_conta = buscar_conta(db, id, empresa_id)
     if not db_conta:
         return None
     for key, value in dados.items():
@@ -48,8 +51,8 @@ def atualizar_conta(db: Session, id: int, dados: dict) -> Optional[PlanoDeContas
     return db_conta
 
 
-def deletar_conta(db: Session, id: int) -> bool:
-    db_conta = buscar_conta(db, id)
+def deletar_conta(db: Session, id: int, empresa_id: Optional[int] = None) -> bool:
+    db_conta = buscar_conta(db, id, empresa_id)
     if not db_conta:
         return False
     db.delete(db_conta)
@@ -365,23 +368,37 @@ def importar_plano_contas(df_sinteticas: pd.DataFrame, df_analiticas: pd.DataFra
         db.commit()
         logger.info(f"v Commit de {estatisticas['analiticas_importadas']} contas analiticas")
         
-        # Resumo final
+        total_importados = estatisticas['sinteticas_importadas'] + estatisticas['analiticas_importadas']
+        qtd_erros = len(estatisticas['erros'])
+
         logger.info("\n" + "="*80)
         logger.info("RESUMO DA IMPORTACAO")
         logger.info("="*80)
         logger.info(f"Total de contas no arquivo: {estatisticas['total_contas']}")
-        logger.info(f"Contas sinteticas importadas: {estatisticas['sinteticas_importadas']}")
-        logger.info(f"Contas analiticas importadas: {estatisticas['analiticas_importadas']}")
-        logger.info(f"Total importado: {estatisticas['sinteticas_importadas'] + estatisticas['analiticas_importadas']}")
-        
-        if estatisticas['erros']:
-            logger.warning(f"\nErros encontrados: {len(estatisticas['erros'])}")
+        logger.info(f"Sinteticas importadas: {estatisticas['sinteticas_importadas']}")
+        logger.info(f"Analiticas importadas: {estatisticas['analiticas_importadas']}")
+        logger.info(f"Total importado: {total_importados}")
+        if qtd_erros:
+            logger.warning(f"Erros encontrados: {qtd_erros}")
             for erro in estatisticas['erros']:
                 logger.warning(f"  - {erro}")
         else:
-            logger.info("\nv Importacao concluida com sucesso!")
-        
-        return estatisticas
+            logger.info("Importacao concluida com sucesso!")
+
+        mensagem = (
+            "Importacao concluida com sucesso!"
+            if not qtd_erros
+            else f"Importacao concluida com {qtd_erros} erro(s)."
+        )
+
+        return {
+            "mensagem": mensagem,
+            "total_linhas": estatisticas['total_contas'],
+            "importados": total_importados,
+            "atualizados": 0,
+            "erros": qtd_erros,
+            "detalhes_erros": [{"linha": i + 1, "erro": e} for i, e in enumerate(estatisticas['erros'])],
+        }
         
     except Exception as e:
         logger.error(f"\nERRO FATAL na importacao: {str(e)}")

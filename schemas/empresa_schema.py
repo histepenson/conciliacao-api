@@ -26,6 +26,7 @@ class EmpresaResponse(EmpresaBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    usuarios_count: int = 0
 
     model_config = {"from_attributes": True}
 

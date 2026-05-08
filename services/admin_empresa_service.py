@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Empresa, UsuarioEmpresa, Usuario, Perfil, AuditLog, AuditAction
@@ -22,8 +23,21 @@ def _log_audit(db: Session, usuario_id: Optional[int], empresa_id: Optional[int]
         )
     )
 
-def listar_empresas(db: Session) -> List[Empresa]:
-    return db.query(Empresa).all()
+def listar_empresas(db: Session) -> List[dict]:
+    counts = {
+        row.empresa_id: row.total
+        for row in db.query(
+            UsuarioEmpresa.empresa_id,
+            func.count(UsuarioEmpresa.usuario_id).label("total")
+        ).group_by(UsuarioEmpresa.empresa_id).all()
+    }
+    empresas = db.query(Empresa).all()
+    result = []
+    for e in empresas:
+        d = {c.name: getattr(e, c.name) for c in e.__table__.columns}
+        d["usuarios_count"] = counts.get(e.id, 0)
+        result.append(d)
+    return result
 
 
 def obter_empresa(db: Session, empresa_id: int) -> Empresa:

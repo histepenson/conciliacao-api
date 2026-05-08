@@ -17,7 +17,7 @@ from services.planodecontas_services import (
     preparar_dados_importacao,
     importar_plano_contas
 )
-from schemas.planodecontas_schema import PlanoDeContasResponse, PlanoDeContasCreate, PlanoDeContasUpdate
+from schemas.planodecontas_schema import PlanoDeContasResponse, PlanoDeContasCreate, PlanoDeContasUpdate, ImportacaoResultado
 
 router = APIRouter(prefix="/plano-contas", tags=["Plano de Contas"])
 
@@ -35,8 +35,12 @@ def route_listar_planos(
 
 
 @router.get("/{id}", response_model=PlanoDeContasResponse)
-def route_buscar_conta(id: int, db: Session = Depends(get_db)):
-    conta = buscar_conta(db, id)
+def route_buscar_conta(
+    id: int,
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(require_permission(Permissions.PLANO_CONTAS_READ)),
+):
+    conta = buscar_conta(db, id, context.empresa_id)
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
     return conta
@@ -58,9 +62,9 @@ def route_atualizar_conta(
     id: int,
     conta: PlanoDeContasUpdate,
     db: Session = Depends(get_db),
-    _: EmpresaContext = Depends(require_permission(Permissions.PLANO_CONTAS_WRITE)),
+    context: EmpresaContext = Depends(require_permission(Permissions.PLANO_CONTAS_WRITE)),
 ):
-    updated = atualizar_conta(db, id, conta.model_dump(exclude_unset=True))
+    updated = atualizar_conta(db, id, conta.model_dump(exclude_unset=True), context.empresa_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
     return updated
@@ -70,15 +74,15 @@ def route_atualizar_conta(
 def route_deletar_conta(
     id: int,
     db: Session = Depends(get_db),
-    _: EmpresaContext = Depends(require_permission(Permissions.PLANO_CONTAS_WRITE)),
+    context: EmpresaContext = Depends(require_permission(Permissions.PLANO_CONTAS_WRITE)),
 ):
-    sucesso = deletar_conta(db, id)
+    sucesso = deletar_conta(db, id, context.empresa_id)
     if not sucesso:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
     return None
 
 
-@router.post("/importar", response_model=dict)
+@router.post("/importar", response_model=ImportacaoResultado)
 def route_importar_plano(
     file: UploadFile = File(...),
     empresa_id: Optional[int] = Form(None),
