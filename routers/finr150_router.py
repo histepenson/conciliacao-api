@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from datetime import datetime, timezone
 import asyncio
+import json
 import logging
 import uuid
 
@@ -15,6 +16,8 @@ from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empre
 router = APIRouter(prefix="/v1/finr150", tags=["FINR150"])
 logger = logging.getLogger(__name__)
 _base_pagar_jobs: dict[str, dict] = {}
+_base_pagar_job_keys: dict[str, str] = {}
+_base_pagar_jobs_lock = asyncio.Lock()
 
 
 def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session) -> FinR150Service:
@@ -70,6 +73,15 @@ async def _run_base_pagar_job(job_id: str, service: FinR150Service, params: dict
         job["status"] = "failed"
         job["error"] = f"Erro ao consultar Protheus: {exc}"
         job["completed_at"] = datetime.now(timezone.utc).isoformat()
+
+
+def _base_pagar_job_key(context: EmpresaContext, empresa_id: Optional[int], params: dict) -> str:
+    payload = {
+        "user_id": context.user_id,
+        "empresa_id": empresa_id or context.empresa_id,
+        "params": params,
+    }
+    return json.dumps(payload, sort_keys=True, default=str)
 
 
 @router.get("")
@@ -228,15 +240,24 @@ async def start_base_pagar_job(
         abatimentos, titulos_excluidos,
     )
     service = _get_service(context, empresa_id, db)
-    job_id = uuid.uuid4().hex
-    _base_pagar_jobs[job_id] = {
-        "status": "pending",
-        "user_id": context.user_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "total": 0,
-        "registros": [],
-        "error": None,
-    }
+    job_key = _base_pagar_job_key(context, empresa_id, params)
+    async with _base_pagar_jobs_lock:
+        existing_job_id = _base_pagar_job_keys.get(job_key)
+        existing_job = _base_pagar_jobs.get(existing_job_id or "")
+        if existing_job and existing_job["status"] in {"pending", "running"}:
+            return {"job_id": existing_job_id, "status": existing_job["status"]}
+
+        job_id = uuid.uuid4().hex
+        _base_pagar_job_keys[job_key] = job_id
+        _base_pagar_jobs[job_id] = {
+            "status": "pending",
+            "user_id": context.user_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "total": 0,
+            "registros": [],
+            "error": None,
+        }
+
     asyncio.create_task(_run_base_pagar_job(job_id, service, params))
     return {"job_id": job_id, "status": "pending"}
 

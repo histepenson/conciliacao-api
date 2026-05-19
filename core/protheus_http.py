@@ -7,7 +7,7 @@ import httpx
 from core.config import settings
 
 
-TRANSIENT_STATUS_CODES = {502, 503, 504}
+TRANSIENT_STATUS_CODES: set[int] = set()
 
 
 def protheus_async_client(auth: tuple[str, str] | None = None) -> httpx.AsyncClient:
