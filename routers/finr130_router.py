@@ -67,7 +67,8 @@ async def get_titulos_receber(
     """
     Proxy para o ZFINR130API do Protheus (Posicao dos Titulos a Receber).
 
-    Busca automaticamente todas as paginas e retorna o resultado consolidado.
+    Quando page e informado, retorna somente aquela pagina do Protheus.
+    Sem page, busca automaticamente todas as paginas e retorna o resultado consolidado.
     Configura PROTHEUS_URL no .env para nao precisar passar o parametro a cada chamada.
     """
     params = {
@@ -115,6 +116,8 @@ async def get_titulos_receber(
     service = _get_service(context, empresa_id, db)
 
     try:
+        if page is not None:
+            return await service.buscar_pagina(params)
         resultado = await service.buscar_todos_titulos(params)
         return resultado
     except Exception as exc:

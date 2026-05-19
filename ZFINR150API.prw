@@ -233,6 +233,7 @@ Local nTotalReg      := 0
 Local nTotalPages    := 1
 Local nOffset        := 0
 Local nRecAtual      := 0
+Local lHasMore       := .F.
 Local lAbriuSE2      := .F.
 Local nOrdemSE2Ant   := 0
 Local lAbriuSE5      := .F.
@@ -284,6 +285,7 @@ nPar38           := IIf(Empty(cTitulosExcl),    2, Val(cTitulosExcl))
 
 lSldRetro  := (nSldRetro == 1)
 nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 500, 100, nPageSize)
+nOffset    := (nPage - 1) * nPageSize
 nDecs      := MsDecimais(nMoeda)
 
 // Filial
@@ -631,19 +633,32 @@ Begin Sequence
 			oItem["prazo"]            := cPrazo
 			oItem["codigo_for"]       := cCodigoFor
 
-			aAdd(aAllTitulos, oItem)
+			nTotalReg++
+			If nTotalReg > (nOffset + nPageSize)
+				lHasMore := .T.
+				FreeObj(oItem)
+			ElseIf nTotalReg > nOffset
+				aAdd(aTitulos, oItem)
+			Else
+				FreeObj(oItem)
+			EndIf
+		EndIf
+
+		If lHasMore
+			Exit
 		EndIf
 
 		(cAlias)->(DbSkip())
 	EndDO
 
 	(cAlias)->(DbCloseArea())
-	ConOut("[FINR150API] Fase principal concluida - aAllTitulos=" + Str(Len(aAllTitulos), 6))
+	ConOut("[FINR150API] Fase principal concluida - titulosPagina=" + Str(Len(aTitulos), 6) + ;
+		" totalProcessado=" + Str(nTotalReg, 6) + " hasMore=" + IIf(lHasMore, "S", "N"))
 
 	// -------------------------------------------------------------------------
 	// Fase 2: Titulos excluidos via FJU (par38 == 1)
 	// -------------------------------------------------------------------------
-	If lExistFJU .And. nPar38 == 1
+	If !lHasMore .And. lExistFJU .And. nPar38 == 1
 		cSqlFJU   := ""
 		cAliasFJU := GetNextAlias()
 
@@ -823,7 +838,18 @@ Begin Sequence
 				oItem["dias_vencidos"]    := nDiasVenc
 				oItem["prazo"]            := cPrazo
 				oItem["codigo_for"]       := cCodigoFor
-				aAdd(aAllTitulos, oItem)
+				nTotalReg++
+				If nTotalReg > (nOffset + nPageSize)
+					lHasMore := .T.
+					FreeObj(oItem)
+				ElseIf nTotalReg > nOffset
+					aAdd(aTitulos, oItem)
+				Else
+					FreeObj(oItem)
+				EndIf
+			EndIf
+			If lHasMore
+				Exit
 			EndIf
 			(cAliasFJU)->(DbSkip())
 		EndDo
@@ -849,16 +875,9 @@ Begin Sequence
 		__oTBxCanc := Nil
 	EndIf
 
-	// Paginacao
-	nTotalReg   := Len(aAllTitulos)
-	nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
-	nOffset     := (nPage - 1) * nPageSize
-
-	nRecAtual := 0
-	While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-		aAdd(aTitulos, aAllTitulos[nOffset + nRecAtual + 1])
-		nRecAtual++
-	EndDo
+	// Paginacao real: nTotalReg representa os registros validos processados
+	// ate preencher a pagina solicitada e detectar se existe proxima pagina.
+	nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
 
 Recover Using oError
 	If Select(cAlias) > 0
@@ -910,6 +929,7 @@ oResp["parametros"]      := oParams
 oResp["total_registros"] := nTotalReg
 oResp["totalPages"]      := nTotalPages
 oResp["page"]            := nPage
+oResp["hasMore"]         := lHasMore
 oResp["titulos"]         := aTitulos
 
 Self:SetResponse(oResp:ToJson())

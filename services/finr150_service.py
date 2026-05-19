@@ -29,6 +29,25 @@ class FinR150Service:
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id
 
+    async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Chama uma pagina do ZFINR150API sem consolidar o resultado inteiro."""
+        query = {k: v for k, v in params.items() if k in _PARAMS_FINR150 and v is not None}
+        query["page"] = int(query.get("page") or 1)
+        query["pageSize"] = int(query.get("pageSize") or 100)
+        headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
+
+        async with protheus_async_client(auth=self.auth) as client:
+            logger.info("FINR150 -> pagina %s  endpoint=%s  tenant=%s", query["page"], self.endpoint, self.tenant_id)
+            resp = await protheus_get(
+                client,
+                self.endpoint,
+                params=query,
+                headers=headers,
+                logger=logger,
+                operation=f"FINR150 pagina {query['page']}",
+            )
+            return _decode_json_response(resp.content)
+
     async def buscar_todos_titulos(self, params: dict[str, Any]) -> dict[str, Any]:
         """Chama o ZFINR150API paginando automaticamente e retorna todos os titulos."""
         page_size = int(params.get("pageSize", 100))
@@ -39,11 +58,12 @@ class FinR150Service:
         parametros: dict = {}
         current_page = 1
         total_pages = 1
+        has_more = True
 
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
         async with protheus_async_client(auth=self.auth) as client:
-            while current_page <= total_pages:
+            while has_more:
                 query["page"] = current_page
                 logger.info("FINR150 -> pagina %s/%s  endpoint=%s  tenant=%s", current_page, total_pages, self.endpoint, self.tenant_id)
 
@@ -56,14 +76,11 @@ class FinR150Service:
                     operation=f"FINR150 pagina {current_page}",
                 )
 
-                raw = resp.content
-                try:
-                    data = _json.loads(raw.decode("utf-8"))
-                except UnicodeDecodeError:
-                    data = _json.loads(raw.decode("windows-1252"))
+                data = _decode_json_response(resp.content)
 
                 parametros = data.get("parametros", {})
-                total_pages = data.get("totalPages", 1)
+                total_pages = int(data.get("totalPages") or total_pages or 1)
+                has_more = bool(data.get("hasMore", current_page < total_pages))
                 all_titulos.extend(data.get("titulos", []))
                 current_page += 1
 
@@ -86,8 +103,33 @@ class FinR150Service:
           - tp: tipo do titulo (para filtro opcional)
         """
         resultado = await self.buscar_todos_titulos(params)
+        return _titulos_para_registros(resultado["titulos"])
+
+    async def buscar_como_registros_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Retorna uma pagina do FINR150 ja no formato de base financeira."""
+        resultado = await self.buscar_pagina(params)
+        registros = _titulos_para_registros(resultado.get("titulos", []))
+        return {
+            "parametros": resultado.get("parametros", {}),
+            "total_registros": resultado.get("total_registros", len(registros)),
+            "totalPages": resultado.get("totalPages", 1),
+            "page": resultado.get("page", params.get("page", 1)),
+            "hasMore": resultado.get("hasMore", False),
+            "registros": registros,
+            "total": len(registros),
+        }
+
+
+def _decode_json_response(raw: bytes) -> dict[str, Any]:
+    try:
+        return _json.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        return _json.loads(raw.decode("windows-1252"))
+
+
+def _titulos_para_registros(titulos: list[dict]) -> list[dict]:
         registros = []
-        for t in resultado["titulos"]:
+        for t in titulos:
             fornecedor = (t.get("fornecedor") or "").strip()
             loja = (t.get("loja") or "").strip()
             nome = (t.get("nome_fornecedor") or "").strip()

@@ -234,6 +234,7 @@ Local nTotalReg      := 0
 Local nTotalPages    := 1
 Local nOffset        := 0
 Local nRecAtual      := 0
+Local lHasMore       := .F.
 Local lAbriuSE5      := .F.
 Local nOrdemSE5Ant   := 0
 Local lAbriuSE1      := .F.
@@ -289,6 +290,7 @@ nPar43           := IIf(Empty(cTitulosExcl),    2, Val(cTitulosExcl))
 
 lSldRetro  := (nSldRetro == 1)
 nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 500, 100, nPageSize)
+nOffset    := (nPage - 1) * nPageSize
 nDecs      := MsDecimais(nMoeda)
 
 // Filial
@@ -662,7 +664,19 @@ Begin Sequence
 			oItem["prazo"]          := cPrazo
 			oItem["codigo_cli"]     := cCodigoCli
 
-			aAdd(aAllTitulos, oItem)
+			nTotalReg++
+			If nTotalReg > (nOffset + nPageSize)
+				lHasMore := .T.
+				FreeObj(oItem)
+			ElseIf nTotalReg > nOffset
+				aAdd(aTitulos, oItem)
+			Else
+				FreeObj(oItem)
+			EndIf
+		EndIf
+
+		If lHasMore
+			Exit
 		EndIf
 
 		(cAlias)->(DbSkip())
@@ -670,14 +684,15 @@ Begin Sequence
 
 	(cAlias)->(DbCloseArea())
 
-	ConOut("[FINR130API] Fase1 concluida - aAllTitulos=" + Str(Len(aAllTitulos), 6))
+	ConOut("[FINR130API] Fase1 concluida - titulosPagina=" + Str(Len(aTitulos), 6) + ;
+		" totalProcessado=" + Str(nTotalReg, 6) + " hasMore=" + IIf(lHasMore, "S", "N"))
 
 	// -------------------------------------------------------------------------
 	// Fase 2: Abatimentos (FINR130 linha 1693+)
 	// Quando par33 == 1 (Lista), busca titulos do tipo MVABATIM separadamente
 	// -------------------------------------------------------------------------
 	// FINR130 linha 1167: Fase 2 quando par33 != 3 (Lista OU Nao Lista, nunca Despreza)
-	If nAbatimentos != 3 .And. (!Empty(cMvAbatim) .Or. !Empty(cMvFuAbt))
+	If !lHasMore .And. nAbatimentos != 3 .And. (!Empty(cMvAbatim) .Or. !Empty(cMvFuAbt))
 		cSqlAbat   := ""
 		cMvAbatAll := ""
 
@@ -872,7 +887,19 @@ EndIf
 				oItem["prazo"]          := cPrazo
 				oItem["codigo_cli"]     := cCodigoCli
 
-				aAdd(aAllTitulos, oItem)
+				nTotalReg++
+				If nTotalReg > (nOffset + nPageSize)
+					lHasMore := .T.
+					FreeObj(oItem)
+				ElseIf nTotalReg > nOffset
+					aAdd(aTitulos, oItem)
+				Else
+					FreeObj(oItem)
+				EndIf
+			EndIf
+
+			If lHasMore
+				Exit
 			EndIf
 
 			(cAliasAbat)->(DbSkip())
@@ -884,7 +911,7 @@ EndIf
 	// -------------------------------------------------------------------------
 	// Fase 3: Titulos excluidos via FJU (par43 == 1) (FINR130 linha 1079-1130)
 	// -------------------------------------------------------------------------
-	If nPar43 == 1
+	If !lHasMore .And. nPar43 == 1
 		cSqlFJU   := ""
 		cAliasFJU := GetNextAlias()
 
@@ -1070,7 +1097,19 @@ EndIf
 				oItem["prazo"]          := cPrazo
 				oItem["codigo_cli"]     := cCodigoCli
 
-				aAdd(aAllTitulos, oItem)
+				nTotalReg++
+				If nTotalReg > (nOffset + nPageSize)
+					lHasMore := .T.
+					FreeObj(oItem)
+				ElseIf nTotalReg > nOffset
+					aAdd(aTitulos, oItem)
+				Else
+					FreeObj(oItem)
+				EndIf
+			EndIf
+
+			If lHasMore
+				Exit
 			EndIf
 
 			(cAliasFJU)->(DbSkip())
@@ -1098,16 +1137,9 @@ EndIf
 		__oTBxCanc := Nil
 	EndIf
 
-    // Paginacao sobre registros validos
-    nTotalReg   := Len(aAllTitulos)
-    nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
-    nOffset     := (nPage - 1) * nPageSize
-
-    nRecAtual := 0
-    While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-        aAdd(aTitulos, aAllTitulos[nOffset + nRecAtual + 1])
-        nRecAtual++
-    EndDo
+    // Paginacao real: nTotalReg representa os registros validos processados
+    // ate preencher a pagina solicitada e detectar se existe proxima pagina.
+    nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
 
 Recover Using oError
     If Select(cAlias) > 0
@@ -1156,6 +1188,7 @@ oResp["parametros"]      := oParams
 oResp["total_registros"] := nTotalReg
 oResp["totalPages"]      := nTotalPages
 oResp["page"]            := nPage
+oResp["hasMore"]         := lHasMore
 oResp["titulos"]         := aTitulos
 
 Self:SetResponse( oResp:ToJson() )

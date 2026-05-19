@@ -30,6 +30,25 @@ class FinR130Service:
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id  # "02,0201"
 
+    async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Chama uma pagina do ZFINR130API sem consolidar o resultado inteiro."""
+        query = {k: v for k, v in params.items() if k in _PARAMS_FINR130 and v is not None}
+        query["page"] = int(query.get("page") or 1)
+        query["pageSize"] = int(query.get("pageSize") or 100)
+        headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
+
+        async with protheus_async_client(auth=self.auth) as client:
+            logger.info("FINR130 -> pagina %s  endpoint=%s  tenant=%s", query["page"], self.endpoint, self.tenant_id)
+            resp = await protheus_get(
+                client,
+                self.endpoint,
+                params=query,
+                headers=headers,
+                logger=logger,
+                operation=f"FINR130 pagina {query['page']}",
+            )
+            return _decode_json_response(resp.content)
+
     async def buscar_todos_titulos(self, params: dict[str, Any]) -> dict[str, Any]:
         """Chama o ZFINR130API paginando automaticamente e retorna todos os titulos."""
         page_size = int(params.get("pageSize", 100))
@@ -40,11 +59,12 @@ class FinR130Service:
         parametros: dict = {}
         current_page = 1
         total_pages = 1
+        has_more = True
 
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
         async with protheus_async_client(auth=self.auth) as client:
-            while current_page <= total_pages:
+            while has_more:
                 query["page"] = current_page
                 logger.info("FINR130 -> pagina %s/%s  endpoint=%s  tenant=%s", current_page, total_pages, self.endpoint, self.tenant_id)
 
@@ -57,15 +77,10 @@ class FinR130Service:
                     operation=f"FINR130 pagina {current_page}",
                 )
 
-                # Protheus retorna Windows-1252 (CP1252) por padrao.
-                # Tenta UTF-8 primeiro; se falhar, usa windows-1252.
-                raw = resp.content
-                try:
-                    data = _json.loads(raw.decode("utf-8"))
-                except UnicodeDecodeError:
-                    data = _json.loads(raw.decode("windows-1252"))
+                data = _decode_json_response(resp.content)
                 parametros = data.get("parametros", {})
-                total_pages = data.get("totalPages", 1)
+                total_pages = int(data.get("totalPages") or total_pages or 1)
+                has_more = bool(data.get("hasMore", current_page < total_pages))
                 all_titulos.extend(data.get("titulos", []))
                 current_page += 1
 
@@ -74,3 +89,11 @@ class FinR130Service:
             "total_registros": len(all_titulos),
             "titulos": all_titulos,
         }
+
+
+def _decode_json_response(raw: bytes) -> dict[str, Any]:
+    # Protheus retorna Windows-1252 (CP1252) por padrao.
+    try:
+        return _json.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        return _json.loads(raw.decode("windows-1252"))

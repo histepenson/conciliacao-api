@@ -131,7 +131,8 @@ async def get_titulos_pagar(
     """
     Proxy para o ZFINR150API do Protheus (Posicao dos Titulos a Pagar).
 
-    Busca automaticamente todas as paginas e retorna o resultado consolidado.
+    Quando page e informado, retorna somente aquela pagina do Protheus.
+    Sem page, busca automaticamente todas as paginas e retorna o resultado consolidado.
     """
     params = {
         "data_base": data_base, "page": page, "pageSize": pageSize,
@@ -157,6 +158,8 @@ async def get_titulos_pagar(
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_pagina(params)
         return await service.buscar_todos_titulos(params)
     except Exception as exc:
         logger.exception("Erro ao consultar ZFINR150API")
@@ -173,6 +176,8 @@ async def get_titulos_pagar(
 )
 async def get_como_base_pagar(
     data_base: str = Query(..., description="Data base no formato YYYYMMDD"),
+    page: Optional[int] = Query(None),
+    pageSize: Optional[int] = Query(500),
     fornecedor_de: Optional[str] = Query(None),
     fornecedor_ate: Optional[str] = Query(None),
     loja_de: Optional[str] = Query(None),
@@ -198,9 +203,14 @@ async def get_como_base_pagar(
         consid_filiais, filial_de, filial_ate, adiantamentos,
         abatimentos, titulos_excluidos,
     )
+    params["pageSize"] = pageSize or 500
+    if page is not None:
+        params["page"] = page
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_como_registros_pagina(params)
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}
     except Exception as exc:
