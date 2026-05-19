@@ -1268,9 +1268,9 @@ Static Function FIN130PosSE1(kFilial, cPrefixo, cNumero, cParcela, cTipo, cClien
 		Return .F.
 	EndIf
 	SE1->(DbSetOrder(1))
-	lFound := SE1->(MsSeek(cFilial + cPrefixo + cNumero + cParcela + cTipo + cCliente + cLoja))
+	lFound := SE1->(MsSeek(kFilial + cPrefixo + cNumero + cParcela + cTipo + cCliente + cLoja))
 	If !lFound
-		ConOut("[FINR130API] FIN130PosSE1 nao encontrou chave " + cFilial + "/" + AllTrim(cPrefixo) + "/" + ;
+		ConOut("[FINR130API] FIN130PosSE1 nao encontrou chave " + kFilial + "/" + AllTrim(cPrefixo) + "/" + ;
 			AllTrim(cNumero) + "/" + AllTrim(cParcela) + "/" + AllTrim(cTipo) + "/" + AllTrim(cCliente) + "/" + AllTrim(cLoja))
 	EndIf
 Return lFound
