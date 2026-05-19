@@ -7,13 +7,15 @@ from sqlalchemy.orm import Session
 from db import get_db
 from services.finr150_service import FinR150Service
 from core.protheus import resolve_protheus_config
+from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
 
 router = APIRouter(prefix="/v1/finr150", tags=["FINR150"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(empresa_id: Optional[int], db: Session) -> FinR150Service:
-    cfg = resolve_protheus_config(empresa_id, db)
+def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session) -> FinR150Service:
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    cfg = resolve_protheus_config(resolved_id, db)
     return FinR150Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
 
 
@@ -58,6 +60,7 @@ async def get_titulos_pagar(
     taxa_moeda: Optional[str] = Query(None),
     titulos_excluidos: Optional[str] = Query(None),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
 ):
     """
@@ -87,7 +90,7 @@ async def get_titulos_pagar(
         "taxa_moeda": taxa_moeda, "titulos_excluidos": titulos_excluidos,
     }
 
-    service = _get_service(empresa_id, db)
+    service = _get_service(context, empresa_id, db)
     try:
         return await service.buscar_todos_titulos(params)
     except Exception as exc:
@@ -121,6 +124,7 @@ async def get_como_base_pagar(
     abatimentos: Optional[str] = Query(None),
     titulos_excluidos: Optional[str] = Query(None),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -136,7 +140,7 @@ async def get_como_base_pagar(
         "pageSize": 500,
     }
 
-    service = _get_service(empresa_id, db)
+    service = _get_service(context, empresa_id, db)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}

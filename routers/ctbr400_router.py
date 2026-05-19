@@ -7,13 +7,15 @@ from sqlalchemy.orm import Session
 from db import get_db
 from services.ctbr400_service import Ctbr400Service
 from core.protheus import resolve_protheus_config
+from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
 
 router = APIRouter(prefix="/v1/ctbr400", tags=["CTBR400"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(empresa_id: Optional[int], db: Session) -> Ctbr400Service:
-    cfg = resolve_protheus_config(empresa_id, db)
+def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session) -> Ctbr400Service:
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    cfg = resolve_protheus_config(resolved_id, db)
     return Ctbr400Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
 
 
@@ -50,6 +52,7 @@ async def get_razao(
     filial_de: Optional[str] = Query(None),
     filial_ate: Optional[str] = Query(None),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -78,7 +81,7 @@ async def get_razao(
         "filial_ate": filial_ate,
     }
 
-    service = _get_service(empresa_id, db)
+    service = _get_service(context, empresa_id, db)
     try:
         return await service.buscar_razao(params)
     except Exception as exc:
@@ -118,6 +121,7 @@ async def get_como_base_razao(
     filial_de: Optional[str] = Query(None),
     filial_ate: Optional[str] = Query(None),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -146,7 +150,7 @@ async def get_como_base_razao(
         "pageSize": 2000,
     }
 
-    service = _get_service(empresa_id, db)
+    service = _get_service(context, empresa_id, db)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}

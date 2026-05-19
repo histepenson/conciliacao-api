@@ -133,7 +133,11 @@
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
-      "c:\\conciliacao-app\\src\\components\\Finr150ParamsDialog"
+      "c:\\conciliacao-app\\src\\components\\Finr150ParamsDialog",
+      "c:\\conciliacao-app\\src\\components\\Finr470ParamsDialog",
+      "c:\\conciliacao-app\\src\\components\\Ctbr400ParamsDialog",
+      "c:\\conciliacao-app\\src\\components\\Matr900ParamsDialog",
+      "c:\\conciliacao-app\\src\\components\\Ctbr480ParamsDialog"
     ]
   }
 }

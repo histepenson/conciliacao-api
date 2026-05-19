@@ -7,13 +7,15 @@ from sqlalchemy.orm import Session
 from db import get_db
 from services.finr470_service import FinR470Service
 from core.protheus import resolve_protheus_config
+from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
 
 router = APIRouter(prefix="/v1/finr470", tags=["FINR470"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(empresa_id: Optional[int], db: Session) -> FinR470Service:
-    cfg = resolve_protheus_config(empresa_id, db)
+def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session) -> FinR470Service:
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    cfg = resolve_protheus_config(resolved_id, db)
     return FinR470Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
 
 
@@ -40,6 +42,7 @@ async def get_extrato(
     data_conv_saldo: Optional[str] = Query(None),
     pageSize: Optional[int] = Query(500),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -57,7 +60,7 @@ async def get_extrato(
         "data_conv_saldo": data_conv_saldo,
         "pageSize": pageSize,
     }
-    service = _get_service(empresa_id, db)
+    service = _get_service(context, empresa_id, db)
     try:
         return await service.buscar_extrato(params)
     except Exception as exc:
@@ -87,6 +90,7 @@ async def get_como_base_extrato(
     todas_filiais: Optional[str] = Query(None),
     data_conv_saldo: Optional[str] = Query(None),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -104,7 +108,7 @@ async def get_como_base_extrato(
         "data_conv_saldo": data_conv_saldo,
         "pageSize": 2000,
     }
-    service = _get_service(empresa_id, db)
+    service = _get_service(context, empresa_id, db)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}

@@ -7,13 +7,15 @@ from sqlalchemy.orm import Session
 from db import get_db
 from services.matr900_service import Matr900Service
 from core.protheus import resolve_protheus_config
+from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
 
 router = APIRouter(prefix="/v1/matr900", tags=["MATR900"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(empresa_id: Optional[int], db: Session) -> Matr900Service:
-    cfg = resolve_protheus_config(empresa_id, db)
+def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session) -> Matr900Service:
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    cfg = resolve_protheus_config(resolved_id, db)
     return Matr900Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
 
 
@@ -44,6 +46,7 @@ async def get_kardex(
     considera_filiais: Optional[str] = Query("2"),
     tipo_custo: Optional[str] = Query("1", description="1=Medio 2=Reposicao"),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -66,7 +69,7 @@ async def get_kardex(
         "tipo_custo": tipo_custo,
     }
 
-    service = _get_service(empresa_id, db)
+    service = _get_service(context, empresa_id, db)
     try:
         return await service.buscar_kardex(params)
     except Exception as exc:
@@ -100,6 +103,7 @@ async def get_como_base_kardex(
     considera_filiais: Optional[str] = Query("2"),
     tipo_custo: Optional[str] = Query("1"),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -122,7 +126,7 @@ async def get_como_base_kardex(
         "pageSize": 2000,
     }
 
-    service = _get_service(empresa_id, db)
+    service = _get_service(context, empresa_id, db)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}
