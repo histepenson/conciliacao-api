@@ -1,40 +1,43 @@
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from fastapi import HTTPException
-from models.empresa import Empresa
-from schemas.empresa_schema import EmpresaCreate, EmpresaUpdate
 from datetime import datetime, timezone
 
-
-
-from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
-from models.empresa import Empresa
-from schemas.empresa_schema import EmpresaCreate
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from datetime import datetime
+from core.protheus import encrypt_password
+from models.empresa import Empresa
+from schemas.empresa_schema import EmpresaCreate, EmpresaUpdate
+
+_PROTHEUS_FIELDS = [
+    "protheus_tenant",
+    "protheus_url",
+    "protheus_rest_prefix",
+    "protheus_user",
+    "protheus_password",
+]
+
 
 def criar_empresa(db: Session, emp: EmpresaCreate):
-    # Verifica duplicidade
     if db.query(Empresa).filter(Empresa.cnpj == emp.cnpj).first():
         raise HTTPException(status_code=400, detail="CNPJ ja cadastrado")
 
-    now = datetime.now(timezone.utc)  # datetime aware em UTC
-    nova_empresa = Empresa(
+    now = datetime.now(timezone.utc)
+    nova = Empresa(
         nome=emp.nome,
         cnpj=emp.cnpj,
         status=emp.status,
         protheus_tenant=emp.protheus_tenant,
+        protheus_url=emp.protheus_url,
+        protheus_rest_prefix=emp.protheus_rest_prefix,
+        protheus_user=emp.protheus_user,
+        protheus_password=encrypt_password(emp.protheus_password) if emp.protheus_password else None,
         updated_at=now,
-        created_at=now
+        created_at=now,
     )
-    
-    db.add(nova_empresa)
+    db.add(nova)
     db.commit()
-    db.refresh(nova_empresa)
-    return nova_empresa
+    db.refresh(nova)
+    return nova
 
 
 def listar_empresas(db: Session):
@@ -51,8 +54,15 @@ def atualizar_empresa(db: Session, empresa_id: int, dados: EmpresaUpdate, is_adm
         return None
 
     campos = dados.model_dump(exclude_unset=True)
+
     if not is_admin:
-        campos.pop("protheus_tenant", None)
+        for f in _PROTHEUS_FIELDS:
+            campos.pop(f, None)
+
+    # Criptografa a senha antes de salvar
+    if "protheus_password" in campos:
+        raw = campos["protheus_password"]
+        campos["protheus_password"] = encrypt_password(raw) if raw else None
 
     for campo, valor in campos.items():
         setattr(empresa, campo, valor)
@@ -66,7 +76,6 @@ def deletar_empresa(db: Session, empresa_id: int):
     empresa = obter_empresa(db, empresa_id)
     if not empresa:
         return None
-
     db.delete(empresa)
     db.commit()
     return True

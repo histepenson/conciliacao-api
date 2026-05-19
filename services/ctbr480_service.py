@@ -33,8 +33,8 @@ class Ctbr480Service:
         conta, desc_item, desc_conta, normal_item, normal_cta
     """
 
-    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = ""):
-        self.endpoint = protheus_base_url.rstrip("/") + "/rest/zctbr480api/api/v1/ctbr480"
+    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = "", rest_prefix: str = "rest"):
+        self.endpoint = protheus_base_url.rstrip("/") + f"/{rest_prefix.strip('/')}/zctbr480api/api/v1/ctbr480"
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id  # ex: "02,0201"
 

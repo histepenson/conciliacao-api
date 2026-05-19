@@ -6,26 +6,15 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from services.finr470_service import FinR470Service
-from core.config import settings
-from core.protheus import resolve_protheus_tenant
+from core.protheus import resolve_protheus_config
 
 router = APIRouter(prefix="/v1/finr470", tags=["FINR470"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(protheus_url: Optional[str], tenant_id: str) -> FinR470Service:
-    url = protheus_url or getattr(settings, "PROTHEUS_URL", None)
-    if not url:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "URL do Protheus nao configurada. "
-                "Informe o parametro 'protheus_url' ou defina PROTHEUS_URL no .env"
-            ),
-        )
-    user = getattr(settings, "PROTHEUS_USER", "")
-    password = getattr(settings, "PROTHEUS_PASSWORD", "")
-    return FinR470Service(url, user, password, tenant_id)
+def _get_service(empresa_id: Optional[int], db: Session) -> FinR470Service:
+    cfg = resolve_protheus_config(empresa_id, db)
+    return FinR470Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
 
 
 @router.get(
@@ -50,8 +39,7 @@ async def get_extrato(
     todas_filiais: Optional[str] = Query(None),
     data_conv_saldo: Optional[str] = Query(None),
     pageSize: Optional[int] = Query(500),
-    protheus_url: Optional[str] = Query(None),
-    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -69,9 +57,7 @@ async def get_extrato(
         "data_conv_saldo": data_conv_saldo,
         "pageSize": pageSize,
     }
-
-    tenant_id = resolve_protheus_tenant(empresa_id, db)
-    service = _get_service(protheus_url, tenant_id)
+    service = _get_service(empresa_id, db)
     try:
         return await service.buscar_extrato(params)
     except Exception as exc:
@@ -100,8 +86,7 @@ async def get_como_base_extrato(
     saldo_compart: Optional[str] = Query(None),
     todas_filiais: Optional[str] = Query(None),
     data_conv_saldo: Optional[str] = Query(None),
-    protheus_url: Optional[str] = Query(None),
-    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -119,9 +104,7 @@ async def get_como_base_extrato(
         "data_conv_saldo": data_conv_saldo,
         "pageSize": 2000,
     }
-
-    tenant_id = resolve_protheus_tenant(empresa_id, db)
-    service = _get_service(protheus_url, tenant_id)
+    service = _get_service(empresa_id, db)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}

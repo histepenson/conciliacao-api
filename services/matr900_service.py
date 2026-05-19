@@ -20,8 +20,8 @@ _PARAMS_MATR900 = [
 class Matr900Service:
     """Proxy/adaptador para o ZMATR900API do Protheus."""
 
-    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = ""):
-        self.endpoint = protheus_base_url.rstrip("/") + "/rest/zmatr900api/api/v1/matr900"
+    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = "", rest_prefix: str = "rest"):
+        self.endpoint = protheus_base_url.rstrip("/") + f"/{rest_prefix.strip('/')}/zmatr900api/api/v1/matr900"
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id
 

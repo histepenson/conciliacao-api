@@ -23,8 +23,8 @@ class Ctbr140Service:
     paginando automaticamente, e entrega os dados prontos para normalizacao.
     """
 
-    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = ""):
-        self.endpoint = protheus_base_url.rstrip("/") + "/rest/zctbr140api/api/v1/ctbr140"
+    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = "", rest_prefix: str = "rest"):
+        self.endpoint = protheus_base_url.rstrip("/") + f"/{rest_prefix.strip('/')}/zctbr140api/api/v1/ctbr140"
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id  # "02,0201"
 

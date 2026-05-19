@@ -6,23 +6,15 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from services.finr130_service import FinR130Service
-from core.config import settings
-from core.protheus import resolve_protheus_tenant
+from core.protheus import resolve_protheus_config
 
 router = APIRouter(prefix="/v1/finr130", tags=["FINR130"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(protheus_url: Optional[str], tenant_id: str) -> FinR130Service:
-    url = protheus_url or getattr(settings, "PROTHEUS_URL", None)
-    if not url:
-        raise HTTPException(
-            status_code=422,
-            detail="URL do Protheus nao configurada. Informe o parametro 'protheus_url' ou defina PROTHEUS_URL no .env",
-        )
-    user = getattr(settings, "PROTHEUS_USER", "")
-    password = getattr(settings, "PROTHEUS_PASSWORD", "")
-    return FinR130Service(url, user, password, tenant_id)
+def _get_service(empresa_id: Optional[int], db: Session) -> FinR130Service:
+    cfg = resolve_protheus_config(empresa_id, db)
+    return FinR130Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
 
 
 @router.get("")
@@ -66,8 +58,7 @@ async def get_titulos_receber(
     emissao_futura: Optional[str] = Query(None),
     taxa_moeda: Optional[str] = Query(None),
     considera_data: Optional[str] = Query(None),
-    protheus_url: Optional[str] = Query(None, description="URL base do servidor Protheus (ex: https://192.168.1.100:8089)"),
-    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     db: Session = Depends(get_db),
 ):
     """
@@ -118,8 +109,7 @@ async def get_titulos_receber(
         "considera_data": considera_data,
     }
 
-    tenant_id = resolve_protheus_tenant(empresa_id, db)
-    service = _get_service(protheus_url, tenant_id)
+    service = _get_service(empresa_id, db)
 
     try:
         resultado = await service.buscar_todos_titulos(params)

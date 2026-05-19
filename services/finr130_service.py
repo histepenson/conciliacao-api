@@ -24,8 +24,8 @@ _PARAMS_FINR130 = [
 class FinR130Service:
     """Proxy/adaptador para o ZFINR130API do Protheus."""
 
-    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = ""):
-        self.endpoint = protheus_base_url.rstrip("/") + "/rest/zfinr130api/api/v1/finr130"
+    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = "", rest_prefix: str = "rest"):
+        self.endpoint = protheus_base_url.rstrip("/") + f"/{rest_prefix.strip('/')}/zfinr130api/api/v1/finr130"
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id  # "02,0201"
 

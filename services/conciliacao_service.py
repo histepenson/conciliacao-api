@@ -84,6 +84,54 @@ class ConciliacaoService:
             "percentual": round(percentual, 2),
         }
 
+    def _mes_analise_from_parametros(self, parametros: dict) -> Optional[str]:
+        """Retorna mes_analise (YYYYMM) dos parametros ou deriva de data_base."""
+        mes = parametros.get("mes_analise")
+        if mes:
+            return str(mes).strip()
+        data_base = str(parametros.get("data_base", "")).strip()
+        if len(data_base) >= 6:
+            return data_base[:6]
+        return None
+
+    def _filtrar_financeiro_por_mes(
+        self, df_detalhado: pd.DataFrame, mes_analise: str
+    ) -> pd.DataFrame:
+        """
+        Filtra registros pelo mes/ano de data_emissao e agrega por codigo.
+        Retorna DataFrame com colunas: codigo, cliente, valor.
+        """
+        if df_detalhado is None or df_detalhado.empty:
+            return pd.DataFrame(columns=["codigo", "cliente", "valor"])
+
+        if "data_emissao" not in df_detalhado.columns:
+            logger.warning("[MES] Coluna data_emissao ausente; usando financeiro completo")
+            return df_detalhado
+
+        try:
+            ano = int(mes_analise[:4])
+            mes = int(mes_analise[4:6])
+        except (ValueError, TypeError, IndexError):
+            logger.warning("[MES] mes_analise invalido: %s", mes_analise)
+            return df_detalhado
+
+        datas = pd.to_datetime(df_detalhado["data_emissao"], errors="coerce")
+        mask = (datas.dt.month == mes) & (datas.dt.year == ano)
+        df_filtrado = df_detalhado[mask].copy()
+
+        logger.info(
+            "[MES] Filtro emissao %s/%s: %s/%s registros",
+            mes, ano, len(df_filtrado), len(df_detalhado),
+        )
+
+        if df_filtrado.empty:
+            return pd.DataFrame(columns=["codigo", "cliente", "valor"])
+
+        return df_filtrado.groupby("codigo", as_index=False).agg(
+            cliente=("cliente", "first"),
+            valor=("valor", "sum"),
+        )
+
     def _gerar_resumo_analise_fallback(self, df_completo: pd.DataFrame) -> dict:
         """Gera resumo da analise diretamente do df_completo, sem depender da analise detalhada."""
         if df_completo is None or df_completo.empty:
@@ -220,6 +268,19 @@ class ConciliacaoService:
             logger.info(" Financeiro normalizado (legado): %s registros", len(financeiro_norm))
 
         # ==========================
+        # 1.5 FILTRAR EMISSAO DO MES
+        # ==========================
+        mes_analise = self._mes_analise_from_parametros(request.parametros or {})
+        df_fin_mes: Optional[pd.DataFrame] = None
+        if mes_analise:
+            df_fin_mes = self._filtrar_financeiro_por_mes(financeiro_detalhado, mes_analise)
+            logger.info(
+                "[MES] df_fin_mes: %s codigos, valor total: %.2f",
+                len(df_fin_mes),
+                float(df_fin_mes["valor"].sum()) if not df_fin_mes.empty else 0.0,
+            )
+
+        # ==========================
         # 2 NORMALIZAR CONTABILIDADE
         # ==========================
         df_contabil_raw = pd.DataFrame(request.base_contabil_filtrada.registros)
@@ -331,8 +392,15 @@ class ConciliacaoService:
             df_razao_filtrado = self._filtrar_razao_por_conta(df_razao_geral, conta_contabil)
 
             analise_service = AnaliseDiferencasService()
+            # Usa financeiro filtrado pelo mes de emissao para comparar com CTBR480
+            # (que ja contem apenas o mes de analise); se nao houver filtro, usa o completo
+            df_fin_para_analise = (
+                df_fin_mes
+                if (df_fin_mes is not None and not df_fin_mes.empty)
+                else financeiro_norm
+            )
             analise_detalhada = analise_service.processar_analise_detalhada(
-                df_financeiro=financeiro_norm,
+                df_financeiro=df_fin_para_analise,
                 df_contabilidade_filtrada=contabil_norm,
                 df_razao_contabil=df_razao_filtrado,
                 df_financeiro_detalhado=financeiro_detalhado,
@@ -378,6 +446,17 @@ class ConciliacaoService:
         # ==========================
         # 8 RETORNO FINAL (DICT)
         # ==========================
+        analise_movimentos_mes: Optional[dict] = None
+        if mes_analise and df_fin_mes is not None:
+            analise_movimentos_mes = {
+                "mes": mes_analise,
+                "codigos_financeiro_mes": int(len(df_fin_mes)),
+                "valor_financeiro_mes": round(float(df_fin_mes["valor"].sum()) if not df_fin_mes.empty else 0.0, 2),
+                "codigos_financeiro_total": int(len(financeiro_norm)),
+                "valor_financeiro_total": round(float(financeiro_norm["valor"].sum()), 2),
+                "codigos_excluidos_outros_periodos": int(len(financeiro_norm)) - int(len(df_fin_mes)),
+            }
+
         retorno = {
             "resumo": resumo,
             "diferencas_origem_maior": diferencas_origem_maior,
@@ -385,6 +464,7 @@ class ConciliacaoService:
             "analise_detalhada": analise_detalhada,
             "resumo_analise": resumo_analise,
             "analise_profunda_contabil": analise_profunda_contabil,
+            "analise_movimentos_mes": analise_movimentos_mes,
             "observacoes": [
                 f"Total de {len(diferencas_origem_maior)} registros onde origem > contabilidade",
                 f"Total de {len(diferencas_contabilidade_maior)} registros onde contabilidade > origem",

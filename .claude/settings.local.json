@@ -126,7 +126,14 @@
       "Bash(Get-ChildItem -Path \"c:\\\\conciliacao-api\" -Recurse -Directory)",
       "Bash(Select-Object -First 20)",
       "Bash(Format-Table FullName)",
-      "PowerShell(winget --version 2>&1)"
+      "PowerShell(winget --version 2>&1)",
+      "Bash(Get-ChildItem -Path \"c:\\\\conciliacao-api\" -Recurse -Filter \"*.py\")",
+      "Read(//c/Users/histepenson/Documents/1212410/1212410/Fontes/Adm/**)",
+      "Read(//c/Users/histepenson/Documents/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\conciliacao-app\\src\\pages",
+      "c:\\conciliacao-app\\src\\components\\Finr150ParamsDialog"
     ]
   }
 }

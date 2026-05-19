@@ -5,7 +5,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from core.protheus import encrypt_password
 from models import Empresa, UsuarioEmpresa, Usuario, Perfil, AuditLog, AuditAction
+
+_UPDATABLE_FIELDS = [
+    "nome", "cnpj", "status", "permite_efetivar_divergente",
+    "protheus_tenant", "protheus_url", "protheus_rest_prefix", "protheus_user",
+]
 
 
 def _now_utc() -> datetime:
@@ -66,9 +72,15 @@ def criar_empresa(db: Session, data: dict, created_by: Optional[int] = None) -> 
 
 def atualizar_empresa(db: Session, empresa_id: int, data: dict, updated_by: Optional[int] = None) -> Empresa:
     empresa = obter_empresa(db, empresa_id)
-    for field in ["nome", "cnpj", "status", "permite_efetivar_divergente", "protheus_tenant"]:
+
+    for field in _UPDATABLE_FIELDS:
         if field in data and data[field] is not None:
             setattr(empresa, field, data[field])
+
+    if "protheus_password" in data:
+        raw = data["protheus_password"]
+        empresa.protheus_password = encrypt_password(raw) if raw else None
+
     empresa.updated_by = updated_by
     empresa.updated_at = _now_utc()
     _log_audit(db, updated_by, empresa.id, AuditAction.UPDATE, "empresa", empresa.id)

@@ -22,8 +22,8 @@ _PARAMS_CTBR400 = [
 class Ctbr400Service:
     """Proxy/adaptador para o ZCTBR400API do Protheus."""
 
-    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = ""):
-        self.endpoint = protheus_base_url.rstrip("/") + "/rest/zctbr400api/api/v1/ctbr400"
+    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = "", rest_prefix: str = "rest"):
+        self.endpoint = protheus_base_url.rstrip("/") + f"/{rest_prefix.strip('/')}/zctbr400api/api/v1/ctbr400"
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id
 

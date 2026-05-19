@@ -23,8 +23,8 @@ _PARAMS_FINR150 = [
 class FinR150Service:
     """Proxy/adaptador para o ZFINR150API do Protheus (Contas a Pagar)."""
 
-    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = ""):
-        self.endpoint = protheus_base_url.rstrip("/") + "/rest/zfinr150api/api/v1/finr150"
+    def __init__(self, protheus_base_url: str, user: str = "", password: str = "", tenant_id: str = "", rest_prefix: str = "rest"):
+        self.endpoint = protheus_base_url.rstrip("/") + f"/{rest_prefix.strip('/')}/zfinr150api/api/v1/finr150"
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id
 

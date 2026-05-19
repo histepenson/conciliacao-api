@@ -6,23 +6,15 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from services.finr150_service import FinR150Service
-from core.config import settings
-from core.protheus import resolve_protheus_tenant
+from core.protheus import resolve_protheus_config
 
 router = APIRouter(prefix="/v1/finr150", tags=["FINR150"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(protheus_url: Optional[str], tenant_id: str) -> FinR150Service:
-    url = protheus_url or getattr(settings, "PROTHEUS_URL", None)
-    if not url:
-        raise HTTPException(
-            status_code=422,
-            detail="URL do Protheus nao configurada. Informe o parametro 'protheus_url' ou defina PROTHEUS_URL no .env",
-        )
-    user = getattr(settings, "PROTHEUS_USER", "")
-    password = getattr(settings, "PROTHEUS_PASSWORD", "")
-    return FinR150Service(url, user, password, tenant_id)
+def _get_service(empresa_id: Optional[int], db: Session) -> FinR150Service:
+    cfg = resolve_protheus_config(empresa_id, db)
+    return FinR150Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
 
 
 @router.get("")
@@ -65,8 +57,7 @@ async def get_titulos_pagar(
     emissao_futura: Optional[str] = Query(None),
     taxa_moeda: Optional[str] = Query(None),
     titulos_excluidos: Optional[str] = Query(None),
-    protheus_url: Optional[str] = Query(None, description="URL base do servidor Protheus"),
-    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     db: Session = Depends(get_db),
 ):
     """
@@ -96,8 +87,7 @@ async def get_titulos_pagar(
         "taxa_moeda": taxa_moeda, "titulos_excluidos": titulos_excluidos,
     }
 
-    tenant_id = resolve_protheus_tenant(empresa_id, db)
-    service = _get_service(protheus_url, tenant_id)
+    service = _get_service(empresa_id, db)
     try:
         return await service.buscar_todos_titulos(params)
     except Exception as exc:
@@ -130,8 +120,7 @@ async def get_como_base_pagar(
     adiantamentos: Optional[str] = Query(None),
     abatimentos: Optional[str] = Query(None),
     titulos_excluidos: Optional[str] = Query(None),
-    protheus_url: Optional[str] = Query(None),
-    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -147,8 +136,7 @@ async def get_como_base_pagar(
         "pageSize": 500,
     }
 
-    tenant_id = resolve_protheus_tenant(empresa_id, db)
-    service = _get_service(protheus_url, tenant_id)
+    service = _get_service(empresa_id, db)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}

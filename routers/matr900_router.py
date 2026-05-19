@@ -6,26 +6,15 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from services.matr900_service import Matr900Service
-from core.config import settings
-from core.protheus import resolve_protheus_tenant
+from core.protheus import resolve_protheus_config
 
 router = APIRouter(prefix="/v1/matr900", tags=["MATR900"])
 logger = logging.getLogger(__name__)
 
 
-def _get_service(protheus_url: Optional[str], tenant_id: str) -> Matr900Service:
-    url = protheus_url or getattr(settings, "PROTHEUS_URL", None)
-    if not url:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "URL do Protheus nao configurada. "
-                "Informe o parametro 'protheus_url' ou defina PROTHEUS_URL no .env"
-            ),
-        )
-    user = getattr(settings, "PROTHEUS_USER", "")
-    password = getattr(settings, "PROTHEUS_PASSWORD", "")
-    return Matr900Service(url, user, password, tenant_id)
+def _get_service(empresa_id: Optional[int], db: Session) -> Matr900Service:
+    cfg = resolve_protheus_config(empresa_id, db)
+    return Matr900Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
 
 
 @router.get(
@@ -54,8 +43,7 @@ async def get_kardex(
     lista_transferencia: Optional[str] = Query("1"),
     considera_filiais: Optional[str] = Query("2"),
     tipo_custo: Optional[str] = Query("1", description="1=Medio 2=Reposicao"),
-    protheus_url: Optional[str] = Query(None),
-    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -78,8 +66,7 @@ async def get_kardex(
         "tipo_custo": tipo_custo,
     }
 
-    tenant_id = resolve_protheus_tenant(empresa_id, db)
-    service = _get_service(protheus_url, tenant_id)
+    service = _get_service(empresa_id, db)
     try:
         return await service.buscar_kardex(params)
     except Exception as exc:
@@ -112,8 +99,7 @@ async def get_como_base_kardex(
     lista_transferencia: Optional[str] = Query("1"),
     considera_filiais: Optional[str] = Query("2"),
     tipo_custo: Optional[str] = Query("1"),
-    protheus_url: Optional[str] = Query(None),
-    empresa_id: Optional[int] = Query(None, description="ID da empresa para resolver o Tenant ID do Protheus"),
+    empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     db: Session = Depends(get_db),
 ):
     params = {
@@ -136,8 +122,7 @@ async def get_como_base_kardex(
         "pageSize": 2000,
     }
 
-    tenant_id = resolve_protheus_tenant(empresa_id, db)
-    service = _get_service(protheus_url, tenant_id)
+    service = _get_service(empresa_id, db)
     try:
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}

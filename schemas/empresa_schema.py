@@ -1,4 +1,4 @@
-from pydantic import BaseModel,field_validator
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -9,9 +9,13 @@ class EmpresaBase(BaseModel):
     status: bool = True
     permite_efetivar_divergente: bool = False
     protheus_tenant: Optional[str] = None
+    protheus_url: Optional[str] = None
+    protheus_rest_prefix: Optional[str] = None
+    protheus_user: Optional[str] = None
+
 
 class EmpresaCreate(EmpresaBase):
-    pass
+    protheus_password: Optional[str] = None
 
 
 class EmpresaUpdate(BaseModel):
@@ -20,6 +24,10 @@ class EmpresaUpdate(BaseModel):
     status: Optional[bool] = None
     permite_efetivar_divergente: Optional[bool] = None
     protheus_tenant: Optional[str] = None
+    protheus_url: Optional[str] = None
+    protheus_rest_prefix: Optional[str] = None
+    protheus_user: Optional[str] = None
+    protheus_password: Optional[str] = None
 
 
 class EmpresaResponse(EmpresaBase):
@@ -27,6 +35,7 @@ class EmpresaResponse(EmpresaBase):
     created_at: datetime
     updated_at: datetime
     usuarios_count: int = 0
+    protheus_password_configurada: bool = False
 
     model_config = {"from_attributes": True}
 

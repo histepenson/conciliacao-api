@@ -18,6 +18,10 @@ class Empresa(Base):
     status = Column(Boolean, default=True, nullable=False)
     permite_efetivar_divergente = Column(Boolean, default=False, nullable=False)
     protheus_tenant = Column(String(100), nullable=True)
+    protheus_url = Column(String(200), nullable=True)
+    protheus_rest_prefix = Column(String(50), nullable=True)
+    protheus_user = Column(String(100), nullable=True)
+    protheus_password = Column(String, nullable=True)
 
     # Timestamps - padrao snake_case
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"), nullable=False)
@@ -58,6 +62,10 @@ class Empresa(Base):
     # Relacionamento com usuarios de auditoria
     criador = relationship("Usuario", foreign_keys=[created_by])
     atualizador = relationship("Usuario", foreign_keys=[updated_by])
+
+    @property
+    def protheus_password_configurada(self) -> bool:
+        return bool(self.protheus_password)
 
     def __repr__(self):
         return f"<Empresa(id={self.id}, nome='{self.nome}', cnpj='{self.cnpj}')>"

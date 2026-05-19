@@ -174,5 +174,6 @@ class RelatorioConsolidacao(BaseModel):
     analise_detalhada: List[AnaliseDiferencaDetalhada] = []
     resumo_analise: Optional[ResumoAnaliseDetalhada] = None
     analise_profunda_contabil: List[AnaliseContabilProfunda] = []
+    analise_movimentos_mes: Optional[Dict[str, Any]] = None
     observacoes: List[str] = []
     alertas: List[str] = []
