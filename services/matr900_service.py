@@ -50,7 +50,7 @@ class Matr900Service:
             {k: v for k, v in query.items() if k not in ("page",)},
         )
 
-        async with httpx.AsyncClient(verify=False, timeout=300.0, auth=self.auth) as client:
+        async with httpx.AsyncClient(verify=False, timeout=600.0, auth=self.auth) as client:
             while current_page <= total_pages:
                 query["page"] = current_page
                 url_completa = str(client.build_request("GET", self.endpoint, params=query).url)

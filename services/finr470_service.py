@@ -38,7 +38,7 @@ class FinR470Service:
 
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
-        async with httpx.AsyncClient(verify=False, timeout=300.0, auth=self.auth) as client:
+        async with httpx.AsyncClient(verify=False, timeout=600.0, auth=self.auth) as client:
             while current_page <= total_pages:
                 query["page"] = current_page
                 logger.info(
