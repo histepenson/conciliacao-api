@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     PROTHEUS_USER: str = ""
     PROTHEUS_PASSWORD: str = ""
     PROTHEUS_TENANT: str = "02,0201"
+    PROTHEUS_HTTP_TIMEOUT_SECONDS: float = 1800.0
+    PROTHEUS_HTTP_RETRY_ATTEMPTS: int = 3
+    PROTHEUS_HTTP_RETRY_BACKOFF_SECONDS: float = 2.0
 
     # Storage
     STORAGE_DIR: str = "data"

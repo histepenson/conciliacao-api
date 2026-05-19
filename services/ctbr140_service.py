@@ -1,7 +1,8 @@
-import httpx
 import json as _json
 import logging
 from typing import Any
+
+from core.protheus_http import protheus_async_client, protheus_get
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +45,21 @@ class Ctbr140Service:
 
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
-        async with httpx.AsyncClient(verify=False, timeout=600.0, auth=self.auth) as client:
+        async with protheus_async_client(auth=self.auth) as client:
             while current_page <= total_pages:
                 query["page"] = current_page
                 logger.info(
                     "CTBR140 -> pagina %s/%s  endpoint=%s  tenant=%s",
                     current_page, total_pages, self.endpoint, self.tenant_id,
                 )
-                resp = await client.get(self.endpoint, params=query, headers=headers)
-                resp.raise_for_status()
+                resp = await protheus_get(
+                    client,
+                    self.endpoint,
+                    params=query,
+                    headers=headers,
+                    logger=logger,
+                    operation=f"CTBR140 pagina {current_page}",
+                )
 
                 # Protheus retorna Windows-1252 (CP1252) por padrao.
                 # Tenta UTF-8 primeiro; se falhar, usa windows-1252.

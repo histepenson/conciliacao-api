@@ -1,8 +1,9 @@
-import httpx
 import json as _json
 import logging
 from typing import Any
 from fastapi import HTTPException
+
+from core.protheus_http import protheus_async_client, protheus_get
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class Matr900Service:
             {k: v for k, v in query.items() if k not in ("page",)},
         )
 
-        async with httpx.AsyncClient(verify=False, timeout=600.0, auth=self.auth) as client:
+        async with protheus_async_client(auth=self.auth) as client:
             while current_page <= total_pages:
                 query["page"] = current_page
                 url_completa = str(client.build_request("GET", self.endpoint, params=query).url)
@@ -58,12 +59,18 @@ class Matr900Service:
                     "MATR900 -> pagina %s/%s | URL: %s",
                     current_page, total_pages, url_completa,
                 )
-                resp = await client.get(self.endpoint, params=query, headers=headers)
+                resp = await protheus_get(
+                    client,
+                    self.endpoint,
+                    params=query,
+                    headers=headers,
+                    logger=logger,
+                    operation=f"MATR900 pagina {current_page}",
+                )
                 logger.info(
                     "MATR900 <- pagina %s | HTTP %s | bytes=%s",
                     current_page, resp.status_code, len(resp.content),
                 )
-                resp.raise_for_status()
 
                 raw = resp.content
                 if not raw:
