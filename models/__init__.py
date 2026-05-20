@@ -44,6 +44,7 @@ from .certificado_digital import CertificadoDigital
 from .nfe import NfeEntrada, NfeEntradaItem, NfeSaida, NfeSaidaItem
 from .estoque_alerta import EstoqueAlerta
 from .estoque import EstoqueSaldo, EstoqueMovimentacao
+from .protheus_carga import ProtheusCarga, ProtheusCargaConfig, ProtheusCargaRegistro
 
 # Lista todos os modelos exportados
 __all__ = [
@@ -72,4 +73,8 @@ __all__ = [
     "EstoqueAlerta",
     "EstoqueSaldo",
     "EstoqueMovimentacao",
+    # Cargas Protheus
+    "ProtheusCargaConfig",
+    "ProtheusCarga",
+    "ProtheusCargaRegistro",
 ]

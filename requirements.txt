@@ -29,3 +29,7 @@ cryptography>=42.0.0
 # Estoque — relatórios e agendamento
 reportlab>=4.1.0
 apscheduler>=3.10.0
+
+# Cargas Protheus em background
+redis>=5.0.0
+rq>=1.16.0

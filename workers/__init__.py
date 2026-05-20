@@ -1,0 +1,1 @@
+"""Workers RQ da aplicacao."""
