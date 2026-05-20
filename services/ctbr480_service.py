@@ -39,24 +39,39 @@ class Ctbr480Service:
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id  # ex: "02,0201"
 
+    async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        query = self._montar_query(params)
+        query["page"] = int(query.get("page") or 1)
+        headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
+
+        async with protheus_async_client(auth=self.auth) as client:
+            resp = await protheus_get(
+                client,
+                self.endpoint,
+                params=query,
+                headers=headers,
+                logger=logger,
+                operation=f"CTBR480 pagina {query['page']}",
+            )
+            return _decode_response(resp.content)
+
     async def buscar_razao(self, params: dict[str, Any]) -> dict[str, Any]:
         """
         Chama o ZCTBR480API paginando automaticamente.
         Retorna todos os lanAamentos consolidados com saldo_atual acumulado.
         """
-        page_size = int(params.get("pageSize") or 500)
-        query = {k: v for k, v in params.items() if k in _PARAMS_CTBR480 and v is not None}
-        query["pageSize"] = page_size
+        query = self._montar_query(params)
 
         all_linhas: list[dict] = []
         parametros: dict = {}
         current_page = 1
         total_pages = 1
+        has_more = True
 
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
         async with protheus_async_client(auth=self.auth) as client:
-            while current_page <= total_pages:
+            while has_more:
                 query["page"] = current_page
                 logger.info(
                     "CTBR480 a' pAgina %s/%s  endpoint=%s  tenant=%s",
@@ -71,14 +86,11 @@ class Ctbr480Service:
                     operation=f"CTBR480 pagina {current_page}",
                 )
 
-                raw = resp.content
-                try:
-                    data = _json.loads(raw.decode("utf-8"))
-                except UnicodeDecodeError:
-                    data = _json.loads(raw.decode("windows-1252"))
+                data = _decode_response(resp.content)
 
                 parametros = data.get("parametros", {})
-                total_pages = int(data.get("total_pages", 1))
+                total_pages = int(data.get("total_pages") or total_pages or 1)
+                has_more = bool(data.get("hasMore", current_page < total_pages))
                 all_linhas.extend(data.get("linhas", []))
                 current_page += 1
 
@@ -101,4 +113,22 @@ class Ctbr480Service:
         """
         resultado = await self.buscar_razao(params)
         return resultado["linhas"]
+
+    async def buscar_como_registros_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        resultado = await self.buscar_pagina(params)
+        linhas = resultado.get("linhas", [])
+        return {**resultado, "registros": linhas, "total": len(linhas)}
+
+    def _montar_query(self, params: dict[str, Any]) -> dict[str, Any]:
+        page_size = int(params.get("pageSize") or 500)
+        query = {k: v for k, v in params.items() if k in _PARAMS_CTBR480 and v is not None}
+        query["pageSize"] = page_size
+        return query
+
+
+def _decode_response(raw: bytes) -> dict[str, Any]:
+    try:
+        return _json.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError:
+        return _json.loads(raw.decode("windows-1252"))
 

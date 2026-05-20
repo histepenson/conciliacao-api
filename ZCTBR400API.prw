@@ -116,6 +116,7 @@ Local nTotalReg     := 0
 Local nTotalPages   := 1
 Local nOffset       := 0
 Local nRecAtual     := 0
+Local lHasMore      := .F.
 Local nSaldoAtu     := 0
 Local nVlrDeb       := 0
 Local nVlrCrd       := 0
@@ -167,6 +168,7 @@ lSaltLin    := IIf(Empty(cSaltaLinha), .T., cSaltaLinha == "1")
 nTipoRel    := Max(1, Min(3, Val(cTipoRel)))
 lAnalitico  := (nTipoRel < 3)
 nPageSize   := IIf(nPageSize <= 0 .Or. nPageSize > 2000, 500, nPageSize)
+nOffset     := (nPage - 1) * nPageSize
 
 mv_par01 := cContaDe
 mv_par02 := cContaAte
@@ -290,6 +292,7 @@ Begin Sequence
 		oResp["total_registros"] := 0
 		oResp["total_pages"]     := 1
 		oResp["page"]            := nPage
+		oResp["hasMore"]         := .F.
 		oResp["linhas"]          := {}
 		Self:SetResponse(oResp:ToJson())
 		If !Empty(cArqTmp) .And. Select(cArqTmp) > 0
@@ -317,7 +320,16 @@ Begin Sequence
 				nSaldoAtu := Round(nSaldoAtu - (cArqTmp)->LANCDEB + (cArqTmp)->LANCCRD, nDecimais)
 				oLinha := JsonObject():New()
 				CTB400ApiPreencheLinha(oLinha, cArqTmp, cContaAnt, cDescConta, cNormalCta, nSaldoAtu, nTipoRel)
-				AAdd(aAllLinhas, oLinha)
+				nTotalReg++
+				If nTotalReg > (nOffset + nPageSize)
+					lHasMore := .T.
+					FreeObj(oLinha)
+					Exit
+				ElseIf nTotalReg > nOffset
+					AAdd(aLinhas, oLinha)
+				Else
+					FreeObj(oLinha)
+				EndIf
 				(cArqTmp)->(DbSkip())
 			Else
 				nVlrDeb := 0
@@ -343,9 +355,21 @@ Begin Sequence
 				oLinha["conta"]              := cContaAnt
 				oLinha["desc_conta"]         := cDescConta
 				oLinha["normal_cta"]         := cNormalCta
-				AAdd(aAllLinhas, oLinha)
+				nTotalReg++
+				If nTotalReg > (nOffset + nPageSize)
+					lHasMore := .T.
+					FreeObj(oLinha)
+					Exit
+				ElseIf nTotalReg > nOffset
+					AAdd(aLinhas, oLinha)
+				Else
+					FreeObj(oLinha)
+				EndIf
 			EndIf
 		EndDo
+		If lHasMore
+			Exit
+		EndIf
 	EndDo
 
 	If !Empty(cArqTmp) .And. Select(cArqTmp) > 0
@@ -365,17 +389,11 @@ Recover Using oError
 	RestArea(aArea)
 Return .T.
 End Sequence
-ConOut("[ZCTBR400] fim montagem linhas | total_objetos=" + cValToChar(Len(aAllLinhas)))
+ConOut("[ZCTBR400] fim montagem linhas | linhas_pagina=" + cValToChar(Len(aLinhas)) + ;
+	" total_processado=" + cValToChar(nTotalReg) + ;
+	" hasMore=" + IIf(lHasMore, "S", "N"))
 
-nTotalReg   := Len(aAllLinhas)
-nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
-nOffset     := (nPage - 1) * nPageSize
-nRecAtual    := 0
-
-While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-	AAdd(aLinhas, aAllLinhas[nOffset + nRecAtual + 1])
-	nRecAtual++
-EndDo
+nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
 
 oParams["data_ini"]     := DtoS(dDataIni)
 oParams["data_fim"]     := DtoS(dDataFim)
@@ -398,6 +416,7 @@ oResp["parametros"]      := oParams
 oResp["total_registros"] := nTotalReg
 oResp["total_pages"]     := nTotalPages
 oResp["page"]            := nPage
+oResp["hasMore"]         := lHasMore
 oResp["linhas"]          := aLinhas
 ConOut("[ZCTBR400] resposta final | total_registros=" + cValToChar(nTotalReg) + ;
     " total_pages=" + cValToChar(nTotalPages) + ;

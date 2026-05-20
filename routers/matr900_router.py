@@ -24,12 +24,14 @@ def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session
     summary="Kardex Fisico-Financeiro (MATR900)",
     description=(
         "Proxy para o ZMATR900API do Protheus. "
-        "Busca automaticamente todas as paginas e retorna o Kardex consolidado."
+        "Quando page e informado, retorna somente aquela pagina. "
+        "Sem page, busca automaticamente todas as paginas e retorna o Kardex consolidado."
     ),
 )
 async def get_kardex(
     data_ini: str = Query(..., description="Data inicio do periodo - YYYYMMDD"),
     data_fim: str = Query(..., description="Data fim do periodo - YYYYMMDD"),
+    page: Optional[int] = Query(None),
     pageSize: Optional[int] = Query(500),
     produto_de: Optional[str] = Query(None),
     produto_ate: Optional[str] = Query(None),
@@ -52,6 +54,7 @@ async def get_kardex(
     params = {
         "data_ini": data_ini,
         "data_fim": data_fim,
+        "page": page,
         "pageSize": pageSize,
         "produto_de": produto_de,
         "produto_ate": produto_ate,
@@ -71,6 +74,8 @@ async def get_kardex(
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_pagina(params)
         return await service.buscar_kardex(params)
     except Exception as exc:
         logger.exception("Erro ao consultar ZMATR900API")
@@ -88,6 +93,8 @@ async def get_kardex(
 async def get_como_base_kardex(
     data_ini: str = Query(...),
     data_fim: str = Query(...),
+    page: Optional[int] = Query(None),
+    pageSize: Optional[int] = Query(2000),
     produto_de: Optional[str] = Query(None),
     produto_ate: Optional[str] = Query(None),
     tipo_de: Optional[str] = Query(None),
@@ -109,6 +116,7 @@ async def get_como_base_kardex(
     params = {
         "data_ini": data_ini,
         "data_fim": data_fim,
+        "page": page,
         "produto_de": produto_de,
         "produto_ate": produto_ate,
         "tipo_de": tipo_de,
@@ -123,11 +131,13 @@ async def get_como_base_kardex(
         "lista_transferencia": lista_transferencia,
         "considera_filiais": considera_filiais,
         "tipo_custo": tipo_custo,
-        "pageSize": 2000,
+        "pageSize": pageSize or 2000,
     }
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_como_registros_pagina(params)
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}
     except Exception as exc:

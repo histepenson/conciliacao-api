@@ -30,6 +30,7 @@ Local oResp := JsonObject():New()
 Local oParams := JsonObject():New()
 Local aAllLinhas := {}
 Local aLinhas := {}
+Local oLinha := Nil
 Local cAliasTop := GetNextAlias()
 Local oError := Nil
 Local nPage := Max(1, Val(AllTrim(Self:page)))
@@ -59,6 +60,7 @@ Local nTotalReg := 0
 Local nTotalPages := 1
 Local nOffset := 0
 Local nRecAtual := 0
+Local lHasMore := .F.
 Local cSelectD1 := ""
 Local cSelectD2 := ""
 Local cSelectD3 := ""
@@ -109,6 +111,7 @@ Return .T.
 EndIf
 
 nPageSize := IIf(nPageSize <= 0 .Or. nPageSize > 2000, 500, nPageSize)
+nOffset := (nPage - 1) * nPageSize
 
 // mv_par usados internamente pelo CalcEst e funcoes do MATR900
 // Precisam estar setados antes do BeginSql e do loop de registros
@@ -275,29 +278,28 @@ Begin Sequence
         " EOF=" + IIf((cAliasTop)->(EoF()), "S", "N"))
 
     While !(cAliasTop)->(Eof())
-        AAdd(aAllLinhas, MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim))
+        oLinha := MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim)
+        nTotalReg++
+
+        If nTotalReg > (nOffset + nPageSize)
+            lHasMore := .T.
+            FreeObj(oLinha)
+            Exit
+        ElseIf nTotalReg > nOffset
+            AAdd(aLinhas, oLinha)
+        Else
+            FreeObj(oLinha)
+        EndIf
+
         (cAliasTop)->(DbSkip())
     EndDo
 
-    nTotalReg := Len(aAllLinhas)
-    nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
-    nOffset := (nPage - 1) * nPageSize
-    nRecAtual := 0
-
-    // LOG: totais antes da paginacao
-    ConOut(cLogPrefix + "Registros encontrados | total=" + cValToChar(nTotalReg) + ;
-        " total_pages=" + cValToChar(nTotalPages) + ;
-        " page_solicitada=" + cValToChar(nPage) + ;
-        " offset=" + cValToChar(nOffset) + ;
-        " pageSize=" + cValToChar(nPageSize))
-
-    While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-        AAdd(aLinhas, aAllLinhas[nOffset + nRecAtual + 1])
-        nRecAtual++
-    EndDo
+    nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
 
     // LOG: registros retornados nesta pagina
-    ConOut(cLogPrefix + "Pagina montada | registros_retornados=" + cValToChar(Len(aLinhas)))
+    ConOut(cLogPrefix + "Pagina montada | registros_retornados=" + cValToChar(Len(aLinhas)) + ;
+        " total_processado=" + cValToChar(nTotalReg) + ;
+        " hasMore=" + IIf(lHasMore, "S", "N"))
 
     oParams["data_ini"] := cDataIni
     oParams["data_fim"] := cDataFim
@@ -321,6 +323,7 @@ Begin Sequence
     oResp["total_registros"] := nTotalReg
     oResp["total_pages"] := nTotalPages
     oResp["page"] := nPage
+    oResp["hasMore"] := lHasMore
     oResp["linhas"] := aLinhas
     Self:SetResponse(oResp:ToJson())
 

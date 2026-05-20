@@ -24,7 +24,8 @@ def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session
     summary="Razao Contabil por Item (CTBR480)",
     description=(
         "Proxy para o ZCTBR480API do Protheus. "
-        "Busca automaticamente todas as paginas e retorna o razao contabil consolidado."
+        "Quando page e informado, retorna somente aquela pagina. "
+        "Sem page, busca automaticamente todas as paginas e retorna o razao contabil consolidado."
     ),
 )
 async def get_razao(
@@ -81,6 +82,8 @@ async def get_razao(
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_pagina(params)
         return await service.buscar_razao(params)
     except Exception as exc:
         logger.exception("Erro ao consultar ZCTBR480API")
@@ -98,6 +101,8 @@ async def get_razao(
 async def get_como_base_contabil_geral(
     data_fim: str = Query(..., description="Data fim do periodo -- YYYYMMDD"),
     data_ini: Optional[str] = Query(None),
+    page: Optional[int] = Query(None),
+    pageSize: Optional[int] = Query(2000),
     item_de: Optional[str] = Query(None),
     item_ate: Optional[str] = Query(None),
     conta_de: Optional[str] = Query(None),
@@ -127,6 +132,7 @@ async def get_como_base_contabil_geral(
     params = {
         "data_fim": data_fim,
         "data_ini": data_ini,
+        "page": page,
         "item_de": item_de,
         "item_ate": item_ate,
         "conta_de": conta_de,
@@ -141,11 +147,13 @@ async def get_como_base_contabil_geral(
         "consid_filiais": consid_filiais,
         "filial_de": filial_de,
         "filial_ate": filial_ate,
-        "pageSize": 2000,  # traz tudo em uma unica chamada ao Protheus
+        "pageSize": pageSize or 2000,
     }
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_como_registros_pagina(params)
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}
     except Exception as exc:

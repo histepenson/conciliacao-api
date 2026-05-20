@@ -24,12 +24,14 @@ def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session
     summary="Razao Contabil (CTBR400)",
     description=(
         "Proxy para o ZCTBR400API do Protheus. "
-        "Busca automaticamente todas as paginas e retorna o razao contabil consolidado."
+        "Quando page e informado, retorna somente aquela pagina. "
+        "Sem page, busca automaticamente todas as paginas e retorna o razao contabil consolidado."
     ),
 )
 async def get_razao(
     data_fim: str = Query(..., description="Data fim do periodo - YYYYMMDD"),
     data_ini: Optional[str] = Query(None, description="Data inicio - YYYYMMDD"),
+    page: Optional[int] = Query(None),
     pageSize: Optional[int] = Query(500),
     conta_de: Optional[str] = Query(None),
     conta_ate: Optional[str] = Query(None),
@@ -58,6 +60,7 @@ async def get_razao(
     params = {
         "data_fim": data_fim,
         "data_ini": data_ini,
+        "page": page,
         "pageSize": pageSize,
         "conta_de": conta_de,
         "conta_ate": conta_ate,
@@ -83,6 +86,8 @@ async def get_razao(
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_pagina(params)
         return await service.buscar_razao(params)
     except Exception as exc:
         logger.exception("Erro ao consultar ZCTBR400API")
@@ -100,6 +105,8 @@ async def get_razao(
 async def get_como_base_razao(
     data_fim: str = Query(...),
     data_ini: Optional[str] = Query(None),
+    page: Optional[int] = Query(None),
+    pageSize: Optional[int] = Query(2000),
     conta_de: Optional[str] = Query(None),
     conta_ate: Optional[str] = Query(None),
     custo_de: Optional[str] = Query(None),
@@ -127,6 +134,7 @@ async def get_como_base_razao(
     params = {
         "data_fim": data_fim,
         "data_ini": data_ini,
+        "page": page,
         "conta_de": conta_de,
         "conta_ate": conta_ate,
         "custo_de": custo_de,
@@ -147,11 +155,13 @@ async def get_como_base_razao(
         "consid_filiais": consid_filiais,
         "filial_de": filial_de,
         "filial_ate": filial_ate,
-        "pageSize": 2000,
+        "pageSize": pageSize or 2000,
     }
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_como_registros_pagina(params)
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}
     except Exception as exc:

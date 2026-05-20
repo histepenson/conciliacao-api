@@ -134,6 +134,7 @@ Local nTotalReg     := 0
 Local nTotalPages   := 1
 Local nOffset       := 0
 Local nRecAtual     := 0
+Local lHasMore      := .F.
 Local nDecVlr       := 2
 Local nDebito       := 0
 Local nCredito      := 0
@@ -199,6 +200,7 @@ lCusto      := IIf(Empty(cImpCusto), !Empty(cCustoDe) .Or. !Empty(cCustoAte), cI
 lCLVL       := IIf(Empty(cImpClvl), !Empty(cClvlDe) .Or. !Empty(cClvlAte), cImpClvl == "1")
 lTotConta   := (cTotConta == "1")
 nPageSize   := IIf(nPageSize <= 0 .Or. nPageSize > 2000, 500, nPageSize)
+nOffset     := (nPage - 1) * nPageSize
 
 mv_par01 := cItemDe
 mv_par02 := cItemAte
@@ -362,7 +364,16 @@ Begin Sequence
 		oLinha["normal_item"]          := cNormalItem
 		oLinha["normal_cta"]           := cNormalConta
 		oLinha["modo"]                 := "analitico"
-		aAdd(aAllLinhas, oLinha)
+		nTotalReg++
+		If nTotalReg > (nOffset + nPageSize)
+			lHasMore := .T.
+			FreeObj(oLinha)
+			Exit
+		ElseIf nTotalReg > nOffset
+			aAdd(aLinhas, oLinha)
+		Else
+			FreeObj(oLinha)
+		EndIf
 		(cArqTmp)->(DbSkip())
 	EndDo
 
@@ -388,14 +399,7 @@ End Sequence
 
 CtbRazClean()
 
-nTotalReg   := Len(aAllLinhas)
-nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
-nOffset     := (nPage - 1) * nPageSize
-
-While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-	aAdd(aLinhas, aAllLinhas[nOffset + nRecAtual + 1])
-	nRecAtual++
-EndDo
+nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
 
 oParams["data_ini"]         := DtoS(dDataIni)
 oParams["data_fim"]         := DtoS(dDataFim)
@@ -425,12 +429,14 @@ oResp["parametros"]      := oParams
 oResp["total_registros"] := nTotalReg
 oResp["total_pages"]     := nTotalPages
 oResp["page"]            := nPage
+oResp["hasMore"]         := lHasMore
 oResp["linhas"]          := aLinhas
 
 ConOut("ZCTBR480API - retorno total_registros=" + cValToChar(nTotalReg) + ;
     " total_pages=" + cValToChar(nTotalPages) + ;
     " page=" + cValToChar(nPage) + ;
-    " linhas_pagina=" + cValToChar(Len(aLinhas)))
+    " linhas_pagina=" + cValToChar(Len(aLinhas)) + ;
+    " hasMore=" + IIf(lHasMore, "S", "N"))
 If Len(aLinhas) > 0 .And. ValType(aLinhas[1]) == "O"
     ConOut("ZCTBR480API - primeira_linha=" + aLinhas[1]:ToJson())
 EndIf

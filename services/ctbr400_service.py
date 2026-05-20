@@ -28,23 +28,35 @@ class Ctbr400Service:
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id
 
+    async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        query = self._montar_query(params)
+        query["page"] = int(query.get("page") or 1)
+        headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
+
+        async with protheus_async_client(auth=self.auth) as client:
+            resp = await protheus_get(
+                client,
+                self.endpoint,
+                params=query,
+                headers=headers,
+                logger=logger,
+                operation=f"CTBR400 pagina {query['page']}",
+            )
+            return self._decode_response(resp.content)
+
     async def buscar_razao(self, params: dict[str, Any]) -> dict[str, Any]:
-        page_size = int(params.get("pageSize") or 500)
-        query = {k: v for k, v in params.items() if k in _PARAMS_CTBR400 and v is not None}
-        query["pageSize"] = page_size
-        query.setdefault("tipo_rel", "1")
-        query.setdefault("moeda", "01")
-        query.setdefault("saldo", "1")
+        query = self._montar_query(params)
 
         all_linhas: list[dict] = []
         parametros: dict[str, Any] = {}
         total_pages = 1
         current_page = 1
+        has_more = True
 
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
         async with protheus_async_client(auth=self.auth) as client:
-            while current_page <= total_pages:
+            while has_more:
                 query["page"] = current_page
                 logger.info(
                     "CTBR400 -> pagina %s/%s endpoint=%s tenant=%s",
@@ -62,22 +74,11 @@ class Ctbr400Service:
                     operation=f"CTBR400 pagina {current_page}",
                 )
 
-                raw = resp.content
-                if not raw:
-                    raise HTTPException(status_code=502, detail="Protheus retornou resposta vazia")
-
-                try:
-                    data = _json.loads(raw.decode("utf-8"))
-                except UnicodeDecodeError:
-                    data = _json.loads(raw.decode("windows-1252"))
-
-                if data.get("erro"):
-                    status = int(data.get("status", 400))
-                    mensagem = data.get("mensagem", "Erro ao consultar Protheus")
-                    raise HTTPException(status_code=status, detail=mensagem)
+                data = self._decode_response(resp.content)
 
                 parametros = data.get("parametros", {})
-                total_pages = int(data.get("total_pages", 1))
+                total_pages = int(data.get("total_pages") or total_pages or 1)
+                has_more = bool(data.get("hasMore", current_page < total_pages))
                 all_linhas.extend(data.get("linhas", []))
                 current_page += 1
 
@@ -90,3 +91,33 @@ class Ctbr400Service:
     async def buscar_como_registros(self, params: dict[str, Any]) -> list[dict]:
         resultado = await self.buscar_razao(params)
         return resultado["linhas"]
+
+    async def buscar_como_registros_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        resultado = await self.buscar_pagina(params)
+        linhas = resultado.get("linhas", [])
+        return {**resultado, "registros": linhas, "total": len(linhas)}
+
+    def _montar_query(self, params: dict[str, Any]) -> dict[str, Any]:
+        page_size = int(params.get("pageSize") or 500)
+        query = {k: v for k, v in params.items() if k in _PARAMS_CTBR400 and v is not None}
+        query["pageSize"] = page_size
+        query.setdefault("tipo_rel", "1")
+        query.setdefault("moeda", "01")
+        query.setdefault("saldo", "1")
+        return query
+
+    def _decode_response(self, raw: bytes) -> dict[str, Any]:
+        if not raw:
+            raise HTTPException(status_code=502, detail="Protheus retornou resposta vazia")
+
+        try:
+            data = _json.loads(raw.decode("utf-8"))
+        except UnicodeDecodeError:
+            data = _json.loads(raw.decode("windows-1252"))
+
+        if data.get("erro"):
+            status = int(data.get("status", 400))
+            mensagem = data.get("mensagem", "Erro ao consultar Protheus")
+            raise HTTPException(status_code=status, detail=mensagem)
+
+        return data
