@@ -164,7 +164,15 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
     if existente and existente.status in STATUS_REUTILIZAVEIS:
         return existente, True
 
-    if existente and existente.status in {"pendente", "processando"}:
+    if existente and existente.status == "processando":
+        return existente, False
+
+    if existente and existente.status in {"pendente", "erro"}:
+        existente.status = "pendente"
+        existente.erro = None
+        existente.iniciado_em = None
+        existente.finalizado_em = None
+        _tentar_enfileirar(db, existente)
         return existente, False
 
     carga = ProtheusCarga(
@@ -180,13 +188,7 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
     db.commit()
     db.refresh(carga)
 
-    try:
-        carga.rq_job_id = enqueue_protheus_carga(carga.id)
-    except Exception as exc:
-        carga.status = "erro"
-        carga.erro = f"Falha ao enfileirar no RQ/Redis: {exc}"
-    db.commit()
-    db.refresh(carga)
+    _tentar_enfileirar(db, carga)
     return carga, False
 
 
@@ -233,13 +235,7 @@ def reprocessar_carga(db: Session, empresa_id: int, carga_id: int) -> ProtheusCa
     db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
     db.commit()
 
-    try:
-        carga.rq_job_id = enqueue_protheus_carga(carga.id)
-    except Exception as exc:
-        carga.status = "erro"
-        carga.erro = f"Falha ao enfileirar no RQ/Redis: {exc}"
-    db.commit()
-    db.refresh(carga)
+    _tentar_enfileirar(db, carga)
     return carga
 
 
@@ -248,6 +244,16 @@ def listar_registros(db: Session, carga: ProtheusCarga, skip: int, limit: int) -
     total = query.count()
     registros = query.order_by(ProtheusCargaRegistro.sequencia).offset(skip).limit(limit).all()
     return total, registros
+
+
+def _tentar_enfileirar(db: Session, carga: ProtheusCarga) -> None:
+    try:
+        carga.rq_job_id = enqueue_protheus_carga(carga.id)
+    except Exception as exc:
+        carga.status = "erro"
+        carga.erro = f"Falha ao enfileirar no RQ/Redis: {exc}"
+    db.commit()
+    db.refresh(carga)
 
 
 def marcar_processando(db: Session, carga: ProtheusCarga) -> None:
