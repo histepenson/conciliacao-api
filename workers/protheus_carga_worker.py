@@ -14,20 +14,25 @@ from services.finr470_service import FinR470Service
 from services.matr900_service import Matr900Service
 from services.protheus_carga_service import marcar_concluido, marcar_erro, marcar_processando
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def executar_carga_protheus(carga_id: int) -> None:
+    print(f"[PROTHEUS_CARGA] job recebido carga_id={carga_id}", flush=True)
     asyncio.run(_executar_carga_protheus(carga_id))
 
 
 async def _executar_carga_protheus(carga_id: int) -> None:
+    print(f"[PROTHEUS_CARGA] abrindo sessao banco carga_id={carga_id}", flush=True)
     db = SessionLocal()
     try:
+        print(f"[PROTHEUS_CARGA] buscando carga no banco carga_id={carga_id}", flush=True)
         carga = db.query(ProtheusCarga).filter(ProtheusCarga.id == carga_id).first()
         if not carga:
             raise RuntimeError(f"Carga Protheus {carga_id} nao encontrada")
 
+        print(f"[PROTHEUS_CARGA] marcando processando carga_id={carga.id}", flush=True)
         marcar_processando(db, carga)
         logger.info(
             "Carga Protheus %s iniciada: relatorio=%s empresa=%s data_base=%s",
@@ -37,8 +42,10 @@ async def _executar_carga_protheus(carga_id: int) -> None:
             carga.data_base,
         )
 
+        print(f"[PROTHEUS_CARGA] chamando Protheus carga_id={carga.id} relatorio={carga.tipo_relatorio}", flush=True)
         registros = await _buscar_registros(carga, db)
 
+        print(f"[PROTHEUS_CARGA] gravando {len(registros)} registros carga_id={carga.id}", flush=True)
         db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
         db.bulk_save_objects(
             [
@@ -48,7 +55,9 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         )
         marcar_concluido(db, carga, len(registros))
         logger.info("Carga Protheus %s concluida com %s registros", carga.id, len(registros))
+        print(f"[PROTHEUS_CARGA] concluida carga_id={carga.id} total={len(registros)}", flush=True)
     except Exception as exc:
+        print(f"[PROTHEUS_CARGA] erro carga_id={carga_id}: {exc}", flush=True)
         db.rollback()
         carga = db.query(ProtheusCarga).filter(ProtheusCarga.id == carga_id).first()
         if carga:
@@ -60,12 +69,14 @@ async def _executar_carga_protheus(carga_id: int) -> None:
 
 
 async def _buscar_registros(carga: ProtheusCarga, db) -> list[dict[str, Any]]:
+    print(f"[PROTHEUS_CARGA] resolvendo config Protheus empresa_id={carga.empresa_id}", flush=True)
     config = resolve_protheus_config(carga.empresa_id, db)
     params = dict(carga.parametros_json or {})
     params["data_base"] = params.get("data_base") or carga.data_base
 
     service_args = (config.url, config.user, config.password, config.tenant, config.rest_prefix)
     tipo = carga.tipo_relatorio.upper()
+    print(f"[PROTHEUS_CARGA] config resolvida relatorio={tipo} tenant={config.tenant}", flush=True)
 
     if tipo == "FINR130":
         resultado = await FinR130Service(*service_args).buscar_todos_titulos(params)
