@@ -95,10 +95,6 @@ class FinR470Service:
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
         async with protheus_async_client(auth=self.auth) as client:
-            logger.info(
-                "FINR470 -> pagina %s  endpoint=%s  tenant=%s",
-                page, self.endpoint, self.tenant_id,
-            )
             resp = await protheus_get(
                 client,
                 self.endpoint,
@@ -124,6 +120,10 @@ class FinR470Service:
 
         total_pages = int(data.get("total_pages", page))
         registros = data.get("registros", data.get("movimentos", []))
+        logger.info(
+            "FINR470 -> pagina %s/%s  endpoint=%s  tenant=%s",
+            page, total_pages, self.endpoint, self.tenant_id,
+        )
         return {
             "parametros": data.get("parametros", {}),
             "banco": data.get("banco", {}),

@@ -37,7 +37,6 @@ class FinR150Service:
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
         async with protheus_async_client(auth=self.auth) as client:
-            logger.info("FINR150 -> pagina %s  endpoint=%s  tenant=%s", query["page"], self.endpoint, self.tenant_id)
             resp = await protheus_get(
                 client,
                 self.endpoint,
@@ -46,7 +45,13 @@ class FinR150Service:
                 logger=logger,
                 operation=f"FINR150 pagina {query['page']}",
             )
-            return _decode_json_response(resp.content)
+            data = _decode_json_response(resp.content)
+            total_pages = int(data.get("totalPages") or data.get("total_pages") or query["page"] or 1)
+            logger.info(
+                "FINR150 -> pagina %s/%s  endpoint=%s  tenant=%s",
+                query["page"], total_pages, self.endpoint, self.tenant_id,
+            )
+            return data
 
     async def buscar_todos_titulos(self, params: dict[str, Any]) -> dict[str, Any]:
         """Chama o ZFINR150API paginando automaticamente e retorna todos os titulos."""

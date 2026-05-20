@@ -45,7 +45,13 @@ class Ctbr140Service:
                 logger=logger,
                 operation=f"CTBR140 pagina {query['page']}",
             )
-            return _decode_json_response(resp.content)
+            data = _decode_json_response(resp.content)
+            total_pages = int(data.get("total_pages") or data.get("totalPages") or query["page"] or 1)
+            logger.info(
+                "CTBR140 -> pagina %s/%s  endpoint=%s  tenant=%s",
+                query["page"], total_pages, self.endpoint, self.tenant_id,
+            )
+            return data
 
     async def buscar_balancete(self, params: dict[str, Any]) -> dict[str, Any]:
         """

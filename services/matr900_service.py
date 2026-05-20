@@ -40,7 +40,13 @@ class Matr900Service:
                 logger=logger,
                 operation=f"MATR900 pagina {query['page']}",
             )
-            return self._decode_response(resp.content)
+            data = self._decode_response(resp.content)
+            total_pages = int(data.get("total_pages") or data.get("totalPages") or query["page"] or 1)
+            logger.info(
+                "MATR900 -> pagina %s/%s  endpoint=%s  tenant=%s",
+                query["page"], total_pages, self.endpoint, self.tenant_id,
+            )
+            return data
 
     async def buscar_kardex(self, params: dict[str, Any]) -> dict[str, Any]:
         query = self._montar_query(params)
@@ -62,10 +68,9 @@ class Matr900Service:
         async with protheus_async_client(auth=self.auth) as client:
             while has_more:
                 query["page"] = current_page
-                url_completa = str(client.build_request("GET", self.endpoint, params=query).url)
                 logger.info(
-                    "MATR900 -> pagina %s/%s | URL: %s",
-                    current_page, total_pages, url_completa,
+                    "MATR900 -> pagina %s/%s  endpoint=%s  tenant=%s",
+                    current_page, total_pages, self.endpoint, self.tenant_id,
                 )
                 resp = await protheus_get(
                     client,

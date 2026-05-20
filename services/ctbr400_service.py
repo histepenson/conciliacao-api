@@ -42,7 +42,13 @@ class Ctbr400Service:
                 logger=logger,
                 operation=f"CTBR400 pagina {query['page']}",
             )
-            return self._decode_response(resp.content)
+            data = self._decode_response(resp.content)
+            total_pages = int(data.get("total_pages") or data.get("totalPages") or query["page"] or 1)
+            logger.info(
+                "CTBR400 -> pagina %s/%s  endpoint=%s  tenant=%s",
+                query["page"], total_pages, self.endpoint, self.tenant_id,
+            )
+            return data
 
     async def buscar_razao(self, params: dict[str, Any]) -> dict[str, Any]:
         query = self._montar_query(params)
@@ -59,7 +65,7 @@ class Ctbr400Service:
             while has_more:
                 query["page"] = current_page
                 logger.info(
-                    "CTBR400 -> pagina %s/%s endpoint=%s tenant=%s",
+                    "CTBR400 -> pagina %s/%s  endpoint=%s  tenant=%s",
                     current_page,
                     total_pages,
                     self.endpoint,
