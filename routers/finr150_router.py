@@ -32,6 +32,8 @@ def _base_pagar_params(
     fornecedor_ate: Optional[str],
     loja_de: Optional[str],
     loja_ate: Optional[str],
+    prefixo_de: Optional[str],
+    prefixo_ate: Optional[str],
     vencto_de: Optional[str],
     vencto_ate: Optional[str],
     natureza_de: Optional[str],
@@ -48,6 +50,7 @@ def _base_pagar_params(
         "data_base": data_base,
         "fornecedor_de": fornecedor_de, "fornecedor_ate": fornecedor_ate,
         "loja_de": loja_de, "loja_ate": loja_ate,
+        "prefixo_de": prefixo_de, "prefixo_ate": prefixo_ate,
         "vencto_de": vencto_de, "vencto_ate": vencto_ate,
         "natureza_de": natureza_de, "natureza_ate": natureza_ate,
         "moeda": moeda,
@@ -182,6 +185,8 @@ async def get_como_base_pagar(
     fornecedor_ate: Optional[str] = Query(None),
     loja_de: Optional[str] = Query(None),
     loja_ate: Optional[str] = Query(None),
+    prefixo_de: Optional[str] = Query(None),
+    prefixo_ate: Optional[str] = Query(None),
     vencto_de: Optional[str] = Query(None),
     vencto_ate: Optional[str] = Query(None),
     natureza_de: Optional[str] = Query(None),
@@ -199,6 +204,7 @@ async def get_como_base_pagar(
 ):
     params = _base_pagar_params(
         data_base, fornecedor_de, fornecedor_ate, loja_de, loja_ate,
+        prefixo_de, prefixo_ate,
         vencto_de, vencto_ate, natureza_de, natureza_ate, moeda,
         consid_filiais, filial_de, filial_ate, adiantamentos,
         abatimentos, titulos_excluidos,
@@ -228,6 +234,8 @@ async def start_base_pagar_job(
     fornecedor_ate: Optional[str] = Query(None),
     loja_de: Optional[str] = Query(None),
     loja_ate: Optional[str] = Query(None),
+    prefixo_de: Optional[str] = Query(None),
+    prefixo_ate: Optional[str] = Query(None),
     vencto_de: Optional[str] = Query(None),
     vencto_ate: Optional[str] = Query(None),
     natureza_de: Optional[str] = Query(None),
@@ -245,6 +253,7 @@ async def start_base_pagar_job(
 ):
     params = _base_pagar_params(
         data_base, fornecedor_de, fornecedor_ate, loja_de, loja_ate,
+        prefixo_de, prefixo_ate,
         vencto_de, vencto_ate, natureza_de, natureza_ate, moeda,
         consid_filiais, filial_de, filial_ate, adiantamentos,
         abatimentos, titulos_excluidos,
