@@ -39,6 +39,28 @@ def post_config(
     return service.criar_config(db, resolved_id, payload)
 
 
+@router.post("/configs/parar-agendamentos")
+def post_parar_agendamentos(
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    total = service.parar_agendamentos(db, resolved_id)
+    return {"total": total, "mensagem": "Agendamentos parados para a empresa."}
+
+
+@router.delete("/configs")
+def delete_configs(
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    total = service.excluir_todas_configs(db, resolved_id)
+    return {"total": total, "mensagem": "Configuracoes excluidas para a empresa."}
+
+
 @router.patch("/configs/{config_id}", response_model=ProtheusCargaConfigOut)
 def patch_config(
     config_id: int,
@@ -107,6 +129,17 @@ def post_carga(
         "reutilizavel": reutilizavel,
         "mensagem": _mensagem_enfileiramento(carga.status, reutilizavel),
     }
+
+
+@router.delete("")
+def delete_cargas(
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    total = service.excluir_todas_cargas(db, resolved_id)
+    return {"total": total, "mensagem": "Cargas excluidas para a empresa."}
 
 
 @router.post("/agendar-diario", response_model=list[ProtheusCargaEnfileirada])

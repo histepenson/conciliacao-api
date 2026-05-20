@@ -51,6 +51,24 @@ def listar_configs(db: Session, empresa_id: int) -> list[ProtheusCargaConfig]:
     )
 
 
+def parar_agendamentos(db: Session, empresa_id: int) -> int:
+    configs = db.query(ProtheusCargaConfig).filter(ProtheusCargaConfig.empresa_id == empresa_id).all()
+    for config in configs:
+        config.ativo = False
+        config.atualizar_automatico = False
+    db.commit()
+    return len(configs)
+
+
+def excluir_todas_configs(db: Session, empresa_id: int) -> int:
+    configs = db.query(ProtheusCargaConfig).filter(ProtheusCargaConfig.empresa_id == empresa_id).all()
+    total = len(configs)
+    for config in configs:
+        db.delete(config)
+    db.commit()
+    return total
+
+
 def criar_config(db: Session, empresa_id: int, payload: ProtheusCargaConfigCreate) -> ProtheusCargaConfig:
     config = ProtheusCargaConfig(
         empresa_id=empresa_id,
@@ -116,6 +134,15 @@ def listar_cargas(
     if status:
         query = query.filter(ProtheusCarga.status == status)
     return query.order_by(ProtheusCarga.created_at.desc()).limit(limit).all()
+
+
+def excluir_todas_cargas(db: Session, empresa_id: int) -> int:
+    cargas = db.query(ProtheusCarga).filter(ProtheusCarga.empresa_id == empresa_id).all()
+    total = len(cargas)
+    for carga in cargas:
+        db.delete(carga)
+    db.commit()
+    return total
 
 
 def obter_carga(db: Session, empresa_id: int, carga_id: int) -> ProtheusCarga:
