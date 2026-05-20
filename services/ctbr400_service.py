@@ -45,8 +45,8 @@ class Ctbr400Service:
             data = self._decode_response(resp.content)
             total_pages = int(data.get("total_pages") or data.get("totalPages") or query["page"] or 1)
             logger.info(
-                "CTBR400 -> pagina %s/%s  endpoint=%s  tenant=%s",
-                query["page"], total_pages, self.endpoint, self.tenant_id,
+                "CTBR400 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
+                query["page"], total_pages, query["pageSize"], self.endpoint, self.tenant_id,
             )
             return data
 
@@ -65,9 +65,10 @@ class Ctbr400Service:
             while has_more:
                 query["page"] = current_page
                 logger.info(
-                    "CTBR400 -> pagina %s/%s  endpoint=%s  tenant=%s",
+                    "CTBR400 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
                     current_page,
                     total_pages,
+                    query["pageSize"],
                     self.endpoint,
                     self.tenant_id,
                 )

@@ -48,8 +48,8 @@ class Ctbr140Service:
             data = _decode_json_response(resp.content)
             total_pages = int(data.get("total_pages") or data.get("totalPages") or query["page"] or 1)
             logger.info(
-                "CTBR140 -> pagina %s/%s  endpoint=%s  tenant=%s",
-                query["page"], total_pages, self.endpoint, self.tenant_id,
+                "CTBR140 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
+                query["page"], total_pages, query["pageSize"], self.endpoint, self.tenant_id,
             )
             return data
 
@@ -74,8 +74,8 @@ class Ctbr140Service:
             while has_more:
                 query["page"] = current_page
                 logger.info(
-                    "CTBR140 -> pagina %s/%s  endpoint=%s  tenant=%s",
-                    current_page, total_pages, self.endpoint, self.tenant_id,
+                    "CTBR140 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
+                    current_page, total_pages, query["pageSize"], self.endpoint, self.tenant_id,
                 )
                 resp = await protheus_get(
                     client,

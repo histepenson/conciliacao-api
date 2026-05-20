@@ -23,7 +23,7 @@ def _get_service(context: EmpresaContext, empresa_id: Optional[int], db: Session
 async def get_titulos_receber(
     data_base: str = Query(..., description="Data base no formato YYYYMMDD"),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(100),
+    pageSize: Optional[int] = Query(2000),
     cliente_de: Optional[str] = Query(None),
     cliente_ate: Optional[str] = Query(None),
     prefixo_de: Optional[str] = Query(None),

@@ -57,7 +57,7 @@ def _base_pagar_params(
         "consid_filiais": consid_filiais, "filial_de": filial_de, "filial_ate": filial_ate,
         "adiantamentos": adiantamentos, "abatimentos": abatimentos,
         "titulos_excluidos": titulos_excluidos,
-        "pageSize": 500,
+        "pageSize": 2000,
     }
 
 
@@ -91,7 +91,7 @@ def _base_pagar_job_key(context: EmpresaContext, empresa_id: Optional[int], para
 async def get_titulos_pagar(
     data_base: str = Query(..., description="Data base no formato YYYYMMDD"),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(100),
+    pageSize: Optional[int] = Query(2000),
     fornecedor_de: Optional[str] = Query(None),
     fornecedor_ate: Optional[str] = Query(None),
     loja_de: Optional[str] = Query(None),
@@ -180,7 +180,7 @@ async def get_titulos_pagar(
 async def get_como_base_pagar(
     data_base: str = Query(..., description="Data base no formato YYYYMMDD"),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(500),
+    pageSize: Optional[int] = Query(2000),
     fornecedor_de: Optional[str] = Query(None),
     fornecedor_ate: Optional[str] = Query(None),
     loja_de: Optional[str] = Query(None),
@@ -209,7 +209,7 @@ async def get_como_base_pagar(
         consid_filiais, filial_de, filial_ate, adiantamentos,
         abatimentos, titulos_excluidos,
     )
-    params["pageSize"] = pageSize or 500
+    params["pageSize"] = pageSize or 2000
     if page is not None:
         params["page"] = page
 

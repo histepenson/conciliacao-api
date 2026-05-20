@@ -210,7 +210,7 @@ lImpMov      := (cImpMov != "2")   // default: retorna movimento
 // No relatorio original e mv_par12 -> cSaldos -> passado para CT4BlnQry/CQ4BlnQry.
 // Default "1" (lancamentos normais, conforme SX1 CTR140 par12). "CT4" e o nome da TABELA.
 cTpSald := IIf(Empty(cTpLanc), "1", AllTrim(cTpLanc))
-nPageSize    := IIf(nPageSize <= 0 .Or. nPageSize > 1000, 200, nPageSize)
+nPageSize    := IIf(nPageSize <= 0 .Or. nPageSize > 2000, 2000, nPageSize)
 
 Do Case
 	Case nDividePor == 2; nDivide := 100

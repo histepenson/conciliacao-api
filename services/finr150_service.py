@@ -33,7 +33,7 @@ class FinR150Service:
         """Chama uma pagina do ZFINR150API sem consolidar o resultado inteiro."""
         query = {k: v for k, v in params.items() if k in _PARAMS_FINR150 and v is not None}
         query["page"] = int(query.get("page") or 1)
-        query["pageSize"] = int(query.get("pageSize") or 100)
+        query["pageSize"] = int(query.get("pageSize") or 2000)
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
         async with protheus_async_client(auth=self.auth) as client:
@@ -48,14 +48,14 @@ class FinR150Service:
             data = _decode_json_response(resp.content)
             total_pages = int(data.get("totalPages") or data.get("total_pages") or query["page"] or 1)
             logger.info(
-                "FINR150 -> pagina %s/%s  endpoint=%s  tenant=%s",
-                query["page"], total_pages, self.endpoint, self.tenant_id,
+                "FINR150 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
+                query["page"], total_pages, query["pageSize"], self.endpoint, self.tenant_id,
             )
             return data
 
     async def buscar_todos_titulos(self, params: dict[str, Any]) -> dict[str, Any]:
         """Chama o ZFINR150API paginando automaticamente e retorna todos os titulos."""
-        page_size = int(params.get("pageSize", 100))
+        page_size = int(params.get("pageSize", 2000))
         query = {k: v for k, v in params.items() if k in _PARAMS_FINR150 and v is not None}
         query["pageSize"] = page_size
 
@@ -70,7 +70,7 @@ class FinR150Service:
         async with protheus_async_client(auth=self.auth) as client:
             while has_more:
                 query["page"] = current_page
-                logger.info("FINR150 -> pagina %s/%s  endpoint=%s  tenant=%s", current_page, total_pages, self.endpoint, self.tenant_id)
+                logger.info("FINR150 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s", current_page, total_pages, query["pageSize"], self.endpoint, self.tenant_id)
 
                 resp = await protheus_get(
                     client,

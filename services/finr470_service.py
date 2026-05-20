@@ -43,8 +43,8 @@ class FinR470Service:
             while current_page <= total_pages:
                 query["page"] = current_page
                 logger.info(
-                    "FINR470 -> pagina %s/%s  endpoint=%s  tenant=%s",
-                    current_page, total_pages, self.endpoint, self.tenant_id,
+                    "FINR470 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
+                    current_page, total_pages, query["pageSize"], self.endpoint, self.tenant_id,
                 )
                 resp = await protheus_get(
                     client,
@@ -121,8 +121,8 @@ class FinR470Service:
         total_pages = int(data.get("total_pages", page))
         registros = data.get("registros", data.get("movimentos", []))
         logger.info(
-            "FINR470 -> pagina %s/%s  endpoint=%s  tenant=%s",
-            page, total_pages, self.endpoint, self.tenant_id,
+            "FINR470 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
+            page, total_pages, page_size, self.endpoint, self.tenant_id,
         )
         return {
             "parametros": data.get("parametros", {}),
