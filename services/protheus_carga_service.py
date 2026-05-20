@@ -83,6 +83,12 @@ def atualizar_config(
     return config
 
 
+def excluir_config(db: Session, empresa_id: int, config_id: int) -> None:
+    config = obter_config(db, empresa_id, config_id)
+    db.delete(config)
+    db.commit()
+
+
 def obter_config(db: Session, empresa_id: int, config_id: int) -> ProtheusCargaConfig:
     config = (
         db.query(ProtheusCargaConfig)

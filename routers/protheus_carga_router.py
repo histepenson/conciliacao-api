@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from db import get_db
@@ -49,6 +49,18 @@ def patch_config(
 ):
     resolved_id = resolve_empresa_id(context, empresa_id)
     return service.atualizar_config(db, resolved_id, config_id, payload)
+
+
+@router.delete("/configs/{config_id}", status_code=204)
+def delete_config(
+    config_id: int,
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    service.excluir_config(db, resolved_id, config_id)
+    return Response(status_code=204)
 
 
 @router.post("/configs/{config_id}/executar", response_model=ProtheusCargaEnfileirada)
