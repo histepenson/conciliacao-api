@@ -43,6 +43,10 @@ class ProtheusCargaConfig(Base):
     empresa = relationship("Empresa")
     cargas = relationship("ProtheusCarga", back_populates="config")
 
+    @property
+    def empresa_nome(self) -> str | None:
+        return self.empresa.nome if self.empresa else None
+
 
 class ProtheusCarga(Base):
     __tablename__ = "protheus_carga"
@@ -77,6 +81,10 @@ class ProtheusCarga(Base):
     config = relationship("ProtheusCargaConfig", back_populates="cargas")
     empresa = relationship("Empresa")
     registros = relationship("ProtheusCargaRegistro", back_populates="carga", cascade="all, delete-orphan")
+
+    @property
+    def empresa_nome(self) -> str | None:
+        return self.empresa.nome if self.empresa else None
 
 
 class ProtheusCargaRegistro(Base):

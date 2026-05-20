@@ -155,6 +155,18 @@ def reprocessar(
     return service.reprocessar_carga(db, resolved_id, carga_id)
 
 
+@router.delete("/{carga_id}", status_code=204)
+def delete_carga(
+    carga_id: int,
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    service.excluir_carga(db, resolved_id, carga_id)
+    return Response(status_code=204)
+
+
 @router.get("/{carga_id}/registros", response_model=ProtheusCargaRegistrosPage)
 def get_registros(
     carga_id: int,

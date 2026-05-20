@@ -32,6 +32,7 @@ class ProtheusCargaConfigOut(ProtheusCargaConfigBase):
 
     id: int
     empresa_id: int
+    empresa_nome: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -50,6 +51,7 @@ class ProtheusCargaOut(BaseModel):
     id: int
     config_id: Optional[int]
     empresa_id: int
+    empresa_nome: Optional[str] = None
     tipo_relatorio: str
     data_base: str
     parametros_hash: str

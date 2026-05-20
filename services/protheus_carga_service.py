@@ -245,6 +245,12 @@ def reprocessar_carga(db: Session, empresa_id: int, carga_id: int) -> ProtheusCa
     return carga
 
 
+def excluir_carga(db: Session, empresa_id: int, carga_id: int) -> None:
+    carga = obter_carga(db, empresa_id, carga_id)
+    db.delete(carga)
+    db.commit()
+
+
 def listar_registros(db: Session, carga: ProtheusCarga, skip: int, limit: int) -> tuple[int, list[ProtheusCargaRegistro]]:
     query = db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id)
     total = query.count()
