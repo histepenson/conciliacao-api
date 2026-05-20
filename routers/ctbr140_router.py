@@ -98,6 +98,8 @@ async def get_balancete(
 async def get_como_base_contabil(
     data_fim: str = Query(..., description="Data fim do periodo -- YYYYMMDD"),
     data_ini: Optional[str] = Query(None),
+    page: Optional[int] = Query(None),
+    pageSize: Optional[int] = Query(2000),
     conta_de: Optional[str] = Query(None),
     conta_ate: Optional[str] = Query(None),
     item_de: Optional[str] = Query(None),
@@ -129,6 +131,8 @@ async def get_como_base_contabil(
     params = {
         "data_fim": data_fim,
         "data_ini": data_ini,
+        "page": page,
+        "pageSize": pageSize,
         "conta_de": conta_de,
         "conta_ate": conta_ate,
         "item_de": item_de,
@@ -148,6 +152,8 @@ async def get_como_base_contabil(
 
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_como_registros_pagina(params)
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}
     except Exception as exc:

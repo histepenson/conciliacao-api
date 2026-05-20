@@ -84,6 +84,58 @@ class FinR470Service:
             "registros": all_registros,
         }
 
+    async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        page = int(params.get("page") or 1)
+        page_size = int(params.get("pageSize") or 2000)
+        query = {k: v for k, v in params.items() if k in _PARAMS_FINR470 and v is not None}
+        query["page"] = page
+        query["pageSize"] = page_size
+        query.setdefault("moeda", 1)
+
+        headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
+
+        async with protheus_async_client(auth=self.auth) as client:
+            logger.info(
+                "FINR470 -> pagina %s  endpoint=%s  tenant=%s",
+                page, self.endpoint, self.tenant_id,
+            )
+            resp = await protheus_get(
+                client,
+                self.endpoint,
+                params=query,
+                headers=headers,
+                logger=logger,
+                operation=f"FINR470 pagina {page}",
+            )
+
+        raw = resp.content
+        if not raw:
+            raise HTTPException(status_code=502, detail="Protheus retornou resposta vazia")
+
+        try:
+            data = _json.loads(raw.decode("utf-8"))
+        except UnicodeDecodeError:
+            data = _json.loads(raw.decode("windows-1252"))
+
+        if data.get("erro"):
+            status = int(data.get("status", 400))
+            mensagem = data.get("mensagem", "Erro ao consultar Protheus")
+            raise HTTPException(status_code=status, detail=mensagem)
+
+        total_pages = int(data.get("total_pages", page))
+        registros = data.get("registros", data.get("movimentos", []))
+        return {
+            "parametros": data.get("parametros", {}),
+            "banco": data.get("banco", {}),
+            "totais": data.get("totais", {}),
+            "total_registros": int(data.get("total_registros", len(registros))),
+            "total_pages": total_pages,
+            "page": page,
+            "pageSize": page_size,
+            "hasMore": bool(data.get("hasMore", page < total_pages)),
+            "registros": registros,
+        }
+
     async def buscar_como_registros(self, params: dict[str, Any]) -> list[dict]:
         """
         Retorna o extrato no formato esperado por `base_extrato.registros`.
@@ -94,3 +146,15 @@ class FinR470Service:
         """
         resultado = await self.buscar_extrato(params)
         return resultado["registros"]
+
+    async def buscar_como_registros_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        resultado = await self.buscar_pagina(params)
+        registros = resultado["registros"]
+        return {
+            "registros": registros,
+            "total": resultado.get("total_registros", len(registros)),
+            "total_pages": resultado.get("total_pages", 1),
+            "page": resultado.get("page", 1),
+            "pageSize": resultado.get("pageSize", len(registros)),
+            "hasMore": resultado.get("hasMore", False),
+        }

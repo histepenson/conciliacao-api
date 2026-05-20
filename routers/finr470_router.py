@@ -89,6 +89,8 @@ async def get_como_base_extrato(
     saldo_compart: Optional[str] = Query(None),
     todas_filiais: Optional[str] = Query(None),
     data_conv_saldo: Optional[str] = Query(None),
+    page: Optional[int] = Query(None),
+    pageSize: Optional[int] = Query(2000),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     context: EmpresaContext = Depends(get_empresa_context),
     db: Session = Depends(get_db),
@@ -106,10 +108,13 @@ async def get_como_base_extrato(
         "saldo_compart": saldo_compart,
         "todas_filiais": todas_filiais,
         "data_conv_saldo": data_conv_saldo,
-        "pageSize": 2000,
+        "page": page,
+        "pageSize": pageSize,
     }
     service = _get_service(context, empresa_id, db)
     try:
+        if page is not None:
+            return await service.buscar_como_registros_pagina(params)
         registros = await service.buscar_como_registros(params)
         return {"registros": registros, "total": len(registros)}
     except Exception as exc:
