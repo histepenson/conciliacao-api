@@ -146,11 +146,17 @@ def _titulos_para_registros(titulos: list[dict]) -> list[dict]:
                 vencido = 0
                 a_vencer = saldo
 
+            prefixo = (t.get("prefixo") or "").strip()
+            numero = (t.get("numero") or "").strip()
+            parcela = (t.get("parcela") or "").strip()
+
             registros.append({
                 "codigo_nome_do_fornecedor": f"{fornecedor}-{loja}-{nome}",
                 "tit_vencidos_valor_corrigido": vencido,
                 "titulos_a_vencer_valor_nominal": a_vencer,
                 "vencto_real": t.get("vencto_real", ""),
+                "data_de_emissao": t.get("emissao", ""),
+                "prf_numero_parcela": f"{prefixo}{numero}{parcela}",
                 "dias_atraso": dias,
                 "tp": t.get("tipo", ""),
                 "natureza": t.get("natureza", ""),

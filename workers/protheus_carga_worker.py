@@ -20,6 +20,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 _PAGE_SIZE = 5000
+_PAGE_SIZE_POR_TIPO: dict[str, int] = {
+    "CTBR140": 3000,
+    "CTBR400": 3000,
+    "CTBR480": 3000,
+}
 _INSERT_CHUNK_SIZE = 1000
 
 
@@ -52,7 +57,8 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         config = resolve_protheus_config(carga.empresa_id, db)
         params = dict(carga.parametros_json or {})
         params["data_base"] = params.get("data_base") or carga.data_base
-        params.setdefault("pageSize", _PAGE_SIZE)
+        tipo_upper = (carga.tipo_relatorio or "").upper()
+        params.setdefault("pageSize", _PAGE_SIZE_POR_TIPO.get(tipo_upper, _PAGE_SIZE))
 
         db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
         db.commit()
@@ -83,6 +89,8 @@ async def _executar_carga_protheus(carga_id: int) -> None:
             if carga.status == "cancelado":
                 logger.info("Carga Protheus %s cancelada durante processamento", carga.id)
                 print(f"[PROTHEUS_CARGA] cancelada carga_id={carga.id}", flush=True)
+                db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
+                carga.total_registros = 0
                 db.commit()
                 return
 

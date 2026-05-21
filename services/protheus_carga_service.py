@@ -188,9 +188,11 @@ def abortar_fila(db: Session, empresa_id: int) -> dict[str, Any]:
         .all()
     )
     for carga in cargas:
+        db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
         carga.status = "cancelado"
         carga.erro = "Fila abortada pelo usuario."
         carga.finalizado_em = datetime.now(timezone.utc)
+        carga.total_registros = 0
     db.commit()
 
     return {
@@ -412,9 +414,11 @@ def cancelar_carga(db: Session, empresa_id: int, carga_id: int) -> ProtheusCarga
         except Exception as exc:
             stop_error = str(exc)
 
+    db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
     carga.status = "cancelado"
     carga.erro = f"Cancelada pelo usuario. Stop RQ: {stop_error}" if stop_error else "Cancelada pelo usuario."
     carga.finalizado_em = datetime.now(timezone.utc)
+    carga.total_registros = 0
     db.commit()
     db.refresh(carga)
     return carga
