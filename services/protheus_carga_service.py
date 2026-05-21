@@ -461,7 +461,9 @@ def marcar_concluido(db: Session, carga: ProtheusCarga, total_registros: int) ->
 
 
 def marcar_erro(db: Session, carga: ProtheusCarga, erro: str) -> None:
+    db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
     carga.status = "erro"
     carga.erro = erro[:8000]
+    carga.total_registros = 0
     carga.finalizado_em = datetime.now(timezone.utc)
     db.commit()
