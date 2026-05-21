@@ -288,6 +288,8 @@ def listar_registros(db: Session, carga: ProtheusCarga, skip: int, limit: int) -
 def _tentar_enfileirar(db: Session, carga: ProtheusCarga) -> None:
     try:
         carga.rq_job_id = enqueue_protheus_carga(carga.id)
+        carga.status = "processando"
+        carga.erro = None
     except Exception as exc:
         carga.status = "erro"
         carga.erro = f"Falha ao enfileirar no RQ/Redis: {exc}"

@@ -21,10 +21,12 @@ router = APIRouter(prefix="/v1/protheus-cargas", tags=["Protheus Cargas"])
 
 @router.get("/configs", response_model=list[ProtheusCargaConfigOut])
 def get_configs(
+    response: Response,
     empresa_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     context: EmpresaContext = Depends(get_empresa_context),
 ):
+    _no_store(response)
     resolved_id = resolve_empresa_id(context, empresa_id)
     return service.listar_configs(db, resolved_id)
 
@@ -104,6 +106,7 @@ def executar_config(
 
 @router.get("", response_model=list[ProtheusCargaOut])
 def get_cargas(
+    response: Response,
     empresa_id: Optional[int] = Query(None),
     tipo_relatorio: Optional[str] = Query(None),
     data_base: Optional[str] = Query(None),
@@ -112,6 +115,7 @@ def get_cargas(
     db: Session = Depends(get_db),
     context: EmpresaContext = Depends(get_empresa_context),
 ):
+    _no_store(response)
     resolved_id = resolve_empresa_id(context, empresa_id)
     return service.listar_cargas(db, resolved_id, tipo_relatorio, data_base, status, limit)
 
@@ -169,10 +173,12 @@ def agendar_diario(
 @router.get("/{carga_id}", response_model=ProtheusCargaOut)
 def get_carga(
     carga_id: int,
+    response: Response,
     empresa_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     context: EmpresaContext = Depends(get_empresa_context),
 ):
+    _no_store(response)
     resolved_id = resolve_empresa_id(context, empresa_id)
     return service.obter_carga(db, resolved_id, carga_id)
 
@@ -223,3 +229,9 @@ def _mensagem_enfileiramento(status: str, reutilizavel: bool) -> str:
     if status == "processando":
         return "Carga ja esta em processamento."
     return "Carga registrada."
+
+
+def _no_store(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
