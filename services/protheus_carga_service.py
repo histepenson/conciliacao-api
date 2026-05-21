@@ -238,6 +238,57 @@ def obter_carga_existente(
     )
 
 
+def obter_registros_carga_concluida(
+    db: Session,
+    empresa_id: int,
+    tipo_relatorio: str,
+    data_base: str,
+    parametros_json: dict[str, Any],
+) -> tuple[Optional[ProtheusCarga], list[dict[str, Any]]]:
+    tipo = normalizar_tipo_relatorio(tipo_relatorio)
+    data_base = validar_data_base(data_base)
+    parametros = dict(parametros_json or {})
+    parametros["data_base"] = parametros.get("data_base") or data_base
+    parametros_hash = calcular_parametros_hash(parametros)
+
+    carga = (
+        db.query(ProtheusCarga)
+        .filter(
+            ProtheusCarga.empresa_id == empresa_id,
+            ProtheusCarga.tipo_relatorio == tipo,
+            ProtheusCarga.data_base == data_base,
+            ProtheusCarga.parametros_hash == parametros_hash,
+            ProtheusCarga.status == "concluido",
+        )
+        .order_by(ProtheusCarga.finalizado_em.desc().nullslast(), ProtheusCarga.created_at.desc())
+        .first()
+    )
+
+    if not carga:
+        carga = (
+            db.query(ProtheusCarga)
+            .filter(
+                ProtheusCarga.empresa_id == empresa_id,
+                ProtheusCarga.tipo_relatorio == tipo,
+                ProtheusCarga.data_base == data_base,
+                ProtheusCarga.status == "concluido",
+            )
+            .order_by(ProtheusCarga.finalizado_em.desc().nullslast(), ProtheusCarga.created_at.desc())
+            .first()
+        )
+
+    if not carga:
+        return None, []
+
+    registros = (
+        db.query(ProtheusCargaRegistro)
+        .filter(ProtheusCargaRegistro.carga_id == carga.id)
+        .order_by(ProtheusCargaRegistro.sequencia)
+        .all()
+    )
+    return carga, [registro.dados_json for registro in registros]
+
+
 def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCargaCreate) -> tuple[ProtheusCarga, bool]:
     tipo = normalizar_tipo_relatorio(payload.tipo_relatorio)
     data_base = validar_data_base(payload.data_base)

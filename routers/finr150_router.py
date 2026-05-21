@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from services.finr150_service import FinR150Service
+from services.protheus_carga_service import obter_registros_carga_concluida
 from core.protheus import resolve_protheus_config
 from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
 
@@ -85,6 +86,34 @@ def _base_pagar_job_key(context: EmpresaContext, empresa_id: Optional[int], para
         "params": params,
     }
     return json.dumps(payload, sort_keys=True, default=str)
+
+
+def _cache_response(registros: list[dict], carga_id: int, page: Optional[int], page_size: int) -> dict:
+    if page is None:
+        return {
+            "registros": registros,
+            "total": len(registros),
+            "fonte": "cache_protheus",
+            "carga_id": carga_id,
+        }
+
+    page = max(int(page), 1)
+    page_size = max(int(page_size or 2000), 1)
+    start = (page - 1) * page_size
+    end = start + page_size
+    total = len(registros)
+    total_pages = max((total + page_size - 1) // page_size, 1)
+    return {
+        "parametros": {},
+        "total_registros": total,
+        "totalPages": total_pages,
+        "page": page,
+        "hasMore": page < total_pages,
+        "registros": registros[start:end],
+        "total": len(registros[start:end]),
+        "fonte": "cache_protheus",
+        "carga_id": carga_id,
+    }
 
 
 @router.get("")
@@ -212,6 +241,17 @@ async def get_como_base_pagar(
     params["pageSize"] = pageSize or 2000
     if page is not None:
         params["page"] = page
+
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    cache_carga, cache_registros = obter_registros_carga_concluida(
+        db,
+        resolved_id,
+        "FINR150",
+        data_base,
+        {k: v for k, v in params.items() if k != "page"},
+    )
+    if cache_carga:
+        return _cache_response(cache_registros, cache_carga.id, page, params["pageSize"])
 
     service = _get_service(context, empresa_id, db)
     try:
