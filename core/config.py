@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     PROTHEUS_HTTP_RETRY_ATTEMPTS: int = 3
     PROTHEUS_HTTP_RETRY_BACKOFF_SECONDS: float = 2.0
 
+    # Redis / RQ
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # Storage
     STORAGE_DIR: str = "data"
 
