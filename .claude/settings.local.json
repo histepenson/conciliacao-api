@@ -134,7 +134,8 @@
       "Bash(.venvScriptspython -c ' *)",
       "PowerShell(Head 30)",
       "Bash(.venv/Scripts/python -)",
-      "Bash(mkdir \"C:\\\\conciliacao-app\\\\src\\\\hooks\")"
+      "Bash(mkdir \"C:\\\\conciliacao-app\\\\src\\\\hooks\")",
+      "Read(//c//**)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
