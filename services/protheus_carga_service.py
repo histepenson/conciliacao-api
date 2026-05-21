@@ -4,9 +4,14 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException
+from rq import Queue
+from rq.command import send_stop_job_command
+from rq.job import Job
+from rq.registry import DeferredJobRegistry, FailedJobRegistry, ScheduledJobRegistry, StartedJobRegistry
 from sqlalchemy.orm import Session
 
-from core.rq import enqueue_protheus_carga
+from core.rq import PROTHEUS_CARGA_QUEUE, enqueue_protheus_carga
+from core.redis import get_redis_connection
 from models.protheus_carga import ProtheusCarga, ProtheusCargaConfig, ProtheusCargaRegistro
 from schemas.protheus_carga_schema import ProtheusCargaConfigCreate, ProtheusCargaConfigUpdate, ProtheusCargaCreate
 
@@ -145,6 +150,62 @@ def excluir_todas_cargas(db: Session, empresa_id: int) -> int:
     return total
 
 
+def abortar_fila(db: Session, empresa_id: int) -> dict[str, Any]:
+    conn = get_redis_connection()
+    queue = Queue(PROTHEUS_CARGA_QUEUE, connection=conn)
+
+    queued_job_ids = list(queue.job_ids)
+    queue.empty()
+
+    stopped: list[str] = []
+    stop_errors: list[dict[str, str]] = []
+    started = StartedJobRegistry(PROTHEUS_CARGA_QUEUE, connection=conn)
+    for job_id in started.get_job_ids():
+        try:
+            send_stop_job_command(conn, job_id)
+            stopped.append(job_id)
+        except Exception as exc:
+            stop_errors.append({"job_id": job_id, "erro": str(exc)})
+
+    cancelled: list[str] = []
+    for registry_cls in (ScheduledJobRegistry, DeferredJobRegistry, FailedJobRegistry):
+        registry = registry_cls(PROTHEUS_CARGA_QUEUE, connection=conn)
+        for job_id in registry.get_job_ids():
+            try:
+                job = Job.fetch(job_id, connection=conn)
+                job.cancel()
+                job.delete()
+                cancelled.append(job_id)
+            except Exception:
+                pass
+
+    cargas = (
+        db.query(ProtheusCarga)
+        .filter(
+            ProtheusCarga.empresa_id == empresa_id,
+            ProtheusCarga.status.in_(["pendente", "processando"]),
+        )
+        .all()
+    )
+    for carga in cargas:
+        carga.status = "cancelado"
+        carga.erro = "Fila abortada pelo usuario."
+        carga.finalizado_em = datetime.now(timezone.utc)
+    db.commit()
+
+    return {
+        "fila": PROTHEUS_CARGA_QUEUE,
+        "jobs_pendentes_removidos": len(queued_job_ids),
+        "jobs_em_execucao_sinalizados": len(stopped),
+        "jobs_cancelados_registries": len(cancelled),
+        "cargas_canceladas": len(cargas),
+        "pendentes": queued_job_ids,
+        "stop_enviado": stopped,
+        "cancelados": cancelled,
+        "erros_stop": stop_errors,
+    }
+
+
 def obter_carga(db: Session, empresa_id: int, carga_id: int) -> ProtheusCarga:
     carga = (
         db.query(ProtheusCarga)
@@ -269,6 +330,24 @@ def reprocessar_carga(db: Session, empresa_id: int, carga_id: int) -> ProtheusCa
     db.commit()
 
     _tentar_enfileirar(db, carga)
+    return carga
+
+
+def cancelar_carga(db: Session, empresa_id: int, carga_id: int) -> ProtheusCarga:
+    carga = obter_carga(db, empresa_id, carga_id)
+    stop_error = None
+
+    if carga.rq_job_id and carga.status in {"pendente", "processando"}:
+        try:
+            send_stop_job_command(get_redis_connection(), carga.rq_job_id)
+        except Exception as exc:
+            stop_error = str(exc)
+
+    carga.status = "cancelado"
+    carga.erro = f"Cancelada pelo usuario. Stop RQ: {stop_error}" if stop_error else "Cancelada pelo usuario."
+    carga.finalizado_em = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(carga)
     return carga
 
 

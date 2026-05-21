@@ -146,6 +146,16 @@ def delete_cargas(
     return {"total": total, "mensagem": "Cargas excluidas para a empresa."}
 
 
+@router.post("/fila/abortar")
+def post_abortar_fila(
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    return service.abortar_fila(db, resolved_id)
+
+
 @router.post("/agendar-diario", response_model=list[ProtheusCargaEnfileirada])
 def agendar_diario(
     empresa_id: Optional[int] = Query(None),
@@ -192,6 +202,17 @@ def reprocessar(
 ):
     resolved_id = resolve_empresa_id(context, empresa_id)
     return service.reprocessar_carga(db, resolved_id, carga_id)
+
+
+@router.post("/{carga_id}/cancelar", response_model=ProtheusCargaOut)
+def cancelar(
+    carga_id: int,
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    return service.cancelar_carga(db, resolved_id, carga_id)
 
 
 @router.delete("/{carga_id}", status_code=204)
