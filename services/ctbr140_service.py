@@ -119,12 +119,14 @@ class Ctbr140Service:
     async def buscar_como_registros_pagina(self, params: dict[str, Any], *, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
         resultado = await self.buscar_pagina(params, client=client)
         registros = [self._linha_para_registro(linha) for linha in resultado.get("linhas", [])]
+        total_pages = int(resultado.get("total_pages") or resultado.get("totalPages") or 1)
+        current_page = int(params.get("page") or 1)
         return {
             "parametros": resultado.get("parametros", {}),
             "total_registros": resultado.get("total_registros", len(registros)),
-            "total_pages": resultado.get("total_pages", 1),
-            "page": resultado.get("page", params.get("page", 1)),
-            "hasMore": resultado.get("hasMore", False),
+            "total_pages": total_pages,
+            "page": current_page,
+            "hasMore": bool(resultado.get("hasMore", current_page < total_pages)),
             "registros": registros,
             "total": len(registros),
         }
