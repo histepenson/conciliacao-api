@@ -1,11 +1,12 @@
 """
-Inicia um pool de workers RQ para processar cargas do Protheus em paralelo.
-Substitui o comando `rq worker protheus-cargas` no Railway.
+Inicia workers RQ para processar cargas do Protheus no Railway.
+Substitui o comando `rq worker protheus-cargas`.
 """
-import os
 import logging
+import os
+from multiprocessing import Process
 
-from rq import WorkerPool
+from rq import Queue, Worker
 
 from core.redis import get_redis_connection
 from core.rq import PROTHEUS_CARGA_QUEUE
@@ -14,12 +15,31 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 NUM_WORKERS = int(os.environ.get("RQ_NUM_WORKERS", "3"))
 
-if __name__ == "__main__":
+
+def _run_worker(worker_index: int) -> None:
     conn = get_redis_connection()
-    logging.info("Iniciando WorkerPool com %s workers na fila '%s'", NUM_WORKERS, PROTHEUS_CARGA_QUEUE)
-    pool = WorkerPool(
-        queues=[PROTHEUS_CARGA_QUEUE],
-        connection=conn,
-        num_workers=NUM_WORKERS,
-    )
-    pool.start(logging_level="INFO")
+    queue = Queue(PROTHEUS_CARGA_QUEUE, connection=conn)
+    worker = Worker([queue], connection=conn, name=f"protheus-cargas-{worker_index}")
+    logging.info("Worker %s iniciado na fila '%s'", worker.name, PROTHEUS_CARGA_QUEUE)
+    worker.work(logging_level="INFO")
+
+
+if __name__ == "__main__":
+    logging.info("Iniciando %s worker(s) RQ na fila '%s'", NUM_WORKERS, PROTHEUS_CARGA_QUEUE)
+
+    if NUM_WORKERS <= 1:
+        _run_worker(1)
+    else:
+        processes = [Process(target=_run_worker, args=(i + 1,)) for i in range(NUM_WORKERS)]
+        for process in processes:
+            process.start()
+
+        try:
+            for process in processes:
+                process.join()
+        except KeyboardInterrupt:
+            logging.info("Encerrando workers RQ")
+            for process in processes:
+                process.terminate()
+            for process in processes:
+                process.join()
