@@ -131,7 +131,8 @@
       "Read(//c/Users/histepenson/Documents/1212410/1212410/Fontes/Adm/**)",
       "Read(//c/Users/histepenson/Documents/**)",
       "Read(//c/Users/histepenson/.claude/projects/c--conciliacao-api/memory/**)",
-      "Bash(.venvScriptspython -c ' *)"
+      "Bash(.venvScriptspython -c ' *)",
+      "PowerShell(Head 30)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

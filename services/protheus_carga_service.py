@@ -320,7 +320,17 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
         _tentar_enfileirar(db, existente)
         return existente, False
 
-    if existente and existente.status in {"pendente", "erro"}:
+    if existente and existente.status == "pendente":
+        if existente.rq_job_id and job_esta_ativo(existente.rq_job_id):
+            return existente, False
+        # job sumiu da fila sem atualizar o banco - reenfileira
+        existente.erro = None
+        existente.iniciado_em = None
+        existente.finalizado_em = None
+        _tentar_enfileirar(db, existente)
+        return existente, False
+
+    if existente and existente.status == "erro":
         existente.status = "pendente"
         existente.erro = None
         existente.iniciado_em = None
@@ -426,7 +436,7 @@ def listar_registros(db: Session, carga: ProtheusCarga, skip: int, limit: int) -
 def _tentar_enfileirar(db: Session, carga: ProtheusCarga) -> None:
     try:
         carga.rq_job_id = enqueue_protheus_carga(carga.id)
-        carga.status = "processando"
+        carga.status = "pendente"
         carga.erro = None
     except Exception as exc:
         carga.status = "erro"
