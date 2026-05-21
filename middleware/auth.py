@@ -2,7 +2,8 @@
 """
 Middleware de autenticacao - Validacao de JWT e usuario.
 """
-from fastapi import Depends, Header, HTTPException, status
+import logging
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -13,6 +14,7 @@ from models import Usuario
 
 # Security scheme para Swagger
 security = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 
 class CurrentUser:
@@ -37,6 +39,7 @@ class CurrentUser:
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     x_empresa_id: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
@@ -48,6 +51,12 @@ async def get_current_user(
         HTTPException 401: Se token invalido ou usuario nao encontrado
     """
     if credentials is None:
+        logger.warning(
+            "AUTH 401 sem token path=%s query=%s user_agent=%s",
+            request.url.path,
+            request.url.query,
+            request.headers.get("user-agent", ""),
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token de autenticacao nao fornecido",
@@ -59,6 +68,12 @@ async def get_current_user(
     # Decodificar token
     payload = decode_token(token)
     if payload is None:
+        logger.warning(
+            "AUTH 401 token invalido/expirado path=%s query=%s user_agent=%s",
+            request.url.path,
+            request.url.query,
+            request.headers.get("user-agent", ""),
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token invalido ou expirado",
@@ -68,6 +83,12 @@ async def get_current_user(
     # Verificar tipo de token
     token_type = payload.get("type")
     if token_type != "access":
+        logger.warning(
+            "AUTH 401 tipo token invalido path=%s query=%s token_type=%s",
+            request.url.path,
+            request.url.query,
+            token_type,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Tipo de token invalido",
@@ -77,6 +98,11 @@ async def get_current_user(
     # Extrair dados do payload
     user_id = payload.get("sub")
     if user_id is None:
+        logger.warning(
+            "AUTH 401 token sem sub path=%s query=%s",
+            request.url.path,
+            request.url.query,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token invalido",
@@ -86,6 +112,12 @@ async def get_current_user(
     # Buscar usuario no banco
     user = db.query(Usuario).filter(Usuario.id == int(user_id)).first()
     if user is None:
+        logger.warning(
+            "AUTH 401 usuario nao encontrado path=%s query=%s user_id=%s",
+            request.url.path,
+            request.url.query,
+            user_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario nao encontrado",
@@ -94,6 +126,12 @@ async def get_current_user(
 
     # Verificar se usuario esta ativo
     if not user.is_active:
+        logger.warning(
+            "AUTH 401 usuario desativado path=%s query=%s user_id=%s",
+            request.url.path,
+            request.url.query,
+            user_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario desativado",
@@ -127,6 +165,7 @@ async def get_current_active_user(
 
 
 async def get_optional_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
 ) -> Optional[CurrentUser]:
@@ -138,6 +177,6 @@ async def get_optional_current_user(
         return None
 
     try:
-        return await get_current_user(credentials, db)
+        return await get_current_user(request=request, credentials=credentials, db=db)
     except HTTPException:
         return None

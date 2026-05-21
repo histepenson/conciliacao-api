@@ -306,7 +306,7 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
         )
         .first()
     )
-    if existente and existente.status in STATUS_REUTILIZAVEIS:
+    if existente and existente.status in STATUS_REUTILIZAVEIS and (existente.total_registros or 0) > 0:
         return existente, True
 
     if existente and existente.status == "processando":

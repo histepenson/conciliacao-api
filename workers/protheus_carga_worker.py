@@ -6,7 +6,6 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from db import SessionLocal
 from core.protheus import resolve_protheus_config
-from core.protheus_http import protheus_async_client
 from models.protheus_carga import ProtheusCarga, ProtheusCargaRegistro
 from services.ctbr140_service import Ctbr140Service
 from services.ctbr400_service import Ctbr400Service
@@ -21,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 _PAGE_SIZE = 5000
-_COMMIT_A_CADA = 5
+_INSERT_CHUNK_SIZE = 1000
 
 
 def executar_carga_protheus(carga_id: int) -> None:
@@ -60,33 +59,32 @@ async def _executar_carga_protheus(carga_id: int) -> None:
 
         total = 0
         sequencia = 1
-        paginas_sem_commit = 0
-        buffer_insert: list[dict] = []
 
         async for registros_pagina in _iterar_paginas(carga, config, params):
             if not registros_pagina:
                 continue
 
-            buffer_insert.extend(
+            rows = [
                 {"carga_id": carga.id, "sequencia": sequencia + i, "dados_json": r}
                 for i, r in enumerate(registros_pagina)
-            )
+            ]
             sequencia += len(registros_pagina)
             total += len(registros_pagina)
-            paginas_sem_commit += 1
 
-            if paginas_sem_commit >= _COMMIT_A_CADA:
-                db.execute(pg_insert(ProtheusCargaRegistro), buffer_insert)
-                carga.total_registros = total
-                db.commit()
-                buffer_insert = []
-                paginas_sem_commit = 0
-                logger.info("Carga Protheus %s: %s registros gravados", carga.id, total)
-                print(f"[PROTHEUS_CARGA] gravados {total} registros carga_id={carga.id}", flush=True)
+            for start in range(0, len(rows), _INSERT_CHUNK_SIZE):
+                db.execute(pg_insert(ProtheusCargaRegistro), rows[start:start + _INSERT_CHUNK_SIZE])
 
-        if buffer_insert:
-            db.execute(pg_insert(ProtheusCargaRegistro), buffer_insert)
+            carga.total_registros = total
             db.commit()
+            logger.info("Carga Protheus %s: %s registros gravados", carga.id, total)
+            print(f"[PROTHEUS_CARGA] gravados {total} registros carga_id={carga.id}", flush=True)
+
+            db.refresh(carga)
+            if carga.status == "cancelado":
+                logger.info("Carga Protheus %s cancelada durante processamento", carga.id)
+                print(f"[PROTHEUS_CARGA] cancelada carga_id={carga.id}", flush=True)
+                db.commit()
+                return
 
         marcar_concluido(db, carga, total)
         logger.info("Carga Protheus %s concluida com %s registros", carga.id, total)
@@ -127,18 +125,21 @@ async def _iterar_paginas(
 
     service = services[tipo](*service_args)
     page = 1
-    auth = (config.user, config.password) if config.user else None
 
-    async with protheus_async_client(auth=auth) as client:
-        while True:
-            p = dict(params)
-            p["page"] = page
-            print(f"[PROTHEUS_CARGA] buscando pagina={page} relatorio={tipo} carga_id={carga.id}", flush=True)
-            resultado = await service.buscar_como_registros_pagina(p, client=client)
+    while True:
+        p = dict(params)
+        p["page"] = page
+        print(f"[PROTHEUS_CARGA] buscando pagina={page} relatorio={tipo} carga_id={carga.id}", flush=True)
+        if tipo == "FINR130":
+            resultado = await service.buscar_pagina(p)
+            registros = resultado.get("titulos", [])
+        else:
+            resultado = await service.buscar_como_registros_pagina(p)
             registros = resultado.get("registros", [])
-            yield registros
-            total_pages = int(resultado.get("total_pages") or resultado.get("totalPages") or 1)
-            has_more = bool(resultado.get("hasMore", page < total_pages))
-            if not has_more:
-                break
-            page += 1
+
+        yield registros
+        total_pages = int(resultado.get("total_pages") or resultado.get("totalPages") or 1)
+        has_more = bool(resultado.get("hasMore", page < total_pages))
+        if not has_more:
+            break
+        page += 1
