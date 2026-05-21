@@ -58,7 +58,7 @@ def _base_pagar_params(
         "consid_filiais": consid_filiais, "filial_de": filial_de, "filial_ate": filial_ate,
         "adiantamentos": adiantamentos, "abatimentos": abatimentos,
         "titulos_excluidos": titulos_excluidos,
-        "pageSize": 2000,
+        "pageSize": 5000,
     }
 
 
@@ -98,7 +98,7 @@ def _cache_response(registros: list[dict], carga_id: int, page: Optional[int], p
         }
 
     page = max(int(page), 1)
-    page_size = max(int(page_size or 2000), 1)
+    page_size = max(int(page_size or 5000), 1)
     start = (page - 1) * page_size
     end = start + page_size
     total = len(registros)
@@ -120,7 +120,7 @@ def _cache_response(registros: list[dict], carga_id: int, page: Optional[int], p
 async def get_titulos_pagar(
     data_base: str = Query(..., description="Data base no formato YYYYMMDD"),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(2000),
+    pageSize: Optional[int] = Query(5000),
     fornecedor_de: Optional[str] = Query(None),
     fornecedor_ate: Optional[str] = Query(None),
     loja_de: Optional[str] = Query(None),
@@ -209,7 +209,7 @@ async def get_titulos_pagar(
 async def get_como_base_pagar(
     data_base: str = Query(..., description="Data base no formato YYYYMMDD"),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(2000),
+    pageSize: Optional[int] = Query(5000),
     fornecedor_de: Optional[str] = Query(None),
     fornecedor_ate: Optional[str] = Query(None),
     loja_de: Optional[str] = Query(None),
@@ -238,7 +238,7 @@ async def get_como_base_pagar(
         consid_filiais, filial_de, filial_ate, adiantamentos,
         abatimentos, titulos_excluidos,
     )
-    params["pageSize"] = pageSize or 2000
+    params["pageSize"] = pageSize or 5000
     if page is not None:
         params["page"] = page
 

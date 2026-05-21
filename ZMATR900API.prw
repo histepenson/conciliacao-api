@@ -110,7 +110,7 @@ If Empty(dDataIni) .Or. Empty(dDataFim) .Or. dDataIni > dDataFim
 Return .T.
 EndIf
 
-nPageSize := IIf(nPageSize <= 0 .Or. nPageSize > 2000, 500, nPageSize)
+nPageSize := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset := (nPage - 1) * nPageSize
 
 // mv_par usados internamente pelo CalcEst e funcoes do MATR900

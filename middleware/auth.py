@@ -2,7 +2,7 @@
 """
 Middleware de autenticacao - Validacao de JWT e usuario.
 """
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -38,6 +38,7 @@ class CurrentUser:
 
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    x_empresa_id: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
     """
@@ -99,12 +100,19 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    empresa_id = payload.get("empresa_id")
+    if empresa_id is None and x_empresa_id:
+        try:
+            empresa_id = int(x_empresa_id)
+        except (ValueError, TypeError):
+            pass
+
     return CurrentUser(
         user_id=user.id,
         email=user.email,
         nome=user.nome,
         is_admin=user.is_admin or payload.get("is_admin", False),
-        empresa_id=payload.get("empresa_id"),
+        empresa_id=empresa_id,
     )
 
 

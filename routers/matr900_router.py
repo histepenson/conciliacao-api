@@ -32,7 +32,7 @@ async def get_kardex(
     data_ini: str = Query(..., description="Data inicio do periodo - YYYYMMDD"),
     data_fim: str = Query(..., description="Data fim do periodo - YYYYMMDD"),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(500),
+    pageSize: Optional[int] = Query(5000),
     produto_de: Optional[str] = Query(None),
     produto_ate: Optional[str] = Query(None),
     tipo_de: Optional[str] = Query(None),
@@ -94,7 +94,7 @@ async def get_como_base_kardex(
     data_ini: str = Query(...),
     data_fim: str = Query(...),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(2000),
+    pageSize: Optional[int] = Query(5000),
     produto_de: Optional[str] = Query(None),
     produto_ate: Optional[str] = Query(None),
     tipo_de: Optional[str] = Query(None),
@@ -131,7 +131,7 @@ async def get_como_base_kardex(
         "lista_transferencia": lista_transferencia,
         "considera_filiais": considera_filiais,
         "tipo_custo": tipo_custo,
-        "pageSize": pageSize or 2000,
+        "pageSize": pageSize or 5000,
     }
 
     service = _get_service(context, empresa_id, db)

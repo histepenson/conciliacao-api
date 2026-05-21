@@ -115,7 +115,7 @@ class Matr900Service:
         return {**resultado, "registros": linhas, "total": len(linhas)}
 
     def _montar_query(self, params: dict[str, Any]) -> dict[str, Any]:
-        page_size = int(params.get("pageSize") or 500)
+        page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_MATR900 and v is not None}
         query["pageSize"] = page_size
         query.setdefault("documento_por", "D")

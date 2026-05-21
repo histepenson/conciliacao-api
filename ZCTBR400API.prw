@@ -167,7 +167,7 @@ lCLVL       := (cImpClvl == "1")
 lSaltLin    := IIf(Empty(cSaltaLinha), .T., cSaltaLinha == "1")
 nTipoRel    := Max(1, Min(3, Val(cTipoRel)))
 lAnalitico  := (nTipoRel < 3)
-nPageSize   := IIf(nPageSize <= 0 .Or. nPageSize > 2000, 500, nPageSize)
+nPageSize   := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset     := (nPage - 1) * nPageSize
 
 mv_par01 := cContaDe

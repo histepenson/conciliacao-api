@@ -284,7 +284,7 @@ nAbatimentos     := IIf(Empty(cAbatimentos),    1, Val(cAbatimentos))
 nPar38           := IIf(Empty(cTitulosExcl),    2, Val(cTitulosExcl))
 
 lSldRetro  := (nSldRetro == 1)
-nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 2000, 2000, nPageSize)
+nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset    := (nPage - 1) * nPageSize
 nDecs      := MsDecimais(nMoeda)
 

@@ -25,7 +25,7 @@ class FinR470Service:
         self.tenant_id = tenant_id
 
     async def buscar_extrato(self, params: dict[str, Any]) -> dict[str, Any]:
-        page_size = int(params.get("pageSize") or 500)
+        page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_FINR470 and v is not None}
         query["pageSize"] = page_size
         query.setdefault("moeda", 1)
@@ -86,7 +86,7 @@ class FinR470Service:
 
     async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
         page = int(params.get("page") or 1)
-        page_size = int(params.get("pageSize") or 2000)
+        page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_FINR470 and v is not None}
         query["page"] = page
         query["pageSize"] = page_size

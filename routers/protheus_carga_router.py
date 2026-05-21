@@ -232,7 +232,7 @@ def get_registros(
     carga_id: int,
     empresa_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(2000, ge=1, le=10000),
+    limit: int = Query(5000, ge=1, le=10000),
     db: Session = Depends(get_db),
     context: EmpresaContext = Depends(get_empresa_context),
 ):

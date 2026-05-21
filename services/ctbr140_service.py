@@ -33,7 +33,7 @@ class Ctbr140Service:
         """Chama uma pagina do ZCTBR140API sem consolidar o resultado inteiro."""
         query = {k: v for k, v in params.items() if k in _PARAMS_CTBR140 and v is not None}
         query["page"] = int(query.get("page") or 1)
-        query["pageSize"] = int(query.get("pageSize") or 2000)
+        query["pageSize"] = int(query.get("pageSize") or 5000)
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
         async with protheus_async_client(auth=self.auth) as client:
@@ -58,7 +58,7 @@ class Ctbr140Service:
         Chama o ZCTBR140API paginando automaticamente.
         Retorna todas as linhas consolidadas.
         """
-        page_size = int(params.get("pageSize") or 200)
+        page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_CTBR140 and v is not None}
         query["pageSize"] = page_size
 

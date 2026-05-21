@@ -32,7 +32,7 @@ async def get_razao(
     data_fim: str = Query(..., description="Data fim do periodo - YYYYMMDD"),
     data_ini: Optional[str] = Query(None, description="Data inicio - YYYYMMDD"),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(500),
+    pageSize: Optional[int] = Query(5000),
     conta_de: Optional[str] = Query(None),
     conta_ate: Optional[str] = Query(None),
     custo_de: Optional[str] = Query(None),
@@ -106,7 +106,7 @@ async def get_como_base_razao(
     data_fim: str = Query(...),
     data_ini: Optional[str] = Query(None),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(2000),
+    pageSize: Optional[int] = Query(5000),
     conta_de: Optional[str] = Query(None),
     conta_ate: Optional[str] = Query(None),
     custo_de: Optional[str] = Query(None),
@@ -155,7 +155,7 @@ async def get_como_base_razao(
         "consid_filiais": consid_filiais,
         "filial_de": filial_de,
         "filial_ate": filial_ate,
-        "pageSize": pageSize or 2000,
+        "pageSize": pageSize or 5000,
     }
 
     service = _get_service(context, empresa_id, db)

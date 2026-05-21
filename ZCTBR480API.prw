@@ -199,7 +199,7 @@ lNoMov      := (cSemMov == "1")
 lCusto      := IIf(Empty(cImpCusto), !Empty(cCustoDe) .Or. !Empty(cCustoAte), cImpCusto == "1")
 lCLVL       := IIf(Empty(cImpClvl), !Empty(cClvlDe) .Or. !Empty(cClvlAte), cImpClvl == "1")
 lTotConta   := (cTotConta == "1")
-nPageSize   := IIf(nPageSize <= 0 .Or. nPageSize > 2000, 500, nPageSize)
+nPageSize   := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset     := (nPage - 1) * nPageSize
 
 mv_par01 := cItemDe

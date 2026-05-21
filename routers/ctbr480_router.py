@@ -32,7 +32,7 @@ async def get_razao(
     data_fim: str = Query(..., description="Data fim do periodo -- YYYYMMDD"),
     data_ini: Optional[str] = Query(None, description="Data inicio -- YYYYMMDD (default: 01/01 do ano de data_fim)"),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(500),
+    pageSize: Optional[int] = Query(5000),
     item_de: Optional[str] = Query(None, description="Item contabil inicial (CTD_ITEM)  (par01)"),
     item_ate: Optional[str] = Query(None, description="Item contabil final               (par02)"),
     conta_de: Optional[str] = Query(None, description="Conta contabil inicial (CT1_CONTA)(par12)"),
@@ -102,7 +102,7 @@ async def get_como_base_contabil_geral(
     data_fim: str = Query(..., description="Data fim do periodo -- YYYYMMDD"),
     data_ini: Optional[str] = Query(None),
     page: Optional[int] = Query(None),
-    pageSize: Optional[int] = Query(2000),
+    pageSize: Optional[int] = Query(5000),
     item_de: Optional[str] = Query(None),
     item_ate: Optional[str] = Query(None),
     conta_de: Optional[str] = Query(None),
@@ -147,7 +147,7 @@ async def get_como_base_contabil_geral(
         "consid_filiais": consid_filiais,
         "filial_de": filial_de,
         "filial_ate": filial_ate,
-        "pageSize": pageSize or 2000,
+        "pageSize": pageSize or 5000,
     }
 
     service = _get_service(context, empresa_id, db)
