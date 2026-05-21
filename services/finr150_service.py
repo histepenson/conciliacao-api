@@ -114,12 +114,13 @@ class FinR150Service:
         """Retorna uma pagina do FINR150 ja no formato de base financeira."""
         resultado = await self.buscar_pagina(params)
         registros = _titulos_para_registros(resultado.get("titulos", []))
+        page = int(params.get("page") or 1)
+        total_pages = int(resultado.get("totalPages") or resultado.get("total_pages") or 1)
         return {
             "parametros": resultado.get("parametros", {}),
-            "total_registros": resultado.get("total_registros", len(registros)),
-            "totalPages": resultado.get("totalPages", 1),
-            "page": resultado.get("page", params.get("page", 1)),
-            "hasMore": resultado.get("hasMore", False),
+            "totalPages": total_pages,
+            "page": page,
+            "hasMore": bool(resultado.get("hasMore", page < total_pages)),
             "registros": registros,
             "total": len(registros),
         }

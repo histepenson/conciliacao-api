@@ -119,7 +119,8 @@ async def _iterar_paginas(
         resultado = await service.buscar_como_registros_pagina(p)
         registros = resultado.get("registros", [])
         yield registros
-        has_more = bool(resultado.get("hasMore", False))
+        total_pages = int(resultado.get("total_pages") or resultado.get("totalPages") or 1)
+        has_more = bool(resultado.get("hasMore", page < total_pages))
         if not has_more:
             break
         page += 1
