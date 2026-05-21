@@ -330,7 +330,7 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
         _tentar_enfileirar(db, existente)
         return existente, False
 
-    if existente and existente.status == "erro":
+    if existente and existente.status in {"erro", "cancelado"}:
         existente.status = "pendente"
         existente.erro = None
         existente.iniciado_em = None
