@@ -10,7 +10,7 @@ from rq.job import Job
 from rq.registry import DeferredJobRegistry, FailedJobRegistry, ScheduledJobRegistry, StartedJobRegistry
 from sqlalchemy.orm import Session
 
-from core.rq import PROTHEUS_CARGA_QUEUE, enqueue_protheus_carga
+from core.rq import PROTHEUS_CARGA_QUEUE, enqueue_protheus_carga, job_esta_ativo
 from core.redis import get_redis_connection
 from models.protheus_carga import ProtheusCarga, ProtheusCargaConfig, ProtheusCargaRegistro
 from schemas.protheus_carga_schema import ProtheusCargaConfigCreate, ProtheusCargaConfigUpdate, ProtheusCargaCreate
@@ -310,6 +310,14 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
         return existente, True
 
     if existente and existente.status == "processando":
+        if existente.rq_job_id and job_esta_ativo(existente.rq_job_id):
+            return existente, False
+        # job morreu sem atualizar o banco - reenfileira
+        existente.status = "pendente"
+        existente.erro = None
+        existente.iniciado_em = None
+        existente.finalizado_em = None
+        _tentar_enfileirar(db, existente)
         return existente, False
 
     if existente and existente.status in {"pendente", "erro"}:

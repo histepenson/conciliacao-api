@@ -32,6 +32,11 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         if not carga:
             raise RuntimeError(f"Carga Protheus {carga_id} nao encontrada")
 
+        if carga.status in {"concluido", "cancelado"}:
+            logger.info("Carga Protheus %s ja esta em status final (%s), ignorando", carga.id, carga.status)
+            print(f"[PROTHEUS_CARGA] status final {carga.status}, ignorando carga_id={carga.id}", flush=True)
+            return
+
         print(f"[PROTHEUS_CARGA] marcando processando carga_id={carga.id}", flush=True)
         marcar_processando(db, carga)
         logger.info(
