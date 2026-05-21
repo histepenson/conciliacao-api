@@ -3,6 +3,8 @@ import logging
 from typing import Any
 from fastapi import HTTPException
 
+import httpx
+
 from core.protheus_http import protheus_async_client, protheus_get
 
 logger = logging.getLogger(__name__)
@@ -26,27 +28,22 @@ class Matr900Service:
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id
 
-    async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def buscar_pagina(self, params: dict[str, Any], *, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
         query = self._montar_query(params)
         query["page"] = int(query.get("page") or 1)
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
-        async with protheus_async_client(auth=self.auth) as client:
-            resp = await protheus_get(
-                client,
-                self.endpoint,
-                params=query,
-                headers=headers,
-                logger=logger,
-                operation=f"MATR900 pagina {query['page']}",
-            )
+        async def _do(c: httpx.AsyncClient) -> dict[str, Any]:
+            resp = await protheus_get(c, self.endpoint, params=query, headers=headers, logger=logger, operation=f"MATR900 pagina {query['page']}")
             data = self._decode_response(resp.content)
             total_pages = int(data.get("total_pages") or data.get("totalPages") or query["page"] or 1)
-            logger.info(
-                "MATR900 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
-                query["page"], total_pages, query["pageSize"], self.endpoint, self.tenant_id,
-            )
+            logger.info("MATR900 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s", query["page"], total_pages, query["pageSize"], self.endpoint, self.tenant_id)
             return data
+
+        if client is not None:
+            return await _do(client)
+        async with protheus_async_client(auth=self.auth) as c:
+            return await _do(c)
 
     async def buscar_kardex(self, params: dict[str, Any]) -> dict[str, Any]:
         query = self._montar_query(params)
@@ -109,8 +106,8 @@ class Matr900Service:
         resultado = await self.buscar_kardex(params)
         return resultado["linhas"]
 
-    async def buscar_como_registros_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
-        resultado = await self.buscar_pagina(params)
+    async def buscar_como_registros_pagina(self, params: dict[str, Any], *, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+        resultado = await self.buscar_pagina(params, client=client)
         linhas = resultado.get("linhas", [])
         return {**resultado, "registros": linhas, "total": len(linhas)}
 

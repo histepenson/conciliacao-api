@@ -2,8 +2,11 @@ import asyncio
 import logging
 from typing import Any, AsyncGenerator
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from db import SessionLocal
 from core.protheus import resolve_protheus_config
+from core.protheus_http import protheus_async_client
 from models.protheus_carga import ProtheusCarga, ProtheusCargaRegistro
 from services.ctbr140_service import Ctbr140Service
 from services.ctbr400_service import Ctbr400Service
@@ -17,7 +20,8 @@ from services.protheus_carga_service import marcar_concluido, marcar_erro, marca
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-_PAGE_SIZE = 2000
+_PAGE_SIZE = 5000
+_COMMIT_A_CADA = 5
 
 
 def executar_carga_protheus(carga_id: int) -> None:
@@ -51,26 +55,38 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         params["data_base"] = params.get("data_base") or carga.data_base
         params.setdefault("pageSize", _PAGE_SIZE)
 
-        # limpa registros anteriores antes de começar
         db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
         db.commit()
 
         total = 0
         sequencia = 1
+        paginas_sem_commit = 0
+        buffer_insert: list[dict] = []
 
         async for registros_pagina in _iterar_paginas(carga, config, params):
             if not registros_pagina:
                 continue
-            db.bulk_save_objects([
-                ProtheusCargaRegistro(carga_id=carga.id, sequencia=sequencia + i, dados_json=r)
+
+            buffer_insert.extend(
+                {"carga_id": carga.id, "sequencia": sequencia + i, "dados_json": r}
                 for i, r in enumerate(registros_pagina)
-            ])
+            )
             sequencia += len(registros_pagina)
             total += len(registros_pagina)
-            carga.total_registros = total
+            paginas_sem_commit += 1
+
+            if paginas_sem_commit >= _COMMIT_A_CADA:
+                db.execute(pg_insert(ProtheusCargaRegistro), buffer_insert)
+                carga.total_registros = total
+                db.commit()
+                buffer_insert = []
+                paginas_sem_commit = 0
+                logger.info("Carga Protheus %s: %s registros gravados", carga.id, total)
+                print(f"[PROTHEUS_CARGA] gravados {total} registros carga_id={carga.id}", flush=True)
+
+        if buffer_insert:
+            db.execute(pg_insert(ProtheusCargaRegistro), buffer_insert)
             db.commit()
-            print(f"[PROTHEUS_CARGA] gravados {total} registros carga_id={carga.id}", flush=True)
-            logger.info("Carga Protheus %s: %s registros gravados", carga.id, total)
 
         marcar_concluido(db, carga, total)
         logger.info("Carga Protheus %s concluida com %s registros", carga.id, total)
@@ -111,16 +127,18 @@ async def _iterar_paginas(
 
     service = services[tipo](*service_args)
     page = 1
+    auth = (config.user, config.password) if config.user else None
 
-    while True:
-        p = dict(params)
-        p["page"] = page
-        print(f"[PROTHEUS_CARGA] buscando pagina={page} relatorio={tipo} carga_id={carga.id}", flush=True)
-        resultado = await service.buscar_como_registros_pagina(p)
-        registros = resultado.get("registros", [])
-        yield registros
-        total_pages = int(resultado.get("total_pages") or resultado.get("totalPages") or 1)
-        has_more = bool(resultado.get("hasMore", page < total_pages))
-        if not has_more:
-            break
-        page += 1
+    async with protheus_async_client(auth=auth) as client:
+        while True:
+            p = dict(params)
+            p["page"] = page
+            print(f"[PROTHEUS_CARGA] buscando pagina={page} relatorio={tipo} carga_id={carga.id}", flush=True)
+            resultado = await service.buscar_como_registros_pagina(p, client=client)
+            registros = resultado.get("registros", [])
+            yield registros
+            total_pages = int(resultado.get("total_pages") or resultado.get("totalPages") or 1)
+            has_more = bool(resultado.get("hasMore", page < total_pages))
+            if not has_more:
+                break
+            page += 1

@@ -2,6 +2,8 @@ import json as _json
 import logging
 from typing import Any
 
+import httpx
+
 from core.protheus_http import protheus_async_client, protheus_get
 
 logger = logging.getLogger(__name__)
@@ -30,32 +32,27 @@ class FinR130Service:
         self.auth = (user, password) if user else None
         self.tenant_id = tenant_id  # "02,0201"
 
-    async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def buscar_pagina(self, params: dict[str, Any], *, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
         """Chama uma pagina do ZFINR130API sem consolidar o resultado inteiro."""
         query = {k: v for k, v in params.items() if k in _PARAMS_FINR130 and v is not None}
         query["page"] = int(query.get("page") or 1)
         query["pageSize"] = int(query.get("pageSize") or 5000)
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
-        async with protheus_async_client(auth=self.auth) as client:
-            resp = await protheus_get(
-                client,
-                self.endpoint,
-                params=query,
-                headers=headers,
-                logger=logger,
-                operation=f"FINR130 pagina {query['page']}",
-            )
+        async def _do(c: httpx.AsyncClient) -> dict[str, Any]:
+            resp = await protheus_get(c, self.endpoint, params=query, headers=headers, logger=logger, operation=f"FINR130 pagina {query['page']}")
             data = _decode_json_response(resp.content)
             total_pages = int(data.get("totalPages") or data.get("total_pages") or query["page"] or 1)
-            logger.info(
-                "FINR130 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s",
-                query["page"], total_pages, query["pageSize"], self.endpoint, self.tenant_id,
-            )
+            logger.info("FINR130 -> pagina %s/%s  pageSize=%s  endpoint=%s  tenant=%s", query["page"], total_pages, query["pageSize"], self.endpoint, self.tenant_id)
             return data
 
-    async def buscar_como_registros_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
-        resultado = await self.buscar_pagina(params)
+        if client is not None:
+            return await _do(client)
+        async with protheus_async_client(auth=self.auth) as c:
+            return await _do(c)
+
+    async def buscar_como_registros_pagina(self, params: dict[str, Any], *, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+        resultado = await self.buscar_pagina(params, client=client)
         titulos = resultado.get("titulos", [])
         total_pages = int(resultado.get("totalPages") or resultado.get("total_pages") or 1)
         page = int(params.get("page") or 1)

@@ -3,6 +3,8 @@ import logging
 from typing import Any
 from fastapi import HTTPException
 
+import httpx
+
 from core.protheus_http import protheus_async_client, protheus_get
 
 logger = logging.getLogger(__name__)
@@ -84,7 +86,7 @@ class FinR470Service:
             "registros": all_registros,
         }
 
-    async def buscar_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def buscar_pagina(self, params: dict[str, Any], *, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
         page = int(params.get("page") or 1)
         page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_FINR470 and v is not None}
@@ -94,15 +96,14 @@ class FinR470Service:
 
         headers = {"tenantId": self.tenant_id} if self.tenant_id else {}
 
-        async with protheus_async_client(auth=self.auth) as client:
-            resp = await protheus_get(
-                client,
-                self.endpoint,
-                params=query,
-                headers=headers,
-                logger=logger,
-                operation=f"FINR470 pagina {page}",
-            )
+        async def _do(c: httpx.AsyncClient) -> httpx.Response:
+            return await protheus_get(c, self.endpoint, params=query, headers=headers, logger=logger, operation=f"FINR470 pagina {page}")
+
+        if client is not None:
+            resp = await _do(client)
+        else:
+            async with protheus_async_client(auth=self.auth) as c:
+                resp = await _do(c)
 
         raw = resp.content
         if not raw:
@@ -147,8 +148,8 @@ class FinR470Service:
         resultado = await self.buscar_extrato(params)
         return resultado["registros"]
 
-    async def buscar_como_registros_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
-        resultado = await self.buscar_pagina(params)
+    async def buscar_como_registros_pagina(self, params: dict[str, Any], *, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+        resultado = await self.buscar_pagina(params, client=client)
         registros = resultado["registros"]
         return {
             "registros": registros,
