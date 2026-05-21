@@ -54,6 +54,19 @@ class FinR130Service:
             )
             return data
 
+    async def buscar_como_registros_pagina(self, params: dict[str, Any]) -> dict[str, Any]:
+        resultado = await self.buscar_pagina(params)
+        titulos = resultado.get("titulos", [])
+        total_pages = int(resultado.get("totalPages") or resultado.get("total_pages") or 1)
+        page = int(params.get("page") or 1)
+        return {
+            "registros": titulos,
+            "total": len(titulos),
+            "total_pages": total_pages,
+            "page": page,
+            "hasMore": bool(resultado.get("hasMore", page < total_pages)),
+        }
+
     async def buscar_todos_titulos(self, params: dict[str, Any]) -> dict[str, Any]:
         """Chama o ZFINR130API paginando automaticamente e retorna todos os titulos."""
         page_size = int(params.get("pageSize", 2000))

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from db import SessionLocal
 from core.protheus import resolve_protheus_config
@@ -16,6 +16,8 @@ from services.protheus_carga_service import marcar_concluido, marcar_erro, marca
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+_PAGE_SIZE = 2000
 
 
 def executar_carga_protheus(carga_id: int) -> None:
@@ -41,26 +43,39 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         marcar_processando(db, carga)
         logger.info(
             "Carga Protheus %s iniciada: relatorio=%s empresa=%s data_base=%s",
-            carga.id,
-            carga.tipo_relatorio,
-            carga.empresa_id,
-            carga.data_base,
+            carga.id, carga.tipo_relatorio, carga.empresa_id, carga.data_base,
         )
 
-        print(f"[PROTHEUS_CARGA] chamando Protheus carga_id={carga.id} relatorio={carga.tipo_relatorio}", flush=True)
-        registros = await _buscar_registros(carga, db)
+        config = resolve_protheus_config(carga.empresa_id, db)
+        params = dict(carga.parametros_json or {})
+        params["data_base"] = params.get("data_base") or carga.data_base
+        params.setdefault("pageSize", _PAGE_SIZE)
 
-        print(f"[PROTHEUS_CARGA] gravando {len(registros)} registros carga_id={carga.id}", flush=True)
+        # limpa registros anteriores antes de começar
         db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
-        db.bulk_save_objects(
-            [
-                ProtheusCargaRegistro(carga_id=carga.id, sequencia=index + 1, dados_json=registro)
-                for index, registro in enumerate(registros)
-            ]
-        )
-        marcar_concluido(db, carga, len(registros))
-        logger.info("Carga Protheus %s concluida com %s registros", carga.id, len(registros))
-        print(f"[PROTHEUS_CARGA] concluida carga_id={carga.id} total={len(registros)}", flush=True)
+        db.commit()
+
+        total = 0
+        sequencia = 1
+
+        async for registros_pagina in _iterar_paginas(carga, config, params):
+            if not registros_pagina:
+                continue
+            db.bulk_save_objects([
+                ProtheusCargaRegistro(carga_id=carga.id, sequencia=sequencia + i, dados_json=r)
+                for i, r in enumerate(registros_pagina)
+            ])
+            sequencia += len(registros_pagina)
+            total += len(registros_pagina)
+            carga.total_registros = total
+            db.commit()
+            print(f"[PROTHEUS_CARGA] gravados {total} registros carga_id={carga.id}", flush=True)
+            logger.info("Carga Protheus %s: %s registros gravados", carga.id, total)
+
+        marcar_concluido(db, carga, total)
+        logger.info("Carga Protheus %s concluida com %s registros", carga.id, total)
+        print(f"[PROTHEUS_CARGA] concluida carga_id={carga.id} total={total}", flush=True)
+
     except Exception as exc:
         print(f"[PROTHEUS_CARGA] erro carga_id={carga_id}: {exc}", flush=True)
         db.rollback()
@@ -73,30 +88,38 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         db.close()
 
 
-async def _buscar_registros(carga: ProtheusCarga, db) -> list[dict[str, Any]]:
-    print(f"[PROTHEUS_CARGA] resolvendo config Protheus empresa_id={carga.empresa_id}", flush=True)
-    config = resolve_protheus_config(carga.empresa_id, db)
-    params = dict(carga.parametros_json or {})
-    params["data_base"] = params.get("data_base") or carga.data_base
-
+async def _iterar_paginas(
+    carga: ProtheusCarga,
+    config: Any,
+    params: dict[str, Any],
+) -> AsyncGenerator[list[dict], None]:
     service_args = (config.url, config.user, config.password, config.tenant, config.rest_prefix)
     tipo = carga.tipo_relatorio.upper()
-    print(f"[PROTHEUS_CARGA] config resolvida relatorio={tipo} tenant={config.tenant}", flush=True)
 
-    if tipo == "FINR130":
-        resultado = await FinR130Service(*service_args).buscar_todos_titulos(params)
-        return list(resultado.get("titulos", []))
-    if tipo == "FINR150":
-        return await FinR150Service(*service_args).buscar_como_registros(params)
-    if tipo == "CTBR140":
-        return await Ctbr140Service(*service_args).buscar_como_registros(params)
-    if tipo == "CTBR400":
-        return await Ctbr400Service(*service_args).buscar_como_registros(params)
-    if tipo == "CTBR480":
-        return await Ctbr480Service(*service_args).buscar_como_registros(params)
-    if tipo == "FINR470":
-        return await FinR470Service(*service_args).buscar_como_registros(params)
-    if tipo == "MATR900":
-        return await Matr900Service(*service_args).buscar_como_registros(params)
+    services = {
+        "FINR130": FinR130Service,
+        "FINR150": FinR150Service,
+        "CTBR140": Ctbr140Service,
+        "CTBR400": Ctbr400Service,
+        "CTBR480": Ctbr480Service,
+        "FINR470": FinR470Service,
+        "MATR900": Matr900Service,
+    }
 
-    raise RuntimeError(f"Relatorio {carga.tipo_relatorio} nao suportado")
+    if tipo not in services:
+        raise RuntimeError(f"Relatorio {carga.tipo_relatorio} nao suportado")
+
+    service = services[tipo](*service_args)
+    page = 1
+
+    while True:
+        p = dict(params)
+        p["page"] = page
+        print(f"[PROTHEUS_CARGA] buscando pagina={page} relatorio={tipo} carga_id={carga.id}", flush=True)
+        resultado = await service.buscar_como_registros_pagina(p)
+        registros = resultado.get("registros", [])
+        yield registros
+        has_more = bool(resultado.get("hasMore", False))
+        if not has_more:
+            break
+        page += 1
