@@ -133,7 +133,8 @@
       "Read(//c/Users/histepenson/.claude/projects/c--conciliacao-api/memory/**)",
       "Bash(.venvScriptspython -c ' *)",
       "PowerShell(Head 30)",
-      "Bash(.venv/Scripts/python -)"
+      "Bash(.venv/Scripts/python -)",
+      "Bash(mkdir \"C:\\\\conciliacao-app\\\\src\\\\hooks\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -141,7 +142,10 @@
       "c:\\conciliacao-app\\src\\components\\Finr470ParamsDialog",
       "c:\\conciliacao-app\\src\\components\\Ctbr400ParamsDialog",
       "c:\\conciliacao-app\\src\\components\\Matr900ParamsDialog",
-      "c:\\conciliacao-app\\src\\components\\Ctbr480ParamsDialog"
+      "c:\\conciliacao-app\\src\\components\\Ctbr480ParamsDialog",
+      "C:\\conciliacao-app\\src\\hooks",
+      "C:\\conciliacao-app\\src\\services",
+      "C:\\conciliacao-app\\src\\components\\ProtheusParamsDialog"
     ]
   }
 }
