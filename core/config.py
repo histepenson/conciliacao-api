@@ -60,8 +60,8 @@ class Settings(BaseSettings):
     PROTHEUS_PASSWORD: str = ""
     PROTHEUS_TENANT: str = "02,0201"
     PROTHEUS_HTTP_TIMEOUT_SECONDS: float = 1800.0
-    PROTHEUS_HTTP_RETRY_ATTEMPTS: int = 3
-    PROTHEUS_HTTP_RETRY_BACKOFF_SECONDS: float = 10.0
+    PROTHEUS_HTTP_RETRY_ATTEMPTS: int = 5
+    PROTHEUS_HTTP_RETRY_BACKOFF_SECONDS: float = 15.0
 
     # Redis / RQ
     REDIS_URL: str = "redis://localhost:6379/0"

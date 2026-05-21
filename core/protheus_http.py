@@ -50,9 +50,7 @@ async def protheus_get(
                 wait_seconds,
             )
             await asyncio.sleep(wait_seconds)
-        except httpx.ReadTimeout:
-            raise
-        except (httpx.ConnectTimeout, httpx.PoolTimeout, httpx.ConnectError, httpx.NetworkError) as exc:
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.ConnectError, httpx.NetworkError) as exc:
             if attempt == attempts:
                 raise
 
