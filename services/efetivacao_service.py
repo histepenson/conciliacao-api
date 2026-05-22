@@ -1,5 +1,5 @@
 """
-Service para efetivação de conciliações.
+Service para efetivacao de conciliacoes.
 """
 import logging
 from datetime import datetime, timezone
@@ -25,14 +25,14 @@ logger = logging.getLogger(__name__)
 
 
 class EfetivacaoService:
-    """Service para gerenciar efetivação de conciliações."""
+    """Service para gerenciar efetivacao de conciliacoes."""
 
     def __init__(self):
         self.file_storage = FileStorageService()
 
     @staticmethod
     def _detectar_tipo_por_resultado(resultado_json: dict | None) -> str:
-        """Fallback: detecta tipo de conciliação pela estrutura do resultado JSON (registros antigos sem coluna)."""
+        """Fallback: detecta tipo de conciliacao pela estrutura do resultado JSON (registros antigos sem coluna)."""
         if not resultado_json:
             return "receber"
         if "movimentos_por_dia" in resultado_json:
@@ -43,7 +43,7 @@ class EfetivacaoService:
 
     def _parse_periodo(self, periodo: str) -> Tuple[int, int]:
         """
-        Converte string de período para (ano, mes).
+        Converte string de periodo para (ano, mes).
 
         Suporta formatos: "YYYY-MM" ou "MM/YYYY"
         """
@@ -54,17 +54,17 @@ class EfetivacaoService:
             parts = periodo.split("/")
             return int(parts[1]), int(parts[0])
         else:
-            raise ValueError(f"Formato de período inválido: {periodo}")
+            raise ValueError(f"Formato de periodo invalido: {periodo}")
 
     def _normalize_periodo(self, periodo: str) -> str:
-        """Normaliza período para formato YYYY-MM."""
+        """Normaliza periodo para formato YYYY-MM."""
         ano, mes = self._parse_periodo(periodo)
         return f"{ano}-{mes:02d}"
 
     def _validate_no_divergencias(
         self, resultado: Dict[str, Any], permite_divergente: bool = False
     ) -> ValidacaoEfetivacaoResponse:
-        """Valida se não há divergências antes de efetivar."""
+        """Valida se nao ha divergencias antes de efetivar."""
         resumo = resultado.get("resumo", {})
         situacao = resumo.get("situacao", "DIVERGENTE")
         diferenca = abs(resumo.get("diferenca", 0) or 0)
@@ -84,10 +84,10 @@ class EfetivacaoService:
                 alertas=alertas
             )
 
-        # Há divergências - verificar se a empresa permite efetivar mesmo assim
+        # Ha divergencias - verificar se a empresa permite efetivar mesmo assim
         if permite_divergente:
             alertas = list(alertas)
-            alertas.append(f"Efetivada com divergências (permitido pela configuração da empresa)")
+            alertas.append(f"Efetivada com divergencias (permitido pela configuracao da empresa)")
             return ValidacaoEfetivacaoResponse(
                 pode_efetivar=True,
                 motivo=None,
@@ -95,12 +95,12 @@ class EfetivacaoService:
                 alertas=alertas
             )
 
-        # Não pode efetivar
+        # Nao pode efetivar
         motivos = []
         if situacao != "CONCILIADO":
-            motivos.append(f"Situação atual: {situacao}, diferença de R$ {diferenca:.2f}")
+            motivos.append(f"Situacao atual: {situacao}, diferenca de R$ {diferenca:.2f}")
         if total_divergencias > 0:
-            motivos.append(f"{total_divergencias} divergências encontradas")
+            motivos.append(f"{total_divergencias} divergencias encontradas")
 
         return ValidacaoEfetivacaoResponse(
             pode_efetivar=False,
@@ -116,7 +116,7 @@ class EfetivacaoService:
         periodo: str,
         conta_contabil_id: int
     ) -> Optional[Conciliacao]:
-        """Verifica se já existe conciliação efetivada para este período."""
+        """Verifica se ja existe conciliacao efetivada para este periodo."""
         periodo_normalizado = self._normalize_periodo(periodo)
         return db.query(Conciliacao).filter(
             and_(
@@ -132,24 +132,24 @@ class EfetivacaoService:
         db: Session,
         request: EfetivarConciliacaoRequest
     ) -> ValidacaoEfetivacaoResponse:
-        """Valida se uma conciliação pode ser efetivada."""
-        # Verifica se já foi efetivada
+        """Valida se uma conciliacao pode ser efetivada."""
+        # Verifica se ja foi efetivada
         existing = self._check_already_efetivada(
             db, request.empresa_id, request.periodo, request.conta_contabil_id
         )
         if existing:
             return ValidacaoEfetivacaoResponse(
                 pode_efetivar=False,
-                motivo=f"Conciliação já efetivada em {existing.data_efetivacao}",
+                motivo=f"Conciliacao ja efetivada em {existing.data_efetivacao}",
                 divergencias=0,
-                alertas=["Período já possui conciliação efetivada"]
+                alertas=["Periodo ja possui conciliacao efetivada"]
             )
 
-        # Consultar parâmetro da empresa
+        # Consultar parametro da empresa
         empresa = db.query(Empresa).filter(Empresa.id == request.empresa_id).first()
         permite_divergente = empresa.permite_efetivar_divergente if empresa else False
 
-        # Valida se não há divergências (ou se a empresa permite)
+        # Valida se nao ha divergencias (ou se a empresa permite)
         return self._validate_no_divergencias(request.resultado, permite_divergente)
 
     def efetivar(
@@ -165,40 +165,40 @@ class EfetivacaoService:
         nome_contabil_geral: str
     ) -> Conciliacao:
         """
-        Efetiva uma conciliação.
+        Efetiva uma conciliacao.
 
         Args:
-            db: Sessão do banco de dados
-            request: Dados da conciliação
-            current_user: Usuário atual
+            db: Sessao do banco de dados
+            request: Dados da conciliacao
+            current_user: Usuario atual
             arquivo_origem: Bytes do arquivo original de origem
-            arquivo_contabil_filtrado: Bytes do arquivo contábil filtrado
-            arquivo_contabil_geral: Bytes do arquivo contábil geral
+            arquivo_contabil_filtrado: Bytes do arquivo contabil filtrado
+            arquivo_contabil_geral: Bytes do arquivo contabil geral
             nome_origem: Nome original do arquivo de origem
-            nome_contabil_filtrado: Nome original do arquivo contábil filtrado
-            nome_contabil_geral: Nome original do arquivo contábil geral
+            nome_contabil_filtrado: Nome original do arquivo contabil filtrado
+            nome_contabil_geral: Nome original do arquivo contabil geral
 
         Returns:
-            Conciliação efetivada
+            Conciliacao efetivada
         """
         # Validar
         validacao = self.validar_efetivacao(db, request)
         if not validacao.pode_efetivar:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Não é possível efetivar: {validacao.motivo}"
+                detail=f"Nao e possivel efetivar: {validacao.motivo}"
             )
 
-        # Parse período
+        # Parse periodo
         ano, mes = self._parse_periodo(request.periodo)
         periodo_normalizado = self._normalize_periodo(request.periodo)
 
-        # Verificar conta contábil
+        # Verificar conta contabil
         conta = db.query(PlanoDeContas).filter(PlanoDeContas.id == request.conta_contabil_id).first()
         if not conta:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conta contábil não encontrada"
+                detail="Conta contabil nao encontrada"
             )
 
         # Criar DataFrames a partir dos registros normalizados
@@ -229,13 +229,13 @@ class EfetivacaoService:
         resumo = request.resultado.get("resumo", {})
         saldo = resumo.get("diferenca", 0) or 0
 
-        # Ao efetivar, situação é sempre CONCILIADO
+        # Ao efetivar, situacao e sempre CONCILIADO
         resultado_para_salvar = {**request.resultado}
         resultado_para_salvar["resumo"] = {**resumo, "situacao": "CONCILIADO"}
 
         now = datetime.now(timezone.utc)
 
-        # Criar registro de conciliação
+        # Criar registro de conciliacao
         conciliacao = Conciliacao(
             empresa_id=request.empresa_id,
             conta_contabil_id=request.conta_contabil_id,
@@ -272,7 +272,7 @@ class EfetivacaoService:
         except Exception as e:
             logger.warning(f"Erro ao registrar audit log: {e}")
 
-        logger.info(f"Conciliação {conciliacao.id} efetivada por usuário {current_user.user_id}")
+        logger.info(f"Conciliacao {conciliacao.id} efetivada por usuario {current_user.user_id}")
         return conciliacao
 
     def listar_efetivadas(
@@ -285,13 +285,13 @@ class EfetivacaoService:
         limit: int = 50
     ) -> Tuple[List[ConciliacaoEfetivadaResumo], int]:
         """
-        Lista conciliações efetivadas para uma empresa/período.
+        Lista conciliacoes efetivadas para uma empresa/periodo.
 
         Args:
-            db: Sessão do banco
+            db: Sessao do banco
             empresa_id: ID da empresa
-            ano: Ano do período
-            mes: Mês do período
+            ano: Ano do periodo
+            mes: Mes do periodo
             skip: Registros a pular
             limit: Limite de registros
 
@@ -317,7 +317,7 @@ class EfetivacaoService:
         for c in conciliacoes:
             resumo_json = c.resultado_json.get("resumo", {}) if c.resultado_json else {}
 
-            # Tipo de conciliação: coluna explícita ou fallback por heurística (registros antigos)
+            # Tipo de conciliacao: coluna explicita ou fallback por heuristica (registros antigos)
             tipo_conc = c.tipo_conciliacao or self._detectar_tipo_por_resultado(c.resultado_json)
 
             item = ConciliacaoEfetivadaResumo(
@@ -350,7 +350,7 @@ class EfetivacaoService:
         conciliacao_id: int,
         empresa_id: int
     ) -> ConciliacaoEfetivadaDetalhe:
-        """Obtém detalhes completos de uma conciliação efetivada."""
+        """Obtem detalhes completos de uma conciliacao efetivada."""
         conciliacao = db.query(Conciliacao).filter(
             Conciliacao.id == conciliacao_id,
             Conciliacao.empresa_id == empresa_id,
@@ -360,12 +360,12 @@ class EfetivacaoService:
         if not conciliacao:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conciliação efetivada não encontrada"
+                detail="Conciliacao efetivada nao encontrada"
             )
 
         resumo_json = conciliacao.resultado_json.get("resumo", {}) if conciliacao.resultado_json else {}
 
-        # Tipo de conciliação: coluna explícita ou fallback por heurística (registros antigos)
+        # Tipo de conciliacao: coluna explicita ou fallback por heuristica (registros antigos)
         tipo_conc = conciliacao.tipo_conciliacao or self._detectar_tipo_por_resultado(conciliacao.resultado_json)
 
         return ConciliacaoEfetivadaDetalhe(
@@ -399,15 +399,15 @@ class EfetivacaoService:
         periodo: str
     ) -> List[int]:
         """
-        Lista IDs das contas já efetivadas para uma empresa/período.
+        Lista IDs das contas ja efetivadas para uma empresa/periodo.
 
         Args:
-            db: Sessão do banco
+            db: Sessao do banco
             empresa_id: ID da empresa
-            periodo: Período no formato YYYY-MM
+            periodo: Periodo no formato YYYY-MM
 
         Returns:
-            Lista de IDs de contas contábeis já efetivadas
+            Lista de IDs de contas contabeis ja efetivadas
         """
         periodo_normalizado = self._normalize_periodo(periodo)
 
@@ -428,11 +428,11 @@ class EfetivacaoService:
         empresa_id: int
     ) -> str:
         """
-        Obtém caminho de arquivo para download.
+        Obtem caminho de arquivo para download.
 
         Args:
-            db: Sessão do banco
-            conciliacao_id: ID da conciliação
+            db: Sessao do banco
+            conciliacao_id: ID da conciliacao
             tipo_arquivo: origem, contabil_filtrado, contabil_geral, relatorio
             formato: original, normalizado, json
             empresa_id: ID da empresa
@@ -449,7 +449,7 @@ class EfetivacaoService:
         if not conciliacao:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conciliação efetivada não encontrada"
+                detail="Conciliacao efetivada nao encontrada"
             )
 
         caminhos = conciliacao.caminhos_arquivos or {}
@@ -459,19 +459,19 @@ class EfetivacaoService:
         if not caminho:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Arquivo do tipo '{tipo_arquivo}' formato '{formato}' não encontrado nos registros"
+                detail=f"Arquivo do tipo '{tipo_arquivo}' formato '{formato}' nao encontrado nos registros"
             )
 
         if not self.file_storage.file_exists(caminho):
             # Para relatorio/json, regenerar a partir do resultado_json do banco
             if tipo_arquivo == "relatorio" and formato == "json" and conciliacao.resultado_json:
-                logger.info(f"Regenerando arquivo JSON para conciliação {conciliacao_id} a partir do banco")
+                logger.info(f"Regenerando arquivo JSON para conciliacao {conciliacao_id} a partir do banco")
                 conta = db.query(PlanoDeContas).filter(
                     PlanoDeContas.id == conciliacao.conta_contabil_id
                 ).first()
                 conta_contabil = conta.conta_contabil if conta else "desconhecida"
                 ano, mes = self._parse_periodo(conciliacao.periodo)
-                # Tipo de conciliação: coluna explícita ou fallback
+                # Tipo de conciliacao: coluna explicita ou fallback
                 tipo_conc = conciliacao.tipo_conciliacao or self._detectar_tipo_por_resultado(conciliacao.resultado_json)
                 caminho_regenerado = self.file_storage.save_json_result(
                     conciliacao.resultado_json, empresa_id, ano, mes, conta_contabil, tipo_conc
@@ -489,7 +489,7 @@ class EfetivacaoService:
 
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Arquivo não encontrado no servidor. Os arquivos podem ter sido perdidos após um redeploy. O relatório JSON pode ser regenerado, mas os arquivos Excel originais precisam ser re-efetivados."
+                detail="Arquivo nao encontrado no servidor. Os arquivos podem ter sido perdidos apos um redeploy. O relatorio JSON pode ser regenerado, mas os arquivos Excel originais precisam ser re-efetivados."
             )
 
         return caminho
@@ -502,22 +502,22 @@ class EfetivacaoService:
         current_user: CurrentUser
     ) -> bool:
         """
-        Exclui uma conciliação efetivada (apenas admin).
+        Exclui uma conciliacao efetivada (apenas admin).
 
         Args:
-            db: Sessão do banco
-            conciliacao_id: ID da conciliação
+            db: Sessao do banco
+            conciliacao_id: ID da conciliacao
             empresa_id: ID da empresa
-            current_user: Usuário atual
+            current_user: Usuario atual
 
         Returns:
-            True se excluído com sucesso
+            True se excluido com sucesso
         """
-        # Verificar se é admin
+        # Verificar se e admin
         if not current_user.is_admin:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Apenas administradores podem excluir conciliações"
+                detail="Apenas administradores podem excluir conciliacoes"
             )
 
         conciliacao = db.query(Conciliacao).filter(
@@ -529,14 +529,14 @@ class EfetivacaoService:
         if not conciliacao:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conciliação efetivada não encontrada"
+                detail="Conciliacao efetivada nao encontrada"
             )
 
         # Remover arquivos
         ano, mes = self._parse_periodo(conciliacao.periodo)
         conta_contabil = conciliacao.conta_contabil.conta_contabil if conciliacao.conta_contabil else ""
 
-        # Tipo de conciliação: coluna explícita ou fallback
+        # Tipo de conciliacao: coluna explicita ou fallback
         tipo_conc = conciliacao.tipo_conciliacao or self._detectar_tipo_por_resultado(conciliacao.resultado_json)
 
         self.file_storage.delete_reconciliation_files(
@@ -566,9 +566,9 @@ class EfetivacaoService:
         except Exception as e:
             logger.warning(f"Erro ao registrar audit log: {e}")
 
-        # Excluir conciliação
+        # Excluir conciliacao
         db.delete(conciliacao)
         db.commit()
 
-        logger.info(f"Conciliação {conciliacao_id} excluída por usuário {current_user.user_id}")
+        logger.info(f"Conciliacao {conciliacao_id} excluida por usuario {current_user.user_id}")
         return True

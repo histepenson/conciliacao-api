@@ -1,8 +1,8 @@
 """
-Factory para seleção de processador financeiro.
+Factory para selecao de processador financeiro.
 
-Este módulo fornece uma interface unificada para obter o processador
-apropriado baseado no tipo de operação financeira (receber/pagar).
+Este modulo fornece uma interface unificada para obter o processador
+apropriado baseado no tipo de operacao financeira (receber/pagar).
 """
 
 import logging
@@ -26,7 +26,7 @@ _PROCESSADORES: Dict[TipoFinanceiro, Type[ProcessadorFinanceiroBase]] = {
     TipoFinanceiro.CONTAS_PAGAR: ProcessadorContasPagar,
 }
 
-# Cache de instâncias (singleton por tipo)
+# Cache de instancias (singleton por tipo)
 _instancias: Dict[TipoFinanceiro, ProcessadorFinanceiroBase] = {}
 
 
@@ -36,24 +36,24 @@ _instancias: Dict[TipoFinanceiro, ProcessadorFinanceiroBase] = {}
 
 def get_processador(tipo: TipoFinanceiro) -> ProcessadorFinanceiroBase:
     """
-    Obtém o processador apropriado para o tipo financeiro.
+    Obtem o processador apropriado para o tipo financeiro.
 
-    Utiliza padrão singleton para reutilizar instâncias.
+    Utiliza padrao singleton para reutilizar instancias.
 
     Args:
         tipo: Tipo de processamento (CONTAS_RECEBER ou CONTAS_PAGAR)
 
     Returns:
-        Instância do processador apropriado
+        Instancia do processador apropriado
 
     Raises:
-        ValueError: Se o tipo não for suportado
+        ValueError: Se o tipo nao for suportado
     """
     if tipo not in _PROCESSADORES:
         tipos_validos = [t.value for t in TipoFinanceiro]
         raise ValueError(
-            f"Tipo de processamento não suportado: {tipo}. "
-            f"Tipos válidos: {tipos_validos}"
+            f"Tipo de processamento nao suportado: {tipo}. "
+            f"Tipos validos: {tipos_validos}"
         )
 
     if tipo not in _instancias:
@@ -65,16 +65,16 @@ def get_processador(tipo: TipoFinanceiro) -> ProcessadorFinanceiroBase:
 
 def get_processador_por_nome(nome: str) -> ProcessadorFinanceiroBase:
     """
-    Obtém o processador pelo nome string do tipo.
+    Obtem o processador pelo nome string do tipo.
 
     Args:
         nome: Nome do tipo ('contas_receber' ou 'contas_pagar')
 
     Returns:
-        Instância do processador apropriado
+        Instancia do processador apropriado
 
     Raises:
-        ValueError: Se o nome não corresponder a um tipo válido
+        ValueError: Se o nome nao corresponder a um tipo valido
     """
     try:
         tipo = TipoFinanceiro(nome.lower())
@@ -82,8 +82,8 @@ def get_processador_por_nome(nome: str) -> ProcessadorFinanceiroBase:
     except ValueError:
         tipos_validos = [t.value for t in TipoFinanceiro]
         raise ValueError(
-            f"Tipo de processamento não reconhecido: '{nome}'. "
-            f"Tipos válidos: {tipos_validos}"
+            f"Tipo de processamento nao reconhecido: '{nome}'. "
+            f"Tipos validos: {tipos_validos}"
         )
 
 
@@ -94,14 +94,14 @@ def registrar_processador(
     """
     Registra um novo tipo de processador.
 
-    Permite extensão do sistema com novos tipos de processamento.
+    Permite extensao do sistema com novos tipos de processamento.
 
     Args:
         tipo: Tipo de processamento
         classe_processador: Classe do processador
     """
     _PROCESSADORES[tipo] = classe_processador
-    # Limpa cache se já existia instância
+    # Limpa cache se ja existia instancia
     if tipo in _instancias:
         del _instancias[tipo]
     logger.info(f"Registrado processador para: {tipo.value}")
@@ -109,16 +109,16 @@ def registrar_processador(
 
 def listar_tipos_disponiveis() -> list[str]:
     """
-    Lista todos os tipos de processamento disponíveis.
+    Lista todos os tipos de processamento disponiveis.
 
     Returns:
-        Lista de nomes dos tipos disponíveis
+        Lista de nomes dos tipos disponiveis
     """
     return [t.value for t in _PROCESSADORES.keys()]
 
 
 # =============================================================================
-# FUNÇÕES DE CONVENIÊNCIA
+# FUNCOES DE CONVENIENCIA
 # =============================================================================
 
 def normalizar_planilha(
@@ -128,7 +128,7 @@ def normalizar_planilha(
     """
     Normaliza planilha financeira usando o processador apropriado.
 
-    Função de conveniência que seleciona automaticamente o processador.
+    Funcao de conveniencia que seleciona automaticamente o processador.
 
     Args:
         entrada: DataFrame ou caminho para arquivo Excel
@@ -161,7 +161,7 @@ def normalizar_planilha_detalhada(
         tipo: Tipo de processamento (enum ou string)
 
     Returns:
-        DataFrame detalhado (não agrupado)
+        DataFrame detalhado (nao agrupado)
     """
     if isinstance(tipo, str):
         processador = get_processador_por_nome(tipo)
@@ -185,7 +185,7 @@ def validar_layout_planilha(
         tipo: Tipo de processamento (enum ou string)
 
     Returns:
-        ResultadoValidacaoLayout com detalhes da validação
+        ResultadoValidacaoLayout com detalhes da validacao
 
     Exemplo:
         >>> resultado = validar_layout_planilha(dados_excel, "contas_pagar")

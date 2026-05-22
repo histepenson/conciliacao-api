@@ -42,10 +42,10 @@ class PasswordReset(Base):
 
     @property
     def is_used(self) -> bool:
-        """Verifica se o token já foi usado."""
+        """Verifica se o token ja foi usado."""
         return self.used_at is not None
 
     @property
     def is_valid(self) -> bool:
-        """Verifica se o token é válido (não expirado e não usado)."""
+        """Verifica se o token e valido (nao expirado e nao usado)."""
         return not self.is_expired and not self.is_used

@@ -17,8 +17,13 @@ class Empresa(Base):
     cnpj = Column(String(20), nullable=False, unique=True, index=True)
     status = Column(Boolean, default=True, nullable=False)
     permite_efetivar_divergente = Column(Boolean, default=False, nullable=False)
+    protheus_tenant = Column(String(100), nullable=True)
+    protheus_url = Column(String(200), nullable=True)
+    protheus_rest_prefix = Column(String(50), nullable=True)
+    protheus_user = Column(String(100), nullable=True)
+    protheus_password = Column(String, nullable=True)
 
-    # Timestamps - padrão snake_case
+    # Timestamps - padrao snake_case
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)
 
@@ -30,7 +35,7 @@ class Empresa(Base):
     # RELACIONAMENTOS
     # ============================================================
 
-    # 1 empresa → N planos de contas
+    # 1 empresa -> N planos de contas
     plano_contas = relationship(
         "PlanoDeContas",
         back_populates="empresa",
@@ -38,7 +43,7 @@ class Empresa(Base):
         lazy="dynamic",
     )
 
-    # 1 empresa → N conciliações
+    # 1 empresa -> N conciliacoes
     conciliacoes = relationship(
         "Conciliacao",
         back_populates="empresa",
@@ -46,7 +51,7 @@ class Empresa(Base):
         lazy="dynamic",
     )
 
-    # 1 empresa → N usuários (via UsuarioEmpresa)
+    # 1 empresa -> N usuarios (via UsuarioEmpresa)
     usuarios = relationship(
         "UsuarioEmpresa",
         back_populates="empresa",
@@ -54,9 +59,13 @@ class Empresa(Base):
         lazy="dynamic",
     )
 
-    # Relacionamento com usuários de auditoria
+    # Relacionamento com usuarios de auditoria
     criador = relationship("Usuario", foreign_keys=[created_by])
     atualizador = relationship("Usuario", foreign_keys=[updated_by])
+
+    @property
+    def protheus_password_configurada(self) -> bool:
+        return bool(self.protheus_password)
 
     def __repr__(self):
         return f"<Empresa(id={self.id}, nome='{self.nome}', cnpj='{self.cnpj}')>"

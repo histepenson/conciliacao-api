@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Conciliações — Guia do Usuário</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    /* ── Capa ── */
+    .cover {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: #fff;
+      padding: 80px 60px;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .cover .logo { font-size: 13px; letter-spacing: 3px; text-transform: uppercase; opacity: .7; margin-bottom: 20px; }
+    .cover h1 { font-size: 42px; font-weight: 800; margin-bottom: 10px; }
+    .cover .subtitle { font-size: 18px; opacity: .85; }
+    .cover .meta { margin-top: 32px; font-size: 13px; opacity: .65; }
+
+    /* ── Layout ── */
+    .container { max-width: 980px; margin: 0 auto; padding: 0 40px 80px; }
+
+    /* ── Índice ── */
+    .toc {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 32px 36px;
+      margin: 48px 0 56px;
+    }
+    .toc h2 { font-size: 16px; font-weight: 700; color: #64748b; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 20px; }
+    .toc ol { padding-left: 20px; }
+    .toc li { margin: 6px 0; }
+    .toc a { color: #2563eb; text-decoration: none; font-size: 15px; }
+    .toc a:hover { text-decoration: underline; }
+    .toc .section-group { margin-top: 10px; font-weight: 600; }
+    .toc ul { list-style: disc; padding-left: 20px; margin-top: 4px; }
+    .toc ul li { font-weight: 400; }
+
+    /* ── Seções ── */
+    section { margin-bottom: 72px; }
+    section h2 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      padding-bottom: 12px;
+      border-bottom: 3px solid #2563eb;
+      margin-bottom: 28px;
+    }
+    section h3 {
+      font-size: 19px;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 36px 0 14px;
+    }
+    section h4 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #334155;
+      margin: 24px 0 10px;
+    }
+    p { margin-bottom: 14px; font-size: 15px; color: #334155; }
+
+    /* ── Numeração de passos ── */
+    .steps { counter-reset: step; }
+    .step {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+    .step-num {
+      counter-increment: step;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 800;
+      font-size: 14px;
+      min-width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .step-body { flex: 1; }
+    .step-body p { margin-bottom: 6px; }
+
+    /* ── Screenshots ── */
+    .screenshot-wrap {
+      margin: 24px 0 32px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,.12);
+      border: 1px solid #e2e8f0;
+    }
+    .screenshot-wrap img { display: block; width: 100%; }
+    .screenshot-label {
+      background: #f1f5f9;
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+      font-style: italic;
+    }
+
+    /* ── Callouts ── */
+    .callout {
+      display: flex;
+      gap: 14px;
+      padding: 16px 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+    .callout-icon { font-size: 20px; flex-shrink: 0; line-height: 1.4; }
+    .callout.info { background: #eff6ff; border-left: 4px solid #2563eb; color: #1e40af; }
+    .callout.warning { background: #fffbeb; border-left: 4px solid #f59e0b; color: #92400e; }
+    .callout.success { background: #f0fdf4; border-left: 4px solid #22c55e; color: #166534; }
+    .callout.danger { background: #fef2f2; border-left: 4px solid #ef4444; color: #991b1b; }
+
+    /* ── Tabelas ── */
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+    th { background: #f1f5f9; color: #475569; font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+    tr:hover td { background: #f8fafc; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-green { background: #dcfce7; color: #15803d; }
+    .badge-orange { background: #ffedd5; color: #c2410c; }
+    .badge-red { background: #fee2e2; color: #b91c1c; }
+
+    /* ── Divisor ── */
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 48px 0; }
+
+    /* ── Fluxo visual ── */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin: 24px 0;
+    }
+    .flow-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 20px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .flow-item .fi-num {
+      background: #2563eb;
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      min-width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .flow-arrow { text-align: center; color: #94a3b8; font-size: 18px; margin: -2px 0; }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; }
+      .cover { background: #1e3a5f !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .screenshot-wrap { box-shadow: none; page-break-inside: avoid; }
+      section { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════ CAPA ════════════════ -->
+<div class="cover">
+  <div class="logo">Smart Conciliações</div>
+  <h1>Guia do Usuário</h1>
+  <div class="subtitle">Passo a passo completo com capturas de tela</div>
+  <div class="meta">Versão 1.0 &nbsp;·&nbsp; Maio de 2026</div>
+</div>
+
+<div class="container">
+
+<!-- ════════════════ ÍNDICE ════════════════ -->
+<nav class="toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><a href="#acesso">Acesso ao Sistema</a>
+      <ul>
+        <li><a href="#login">Login</a></li>
+        <li><a href="#senha">Esqueci minha senha</a></li>
+      </ul>
+    </li>
+    <li><a href="#dashboard">Dashboard</a></li>
+    <li><a href="#conciliacao">Módulo de Conciliação</a>
+      <ul>
+        <li><a href="#selecionar-periodo">Selecionar Período</a></li>
+        <li><a href="#processar">Processar Conciliação</a></li>
+        <li><a href="#acompanhamento">Acompanhamento de Fechamentos</a></li>
+      </ul>
+    </li>
+    <li><a href="#cadastros">Cadastros</a>
+      <ul>
+        <li><a href="#empresas">Empresas</a></li>
+        <li><a href="#planocontas">Plano de Contas</a></li>
+      </ul>
+    </li>
+    <li><a href="#estoque">Módulo de Estoque</a>
+      <ul>
+        <li><a href="#produtos">Produtos</a></li>
+        <li><a href="#depara">De-Para</a></li>
+        <li><a href="#nfe">Importação de NF-e</a></li>
+        <li><a href="#saldo">Saldo de Estoque</a></li>
+        <li><a href="#movimentacoes">Movimentações</a></li>
+        <li><a href="#fechamento">Fechamento de Períodos</a></li>
+      </ul>
+    </li>
+    <li><a href="#admin">Administração</a>
+      <ul>
+        <li><a href="#usuarios">Usuários</a></li>
+        <li><a href="#perfis">Perfis de Acesso</a></li>
+      </ul>
+    </li>
+  </ol>
+</nav>
+
+
+<!-- ════════════════ 1. ACESSO ════════════════ -->
+<section id="acesso">
+  <h2>1. Acesso ao Sistema</h2>
+
+  <h3 id="login">1.1 Login</h3>
+  <p>Acesse o sistema pelo navegador e informe seu e-mail corporativo e senha.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/01_login.png" alt="Tela de Login" />
+    <div class="screenshot-label">Tela de Login — informe e-mail e senha para entrar</div>
+  </div>
+
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Digite seu <strong>e-mail corporativo</strong> no campo E-mail.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Digite sua <strong>senha</strong> no campo Senha.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>Entrar</strong> ou pressione <kbd>Enter</kbd>.</p></div></div>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div>Usuários <strong>administradores</strong> são direcionados ao Dashboard. Usuários comuns vinculados a mais de uma empresa verão a tela de seleção de empresa antes do Dashboard.</div>
+  </div>
+
+  <h3 id="senha">1.2 Esqueci minha senha</h3>
+  <p>Na tela de Login, clique em <strong>"Esqueci minha senha"</strong>.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/21_esqueci_senha.png" alt="Recuperação de senha" />
+    <div class="screenshot-label">Tela de Recuperação de Senha</div>
+  </div>
+
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Informe o <strong>e-mail</strong> cadastrado.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>Enviar link</strong>. Você receberá um e-mail com o link de redefinição.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Acesse o link no e-mail e defina uma nova senha. O link expira em <strong>30 minutos</strong>.</p></div></div>
+  </div>
+</section>
+
+
+<!-- ════════════════ 2. DASHBOARD ════════════════ -->
+<section id="dashboard">
+  <h2>2. Dashboard</h2>
+  <p>Após o login, você é direcionado ao Dashboard — a página inicial do sistema com um resumo geral da empresa.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/04_dashboard.png" alt="Dashboard" />
+    <div class="screenshot-label">Dashboard — visão geral com menu lateral e métricas da empresa</div>
+  </div>
+
+  <h3>Menu lateral</h3>
+  <p>A barra lateral à esquerda contém todos os módulos do sistema. Ela pode ser recolhida pressionando <kbd>Ctrl+B</kbd> para ganhar mais espaço na tela.</p>
+
+  <table>
+    <thead><tr><th>Seção</th><th>Submenu</th><th>O que faz</th></tr></thead>
+    <tbody>
+      <tr><td>Início</td><td>—</td><td>Dashboard</td></tr>
+      <tr><td>Cadastros</td><td>Empresas / Plano de Contas</td><td>Configuração inicial</td></tr>
+      <tr><td>Conciliações</td><td>Conciliar Período / Acompanhamento</td><td>Módulo principal de conciliação</td></tr>
+      <tr><td>Estoque</td><td>Produtos / De-Para / NF-e / Saldo / Movimentações / Fechamento</td><td>Controle de estoque</td></tr>
+      <tr><td>Administração</td><td>Usuários / Empresas / Perfis</td><td>Gestão de acessos (somente admin)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div>O menu <strong>Administração</strong> é visível apenas para usuários com perfil de administrador.</div>
+  </div>
+</section>
+
+
+<!-- ════════════════ 3. CONCILIAÇÃO ════════════════ -->
+<section id="conciliacao">
+  <h2>3. Módulo de Conciliação</h2>
+
+  <p>O módulo de conciliação compara os saldos registrados no sistema financeiro (Protheus) com os saldos contábeis, identificando automaticamente divergências.</p>
+
+  <h3>Fluxo resumido</h3>
+  <div class="flow">
+    <div class="flow-item"><div class="fi-num">1</div><strong>Selecionar Período</strong> — empresa, data-base e conta contábil</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-item"><div class="fi-num">2</div><strong>Configurar fontes de dados</strong> — parâmetros da API Protheus (FINR130/150, CTBR140, CTBR480)</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-item"><div class="fi-num">3</div><strong>Processar</strong> — sistema busca, normaliza e calcula as diferenças automaticamente</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-item"><div class="fi-num">4</div><strong>Analisar resultado</strong> — resumo, tabela de diferenças e análise detalhada por código</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-item"><div class="fi-num">5</div><strong>Efetivar</strong> — registra oficialmente no histórico para auditoria</div>
+  </div>
+
+  <!-- ── Selecionar Período ── -->
+  <h3 id="selecionar-periodo">3.1 Passo 1 — Selecionar Período</h3>
+  <p>Acesse <strong>Conciliações → Conciliar Período</strong> no menu lateral.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/05_conciliacao_selecionar_periodo.png" alt="Selecionar Período" />
+    <div class="screenshot-label">Conciliar Período — selecione empresa, data-base e conta contábil</div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <p>Selecione a <strong>Empresa</strong> no dropdown.</p>
+        <p>A lista exibe apenas as empresas às quais você tem acesso.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <p>Informe a <strong>Data-Base da Conciliação</strong> — deve ser sempre o <strong>último dia do mês</strong> (ex.: 30/04/2026).</p>
+        <p>Use o botão <strong>"Mês Atual"</strong> para preencher automaticamente.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <p>Após selecionar a empresa e a data, a lista de <strong>Contas Contábeis</strong> disponíveis será carregada abaixo. Escolha a conta que deseja conciliar.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <p>Selecione o <strong>tipo de conciliação</strong>: A Receber, A Pagar, Bancária ou Estoque.</p>
+        <p>O sistema abrirá a tela de processamento correspondente.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout warning">
+    <span class="callout-icon">⚠️</span>
+    <div>A data-base deve ser o <strong>último dia do mês</strong>. O sistema exibe uma mensagem de alerta em laranja caso a data informada não seja válida.</div>
+  </div>
+
+  <!-- ── Processar ── -->
+  <h3 id="processar">3.2 Passo 2 — Configurar Fontes e Processar</h3>
+  <p>Após selecionar o período, a tela de conciliação é aberta com as três bases de dados que precisam ser configuradas:</p>
+
+  <table>
+    <thead><tr><th>Base</th><th>Relatório Protheus</th><th>O que contém</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Origem (Financeiro)</strong></td><td>FINR130 (A Receber) ou FINR150 (A Pagar)</td><td>Posição dos títulos por cliente/fornecedor</td></tr>
+      <tr><td><strong>Contábil Filtrado</strong></td><td>CTBR140 — Balancete</td><td>Saldo contábil da conta selecionada</td></tr>
+      <tr><td><strong>Contábil Geral (Razão)</strong></td><td>CTBR480 — Razão Geral</td><td>Todos os lançamentos da conta para análise detalhada</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Configurar via API Protheus (recomendado)</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique no botão <strong>"Parâmetros Protheus"</strong> (ícone de engrenagem) ao lado da base desejada.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Preencha os parâmetros: <strong>Data Fim</strong> é obrigatório. Os demais (conta, filial, item) são opcionais e servem para filtrar os dados.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Confirme. Os dados serão buscados automaticamente no Protheus ao processar.</p></div></div>
+  </div>
+
+  <h4>Configurar via arquivo Excel (alternativa)</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Exporte o relatório do Protheus em formato <strong>.xlsx</strong>.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Arraste o arquivo para a área de carregamento ou clique para selecionar.</p><p>Formatos: <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code> — máximo 50 MB.</p></div></div>
+  </div>
+
+  <div class="callout success">
+    <span class="callout-icon">✅</span>
+    <div>Após configurar as três bases, clique em <strong>"Processar Conciliação"</strong>. O sistema busca os dados, normaliza, faz o merge e calcula as diferenças automaticamente.</div>
+  </div>
+
+  <h3>3.3 Passo 3 — Analisar o Resultado</h3>
+  <p>O resultado é exibido em três seções:</p>
+
+  <h4>Resumo Geral</h4>
+  <table>
+    <thead><tr><th>Card</th><th>O que mostra</th></tr></thead>
+    <tbody>
+      <tr><td>Total de registros</td><td>Quantidade total após o cruzamento</td></tr>
+      <tr><td>Conciliados</td><td>Registros com diferença ≤ R$ 0,01 <span class="badge badge-green">OK</span></td></tr>
+      <tr><td>Com divergência</td><td>Registros acima do threshold <span class="badge badge-red">DIVERGENTE</span></td></tr>
+      <tr><td>Taxa de sucesso</td><td>% conciliados sobre o total</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Tabela de Diferenças</h4>
+  <p>Tabela paginada com todos os registros. Use os filtros para localizar itens específicos:</p>
+  <table>
+    <thead><tr><th>Filtro</th><th>Opções</th></tr></thead>
+    <tbody>
+      <tr><td>Busca</td><td>Por código ou nome do cliente/fornecedor</td></tr>
+      <tr><td>Status</td><td>OK (conciliado) / Com Diferença</td></tr>
+      <tr><td>Origem</td><td>Ambos / Só Financeiro / Só Contabilidade</td></tr>
+      <tr><td>Itens por página</td><td>10 / 20 / 50 / 100</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Análise Detalhada</h4>
+  <p>Para cada código com divergência, o sistema exibe os lançamentos individuais do razão geral (CTBR480). Cada item mostra:</p>
+  <ul style="margin: 10px 0 14px 20px; font-size: 15px; color: #334155; line-height: 2;">
+    <li>Data, histórico, débito, crédito e saldo atual</li>
+    <li>Status: <span class="badge badge-green">VERDE</span> conciliado ou <span class="badge badge-red">VERMELHO</span> divergente</li>
+    <li>Classificação: CONCILIADO · SÓ FINANCEIRO · SÓ CONTABILIDADE · DIVERGENTE_VALOR</li>
+  </ul>
+
+  <h3>3.4 Passo 4 — Efetivar a Conciliação</h3>
+  <p>Após confirmar que o resultado está correto, clique em <strong>"Efetivar Conciliação"</strong> para registrá-la no histórico.</p>
+
+  <div class="callout warning">
+    <span class="callout-icon">⚠️</span>
+    <div>Por padrão, o sistema só efetiva conciliações <strong>sem divergências</strong>. Se a empresa permitir efetivação com divergências, um aviso é exibido antes da confirmação.</div>
+  </div>
+
+  <!-- ── Acompanhamento ── -->
+  <h3 id="acompanhamento">3.5 Acompanhamento de Fechamentos</h3>
+  <p>Acesse <strong>Conciliações → Acompanhamento</strong> para visualizar o histórico de todas as conciliações efetivadas.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/10_acompanhamento_fechamentos.png" alt="Acompanhamento de Fechamentos" />
+    <div class="screenshot-label">Acompanhamento de Fechamentos — histórico de conciliações por empresa e período</div>
+  </div>
+
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Selecione a <strong>Empresa</strong>, <strong>Ano</strong> e <strong>Mês</strong>.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>Buscar</strong>. O sistema lista todas as conciliações efetivadas no período.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em qualquer registro para ver o <strong>detalhe completo</strong> ou fazer o <strong>download</strong> do arquivo Excel.</p></div></div>
+  </div>
+
+  <div class="callout danger">
+    <span class="callout-icon">🗑️</span>
+    <div>A exclusão de uma efetivação é permanente e remove todos os dados do registro. Disponível apenas para administradores.</div>
+  </div>
+</section>
+
+
+<!-- ════════════════ 4. CADASTROS ════════════════ -->
+<section id="cadastros">
+  <h2>4. Cadastros</h2>
+
+  <!-- ── Empresas ── -->
+  <h3 id="empresas">4.1 Empresas</h3>
+  <p>Acesse <strong>Cadastros → Empresas</strong> para gerenciar as empresas do sistema.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/11_cadastros_empresas.png" alt="Cadastro de Empresas" />
+    <div class="screenshot-label">Cadastro de Empresas — listagem com filtros e estatísticas de total/ativas/inativas</div>
+  </div>
+
+  <h4>Criar nova empresa</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>"Nova Empresa"</strong> (ou pressione <kbd>Ctrl+N</kbd>).</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Preencha <strong>Nome</strong> (razão social) e <strong>CNPJ</strong>. O CNPJ é formatado automaticamente e validado pelos dígitos verificadores.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Defina o <strong>Status</strong> (Ativo/Inativo) e clique em <strong>Salvar</strong>.</p></div></div>
+  </div>
+
+  <h4>Certificado Digital (para importação de NF-e)</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Na listagem, clique no ícone de certificado na linha da empresa.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>Upload de Certificado</strong> e selecione o arquivo <code>.pfx</code>.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Informe a <strong>senha do certificado</strong> e salve.</p></div></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Ação</th><th>Como fazer</th></tr></thead>
+    <tbody>
+      <tr><td>Buscar empresa</td><td>Campo de busca por nome ou CNPJ</td></tr>
+      <tr><td>Filtrar por status</td><td>Dropdown "Status": Todos / Ativos / Inativos</td></tr>
+      <tr><td>Editar</td><td>Ícone de lápis na linha</td></tr>
+      <tr><td>Excluir</td><td>Ícone de lixeira (remove todos os dados vinculados)</td></tr>
+      <tr><td>Atualizar lista</td><td>Botão "Atualizar" ou <kbd>Ctrl+R</kbd></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── Plano de Contas ── -->
+  <h3 id="planocontas">4.2 Plano de Contas</h3>
+  <p>Acesse <strong>Cadastros → Plano de Contas</strong> para gerenciar as contas contábeis da empresa.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/12_cadastros_planocontas.png" alt="Plano de Contas" />
+    <div class="screenshot-label">Plano de Contas — gerenciamento de contas contábeis com seletor de empresa e importação</div>
+  </div>
+
+  <h4>Importar via Balancete (recomendado)</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Selecione a <strong>Empresa</strong> no seletor.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>"Importar Balancete"</strong> e selecione o arquivo Excel exportado do Protheus (CTBR140).</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>O sistema mapeará as colunas automaticamente e importará a estrutura hierárquica do plano.</p></div></div>
+  </div>
+
+  <h4>Criar conta manualmente</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>"Nova Conta"</strong> (ou <kbd>Ctrl+N</kbd>).</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Preencha: <strong>Conta Contábil</strong>, <strong>Descrição</strong>, <strong>Tipo</strong> (Ativo/Passivo/Receita/Despesa/Patrimônio), <strong>Conciliável</strong> e <strong>Conta Superior</strong> (para hierarquia).</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>Salvar</strong>.</p></div></div>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div>Somente contas marcadas como <strong>Conciliável</strong> aparecem para seleção na tela de Conciliar Período.</div>
+  </div>
+</section>
+
+
+<!-- ════════════════ 5. ESTOQUE ════════════════ -->
+<section id="estoque">
+  <h2>5. Módulo de Estoque</h2>
+  <p>O módulo de estoque controla o saldo de produtos com base nas NF-e importadas diretamente da SEFAZ.</p>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div><strong>Fórmula do saldo:</strong> Saldo Final = Saldo Inicial + Entradas − Saídas + Ajustes</div>
+  </div>
+
+  <!-- ── Produtos ── -->
+  <h3 id="produtos">5.1 Produtos</h3>
+  <p>Acesse <strong>Estoque → Produtos</strong> para cadastrar e gerenciar os produtos da empresa.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/13_estoque_produtos.png" alt="Produtos" />
+    <div class="screenshot-label">Produtos — listagem com estatísticas de total/ativos/inativos e busca por descrição, código ou NCM</div>
+  </div>
+
+  <h4>Criar produto</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>"+ Novo Produto"</strong>.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Preencha: <strong>Código Interno</strong> (único por empresa), <strong>Descrição</strong>, <strong>NCM</strong>, <strong>Unidade de Estoque</strong> e <strong>Status</strong> (Ativo).</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>Salvar</strong>.</p></div></div>
+  </div>
+
+  <!-- ── De-Para ── -->
+  <h3 id="depara">5.2 De-Para (Vínculo Produto × Fornecedor)</h3>
+  <p>Acesse <strong>Estoque → De-Para</strong> para configurar a equivalência entre o código do produto no fornecedor e o código interno da empresa.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/14_estoque_depara.png" alt="De-Para" />
+    <div class="screenshot-label">De-Para — vínculo entre produto interno e código do fornecedor com fator de conversão</div>
+  </div>
+
+  <h4>Criar vínculo</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>"Novo Vínculo"</strong>.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Selecione o <strong>Produto</strong> (código interno), informe o <strong>CNPJ do Fornecedor</strong> e o <strong>Código do Produto no Fornecedor</strong>.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Defina o <strong>Fator de Conversão</strong> e a <strong>Operação</strong> (Multiplicar/Dividir). Exemplo: fornecedor vende em caixas de 12 → fator 12, multiplicar.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>Salvar</strong>.</p></div></div>
+  </div>
+
+  <div class="callout success">
+    <span class="callout-icon">✅</span>
+    <div>Com o De-Para configurado, ao importar NF-e o sistema <strong>vincula automaticamente</strong> os itens ao produto interno e aplica o fator de conversão na quantidade.</div>
+  </div>
+
+  <!-- ── NF-e ── -->
+  <h3 id="nfe">5.3 Importação de NF-e</h3>
+  <p>Acesse <strong>Estoque → Importar NF-e</strong> para buscar notas fiscais diretamente na SEFAZ usando o certificado digital da empresa.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/15_estoque_nfe.png" alt="Importação de NF-e" />
+    <div class="screenshot-label">Importação NF-e — busca na SEFAZ com certificado digital, listagem de entrada e saída</div>
+  </div>
+
+  <h4>Importar notas</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Selecione o <strong>Certificado / CNPJ</strong> da empresa.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Informe a <strong>Data Início</strong> e <strong>Data Fim</strong> do período.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>"Buscar na SEFAZ"</strong>. A importação ocorre em segundo plano — aguarde o indicador de progresso.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Após concluir, clique em <strong>"Atualizar Lista"</strong> para ver as NF-e importadas nas abas <strong>Entrada</strong> e <strong>Saída</strong>.</p></div></div>
+  </div>
+
+  <h4>Vincular itens pendentes</h4>
+  <p>Itens sem De-Para configurado ficam com status <span class="badge badge-orange">VÍNCULO PENDENTE</span>. Para vincular manualmente:</p>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Na aba Entrada ou Saída, localize o item com status pendente.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique no ícone de vínculo e selecione o <strong>produto interno</strong> correspondente.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Confirme. O saldo do período é atualizado automaticamente.</p></div></div>
+  </div>
+
+  <!-- ── Saldo ── -->
+  <h3 id="saldo">5.4 Saldo de Estoque</h3>
+  <p>Acesse <strong>Estoque → Saldo</strong> para visualizar a posição atual do estoque por produto.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/16_estoque_saldo.png" alt="Saldo de Estoque" />
+    <div class="screenshot-label">Saldo de Estoque — posição por produto no período, com opções de reprocessar e exportar</div>
+  </div>
+
+  <table>
+    <thead><tr><th>Coluna</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td>Saldo Inicial</td><td>Saldo final do mês anterior</td></tr>
+      <tr><td>Entradas</td><td>NF-e de entrada do período</td></tr>
+      <tr><td>Saídas</td><td>NF-e de saída do período</td></tr>
+      <tr><td>Ajustes</td><td>Ajustes manuais registrados</td></tr>
+      <tr><td>Saldo Final</td><td>Inicial + Entradas − Saídas + Ajustes</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div>Use o botão <strong>"Reprocessar"</strong> para recalcular todos os saldos do período (útil após vincular itens ou importar novas NF-e).</div>
+  </div>
+
+  <!-- ── Movimentações ── -->
+  <h3 id="movimentacoes">5.5 Movimentações</h3>
+  <p>Acesse <strong>Estoque → Movimentações</strong> para ver o histórico detalhado de todas as movimentações de um produto.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/17_estoque_movimentacoes.png" alt="Movimentações" />
+    <div class="screenshot-label">Movimentações — histórico detalhado com filtros por empresa, produto, período e tipo</div>
+  </div>
+
+  <table>
+    <thead><tr><th>Tipo</th><th>Origem</th><th>Efeito</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge badge-green">Entrada</span></td><td>NF-e de entrada</td><td>Aumenta o saldo</td></tr>
+      <tr><td><span class="badge badge-red">Saída</span></td><td>NF-e de saída</td><td>Diminui o saldo</td></tr>
+      <tr><td><span class="badge badge-blue">Ajuste</span></td><td>Registro manual</td><td>Pode aumentar ou diminuir</td></tr>
+      <tr><td><span class="badge badge-orange">Estorno</span></td><td>Cancelamento de NF-e</td><td>Reverte a movimentação original</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── Fechamento ── -->
+  <h3 id="fechamento">5.6 Fechamento de Períodos</h3>
+  <p>Acesse <strong>Estoque → Fechamento</strong> para fechar ou reabrir períodos.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/18_estoque_fechamento.png" alt="Fechamento de Períodos" />
+    <div class="screenshot-label">Fechamento de Períodos — status mensal com opções de fechar e reabrir</div>
+  </div>
+
+  <h4>Fechar período</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Selecione a empresa e o período desejado.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>"Fechar Período"</strong> e confirme.</p></div></div>
+  </div>
+
+  <div class="callout warning">
+    <span class="callout-icon">⚠️</span>
+    <div>Após o fechamento, <strong>ajustes manuais não são permitidos</strong> no período. O sistema também fecha automaticamente o mês anterior no dia 01 de cada mês às 02:00.</div>
+  </div>
+
+  <h4>Reabrir período</h4>
+  <p>Se necessário corrigir dados, localize o período na lista e clique em <strong>"Reabrir"</strong>. Use com cautela — pode impactar o encadeamento de saldos dos meses seguintes.</p>
+</section>
+
+
+<!-- ════════════════ 6. ADMINISTRAÇÃO ════════════════ -->
+<section id="admin">
+  <h2>6. Administração</h2>
+  <p>A área de administração é acessível apenas para usuários com perfil <strong>Administrador</strong>.</p>
+
+  <!-- ── Usuários ── -->
+  <h3 id="usuarios">6.1 Gestão de Usuários</h3>
+  <p>Acesse <strong>Administração → Usuários</strong>.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/19_admin_usuarios.png" alt="Gestão de Usuários" />
+    <div class="screenshot-label">Gestão de Usuários — CRUD com filtros por status (ativo/inativo) e tipo (admin/comum)</div>
+  </div>
+
+  <h4>Criar usuário</h4>
+  <div class="steps">
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Clique em <strong>"+ Novo Usuário"</strong>.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Preencha nome, e-mail, senha e tipo (admin/comum).</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Salve e, em seguida, <strong>vincule o usuário às empresas</strong> que ele poderá acessar clicando no ícone de empresas na linha do usuário.</p></div></div>
+    <div class="step"><div class="step-num"></div><div class="step-body"><p>Para cada empresa vinculada, defina o <strong>perfil de acesso</strong>.</p></div></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Ação</th><th>Como fazer</th></tr></thead>
+    <tbody>
+      <tr><td>Buscar usuário</td><td>Campo de busca por nome ou e-mail</td></tr>
+      <tr><td>Filtrar por status</td><td>Dropdown "Status": Todos / Ativo / Inativo</td></tr>
+      <tr><td>Filtrar por tipo</td><td>Dropdown "Tipo": Todos / Admin / Comum</td></tr>
+      <tr><td>Ativar/Inativar</td><td>Toggle de status na linha do usuário</td></tr>
+      <tr><td>Editar dados</td><td>Ícone de lápis</td></tr>
+      <tr><td>Gerenciar empresas</td><td>Ícone de empresa na linha</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── Perfis ── -->
+  <h3 id="perfis">6.2 Perfis de Acesso</h3>
+  <p>Acesse <strong>Administração → Perfis</strong> para visualizar e gerenciar os perfis de acesso.</p>
+
+  <div class="screenshot-wrap">
+    <img src="screenshots/20_admin_perfis.png" alt="Perfis de Acesso" />
+    <div class="screenshot-label">Perfis de Acesso — lista de perfis com indicação de perfis do sistema (não editáveis)</div>
+  </div>
+
+  <p>Perfis definem quais funcionalidades cada usuário pode acessar dentro de cada empresa. <strong>Perfis do sistema</strong> são criados automaticamente e não podem ser alterados.</p>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <div>Um mesmo usuário pode ter <strong>perfis diferentes em empresas diferentes</strong>. O perfil é definido no momento da vinculação do usuário à empresa.</div>
+  </div>
+</section>
+
+<hr />
+
+<!-- ════════════════ ATALHOS ════════════════ -->
+<section>
+  <h2>Atalhos de Teclado</h2>
+  <table>
+    <thead><tr><th>Atalho</th><th>Ação</th><th>Onde</th></tr></thead>
+    <tbody>
+      <tr><td><kbd>Ctrl+B</kbd></td><td>Recolher / expandir barra lateral</td><td>Qualquer página</td></tr>
+      <tr><td><kbd>Ctrl+N</kbd></td><td>Novo registro</td><td>Empresas, Plano de Contas</td></tr>
+      <tr><td><kbd>Ctrl+R</kbd></td><td>Atualizar lista</td><td>Empresas, Plano de Contas</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Fechar modal / janela</td><td>Qualquer modal</td></tr>
+      <tr><td><kbd>Enter</kbd></td><td>Submeter formulário de login</td><td>Tela de Login</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</div><!-- /container -->
+</body>
+</html>

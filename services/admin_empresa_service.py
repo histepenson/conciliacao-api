@@ -2,9 +2,16 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from core.protheus import encrypt_password
 from models import Empresa, UsuarioEmpresa, Usuario, Perfil, AuditLog, AuditAction
+
+_UPDATABLE_FIELDS = [
+    "nome", "cnpj", "status", "permite_efetivar_divergente",
+    "protheus_tenant", "protheus_url", "protheus_rest_prefix", "protheus_user",
+]
 
 
 def _now_utc() -> datetime:
@@ -22,20 +29,33 @@ def _log_audit(db: Session, usuario_id: Optional[int], empresa_id: Optional[int]
         )
     )
 
-def listar_empresas(db: Session) -> List[Empresa]:
-    return db.query(Empresa).all()
+def listar_empresas(db: Session) -> List[dict]:
+    counts = {
+        row.empresa_id: row.total
+        for row in db.query(
+            UsuarioEmpresa.empresa_id,
+            func.count(UsuarioEmpresa.usuario_id).label("total")
+        ).group_by(UsuarioEmpresa.empresa_id).all()
+    }
+    empresas = db.query(Empresa).all()
+    result = []
+    for e in empresas:
+        d = {c.name: getattr(e, c.name) for c in e.__table__.columns}
+        d["usuarios_count"] = counts.get(e.id, 0)
+        result.append(d)
+    return result
 
 
 def obter_empresa(db: Session, empresa_id: int) -> Empresa:
     empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
     if not empresa:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa não encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empresa nao encontrada")
     return empresa
 
 
 def criar_empresa(db: Session, data: dict, created_by: Optional[int] = None) -> Empresa:
     if db.query(Empresa).filter(Empresa.cnpj == data.get("cnpj")).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CNPJ já cadastrado")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CNPJ ja cadastrado")
 
     empresa = Empresa(
         nome=data.get("nome"),
@@ -52,9 +72,15 @@ def criar_empresa(db: Session, data: dict, created_by: Optional[int] = None) -> 
 
 def atualizar_empresa(db: Session, empresa_id: int, data: dict, updated_by: Optional[int] = None) -> Empresa:
     empresa = obter_empresa(db, empresa_id)
-    for field in ["nome", "cnpj", "status", "permite_efetivar_divergente"]:
+
+    for field in _UPDATABLE_FIELDS:
         if field in data and data[field] is not None:
             setattr(empresa, field, data[field])
+
+    if "protheus_password" in data:
+        raw = data["protheus_password"]
+        empresa.protheus_password = encrypt_password(raw) if raw else None
+
     empresa.updated_by = updated_by
     empresa.updated_at = _now_utc()
     _log_audit(db, updated_by, empresa.id, AuditAction.UPDATE, "empresa", empresa.id)

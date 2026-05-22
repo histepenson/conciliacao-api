@@ -6,7 +6,7 @@ from db import Base
 
 
 class AuditLog(Base):
-    """Modelo para log de auditoria de ações do sistema."""
+    """Modelo para log de auditoria de acoes do sistema."""
 
     __tablename__ = "audit_log"
     __table_args__ = {"schema": "concilia"}
@@ -44,9 +44,9 @@ class AuditLog(Base):
         return f"<AuditLog(id={self.id}, action='{self.action}', entity_type='{self.entity_type}')>"
 
 
-# Constantes de ações para auditoria
+# Constantes de acoes para auditoria
 class AuditAction:
-    """Constantes para tipos de ação no audit log."""
+    """Constantes para tipos de acao no audit log."""
 
     # Auth
     LOGIN = "LOGIN"

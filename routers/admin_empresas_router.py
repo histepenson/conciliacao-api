@@ -18,7 +18,7 @@ from services.admin_empresa_service import (
 router = APIRouter(prefix="/admin/empresas", tags=["Admin - Empresas"])
 
 
-@router.get("/", response_model=list[EmpresaResponse])
+@router.get("", response_model=list[EmpresaResponse])
 def admin_listar_empresas(
     db: Session = Depends(get_db),
     _admin=Depends(require_admin),
@@ -35,7 +35,7 @@ def admin_obter_empresa(
     return obter_empresa(db, empresa_id)
 
 
-@router.post("/", response_model=EmpresaResponse)
+@router.post("", response_model=EmpresaResponse)
 def admin_criar_empresa(
     payload: EmpresaCreate,
     db: Session = Depends(get_db),

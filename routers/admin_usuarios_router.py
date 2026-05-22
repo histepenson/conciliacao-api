@@ -22,10 +22,10 @@ from services.admin_user_service import (
 )
 
 
-router = APIRouter(prefix="/admin/usuarios", tags=["Admin - Usuários"])
+router = APIRouter(prefix="/admin/usuarios", tags=["Admin - Usuarios"])
 
 
-@router.get("/", response_model=list[UsuarioListOut])
+@router.get("", response_model=list[UsuarioListOut])
 def admin_listar_usuarios(
     db: Session = Depends(get_db),
     _admin=Depends(require_admin),
@@ -42,7 +42,7 @@ def admin_obter_usuario(
     return obter_usuario(db, usuario_id)
 
 
-@router.post("/", response_model=UsuarioOut)
+@router.post("", response_model=UsuarioOut)
 def admin_criar_usuario(
     payload: UsuarioCreate,
     db: Session = Depends(get_db),

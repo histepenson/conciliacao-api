@@ -15,7 +15,21 @@ passlib[bcrypt]>=1.7.4
 bcrypt<4
 pydantic-settings>=2.0.0
 
+# HTTP client (proxy Protheus)
+httpx>=0.27.0
+
 # Email
 aiosmtplib>=3.0.0
 jinja2>=3.1.0
 pydantic[email]
+
+# Certificado Digital e NF-e
+cryptography>=42.0.0
+
+# Estoque — relatórios e agendamento
+reportlab>=4.1.0
+apscheduler>=3.10.0
+
+# Cargas Protheus em background
+redis>=5.0.0
+rq>=1.16.0

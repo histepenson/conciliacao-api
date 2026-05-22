@@ -38,12 +38,12 @@ class DashboardService:
     def _get_data_formatada(self) -> str:
         """Retorna data atual formatada."""
         meses = [
-            "", "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+            "", "janeiro", "fevereiro", "marco", "abril", "maio", "junho",
             "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
         ]
         dias_semana = [
-            "segunda-feira", "terça-feira", "quarta-feira",
-            "quinta-feira", "sexta-feira", "sábado", "domingo"
+            "segunda-feira", "terca-feira", "quarta-feira",
+            "quinta-feira", "sexta-feira", "sabado", "domingo"
         ]
 
         agora = datetime.now()
@@ -171,7 +171,7 @@ class DashboardService:
         if pendentes > 0:
             alertas.append(AlertaPendencia(
                 tipo="warning",
-                mensagem=f"{pendentes} conta(s) pendente(s) de conciliação este mês",
+                mensagem=f"{pendentes} conta(s) pendente(s) de conciliacao este mes",
                 acao_url="/conciliacoes/periodo"
             ))
 
@@ -188,7 +188,7 @@ class DashboardService:
         if contas_mes_anterior < total_contas and total_contas > 0:
             faltantes = total_contas - contas_mes_anterior
             nomes_meses = [
-                "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                "", "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
                 "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
             ]
             alertas.append(AlertaPendencia(
@@ -200,7 +200,7 @@ class DashboardService:
         if not alertas:
             alertas.append(AlertaPendencia(
                 tipo="success",
-                mensagem="Todas as conciliações estão em dia!",
+                mensagem="Todas as conciliacoes estao em dia!",
                 acao_url=None
             ))
 

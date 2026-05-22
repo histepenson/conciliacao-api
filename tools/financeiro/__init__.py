@@ -1,11 +1,11 @@
 """
 Pacote de processamento financeiro.
 
-Este pacote contém módulos para normalização de planilhas financeiras:
+Este pacote contem modulos para normalizacao de planilhas financeiras:
 - Contas a Receber (clientes)
 - Contas a Pagar (fornecedores)
 
-Uso básico:
+Uso basico:
     >>> from tools.financeiro import normalizar_planilha, TipoFinanceiro
     >>>
     >>> # Contas a Receber
@@ -14,7 +14,7 @@ Uso básico:
     >>> # Contas a Pagar
     >>> df_pagar = normalizar_planilha(dados, TipoFinanceiro.CONTAS_PAGAR)
 
-Para compatibilidade com código legado:
+Para compatibilidade com codigo legado:
     >>> from tools.financeiro import normalizar_planilha_financeira
     >>> df = normalizar_planilha_financeira(dados)  # Contas a Receber
 """
@@ -28,7 +28,7 @@ from .base import (
     ResultadoValidacaoLayout,
 )
 
-# Processadores específicos
+# Processadores especificos
 from .contas_receber import (
     ProcessadorContasReceber,
     normalizar_planilha_financeira,
@@ -52,7 +52,7 @@ from .factory import (
     validar_layout_planilha,
 )
 
-# Utilitários base (para uso avançado)
+# Utilitarios base (para uso avancado)
 from .base import (
     normalizar_nome_colunas,
     obter_coluna,
@@ -80,11 +80,11 @@ __all__ = [
     "ProcessadorContasReceber",
     "ProcessadorContasPagar",
 
-    # Funções Contas a Receber
+    # Funcoes Contas a Receber
     "normalizar_planilha_financeira",
     "normalizar_planilha_financeira_detalhada",
 
-    # Funções Contas a Pagar
+    # Funcoes Contas a Pagar
     "normalizar_planilha_contas_pagar",
     "normalizar_planilha_contas_pagar_detalhada",
 
@@ -97,7 +97,7 @@ __all__ = [
     "normalizar_planilha_detalhada",
     "validar_layout_planilha",
 
-    # Utilitários
+    # Utilitarios
     "normalizar_nome_colunas",
     "obter_coluna",
     "obter_coluna_opcional",

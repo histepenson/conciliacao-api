@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema - Add efetivacao columns to conciliacoes table."""
 
-    # Adicionar colunas de efetivação na tabela conciliacoes
+    # Adicionar colunas de efetivacao na tabela conciliacoes
     op.add_column(
         'conciliacoes',
         sa.Column('status', sa.String(length=20), nullable=False, server_default='PROCESSADA'),
@@ -48,7 +48,7 @@ def upgrade() -> None:
         schema='concilia'
     )
 
-    # Criar índices
+    # Criar indices
     op.create_index(
         'ix_conciliacoes_status',
         'conciliacoes',
@@ -83,7 +83,7 @@ def upgrade() -> None:
         ondelete='SET NULL'
     )
 
-    # Criar índice composto para busca de contas efetivadas por empresa/período
+    # Criar indice composto para busca de contas efetivadas por empresa/periodo
     op.create_index(
         'ix_conciliacoes_empresa_periodo_status',
         'conciliacoes',
@@ -96,13 +96,13 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema - Remove efetivacao columns from conciliacoes table."""
 
-    # Remover índice composto
+    # Remover indice composto
     op.drop_index('ix_conciliacoes_empresa_periodo_status', table_name='conciliacoes', schema='concilia')
 
     # Remover FK
     op.drop_constraint('fk_conciliacoes_usuario_responsavel', 'conciliacoes', schema='concilia', type_='foreignkey')
 
-    # Remover índices
+    # Remover indices
     op.drop_index('ix_conciliacoes_data_efetivacao', table_name='conciliacoes', schema='concilia')
     op.drop_index('ix_conciliacoes_usuario_responsavel', table_name='conciliacoes', schema='concilia')
     op.drop_index('ix_conciliacoes_status', table_name='conciliacoes', schema='concilia')

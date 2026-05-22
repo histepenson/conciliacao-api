@@ -9,7 +9,6 @@ __pycache__/
 venv/
 
 # Env
-.env
 .env.*
 # OS / IDE
 .vscode/
@@ -17,3 +16,20 @@ venv/
 .DS_Store
 nul
 NUL
+
+# Logs
+*.log
+uvicorn_*.log
+
+# Docs — dependências e capturas locais
+docs/node_modules/
+docs/package-lock.json
+docs/screenshots/
+
+# Arquivos temporários / artefatos
+=*
+data/
+
+# Scripts locais com credenciais
+copy_db.py
+dump_prod.dump

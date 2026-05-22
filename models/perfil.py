@@ -7,7 +7,7 @@ from db import Base
 
 
 class Perfil(Base):
-    """Modelo de Perfil (Role) de permissões."""
+    """Modelo de Perfil (Role) de permissoes."""
 
     __tablename__ = "perfil"
     __table_args__ = {"schema": "concilia"}
@@ -34,7 +34,7 @@ class Perfil(Base):
         return f"<Perfil(id={self.id}, nome='{self.nome}')>"
 
     def has_permission(self, permission: str) -> bool:
-        """Verifica se o perfil tem uma permissão específica."""
+        """Verifica se o perfil tem uma permissao especifica."""
         if "*" in self.permissoes:
             return True
 

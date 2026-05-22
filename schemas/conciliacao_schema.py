@@ -1,4 +1,4 @@
-﻿from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any
 from pydantic import BaseModel, Field
 
 # =======================
@@ -10,13 +10,65 @@ class BaseOrigem(BaseModel):
     tipo: Optional[str] = None  # "contas_receber" ou "contas_pagar"
 
 
+class Ctbr140Params(BaseModel):
+    """
+    Parametros para buscar o balancete CTBR140 diretamente do Protheus.
+    Quando presente em BaseContabilFiltrada, o backend busca os dados
+    automaticamente via ZCTBR140API -- nao e necessario enviar 'registros'.
+    """
+    data_fim: str                              # YYYYMMDD -- obrigatorio
+    data_ini: Optional[str] = None            # YYYYMMDD -- default: 01/01 do ano de data_fim
+    conta_de: Optional[str] = None
+    conta_ate: Optional[str] = None
+    item_de: Optional[str] = None
+    item_ate: Optional[str] = None
+    vlr_zerado: Optional[str] = None          # 1=inclui zeros  2=exclui
+    moeda: Optional[str] = None               # default: 1
+    tp_lanc: Optional[str] = None             # tipo de lancamento (vazio = todos)
+    sld_ant_lp: Optional[str] = None          # 1=usa data_lp  2=usa data_ini-1
+    data_lp: Optional[str] = None             # YYYYMMDD -- data base LP
+    consid_filiais: Optional[str] = None      # 1=range  2=filial corrente
+    filial_de: Optional[str] = None
+    filial_ate: Optional[str] = None
+    protheus_url: Optional[str] = None        # sobrescreve PROTHEUS_URL do .env
+
+
 class BaseContabilFiltrada(BaseModel):
-    registros: List[Dict[str, Any]]
+    # registros pode vir vazio quando ctbr140_params estiver preenchido
+    registros: List[Dict[str, Any]] = Field(default_factory=list)
     conta_contabil: str
+    ctbr140_params: Optional[Ctbr140Params] = None  # busca automatica via Protheus
+
+
+class Ctbr480Params(BaseModel):
+    """
+    Parametros para buscar o razao contabil CTBR480 diretamente do Protheus.
+    Quando presente em BaseContabilGeral, o backend busca os dados
+    automaticamente via ZCTBR480API -- nao e necessario enviar 'registros'.
+    """
+    data_fim: str                              # YYYYMMDD -- obrigatorio
+    data_ini: Optional[str] = None            # YYYYMMDD -- default: 01/01 do ano de data_fim
+    item_de: Optional[str] = None             # CTD_ITEM inicio   (par01)
+    item_ate: Optional[str] = None            # CTD_ITEM fim       (par02)
+    conta_de: Optional[str] = None            # CT1_CONTA inicio  (par12)
+    conta_ate: Optional[str] = None           # CT1_CONTA fim      (par13)
+    custo_de: Optional[str] = None            # CTT_CUSTO inicio  (par15)
+    custo_ate: Optional[str] = None           # CTT_CUSTO fim      (par16)
+    clvl_de: Optional[str] = None             # CTH_CLVL inicio   (par18)
+    clvl_ate: Optional[str] = None            # CTH_CLVL fim       (par19)
+    moeda: Optional[str] = None               # default: 1         (par05)
+    saldo: Optional[str] = None               # CQ5_TPSALD default: "1" (par06)
+    vlr_zerado: Optional[str] = None          # 1=inclui zeros 2=exclui (par27)
+    consid_filiais: Optional[str] = None      # 1=range 2=filial corrente (par29)
+    filial_de: Optional[str] = None
+    filial_ate: Optional[str] = None
+    protheus_url: Optional[str] = None        # sobrescreve PROTHEUS_URL do .env
 
 
 class BaseContabilGeral(BaseModel):
-    registros: List[Dict[str, Any]]
+    # registros pode vir vazio quando ctbr480_params estiver preenchido
+    registros: List[Dict[str, Any]] = Field(default_factory=list)
+    ctbr480_params: Optional[Ctbr480Params] = None  # busca automatica via Protheus
 
 
 class RequestConciliacao(BaseModel):
@@ -27,7 +79,7 @@ class RequestConciliacao(BaseModel):
 
 
 # =======================
-# SAÍDA
+# SAIDA
 # =======================
 
 class DiferencaOrigemMaior(BaseModel):
@@ -58,7 +110,7 @@ class DiferencaContabilidadeMaior(BaseModel):
 
 
 class OrigemLancamento(BaseModel):
-    """Representa uma origem identificada no razão geral para um lançamento SO_CONTABILIDADE."""
+    """Representa uma origem identificada no razao geral para um lancamento SO_CONTABILIDADE."""
     conta_origem: str
     descricao_conta: str = ""
     valor: float
@@ -70,7 +122,7 @@ class OrigemLancamento(BaseModel):
 
 
 class AnaliseContabilProfunda(BaseModel):
-    """Análise detalhada de um registro SO_CONTABILIDADE com busca no razão geral."""
+    """Analise detalhada de um registro SO_CONTABILIDADE com busca no razao geral."""
     codigo: str
     nome: str
     valor_contabilidade: float
@@ -122,5 +174,6 @@ class RelatorioConsolidacao(BaseModel):
     analise_detalhada: List[AnaliseDiferencaDetalhada] = []
     resumo_analise: Optional[ResumoAnaliseDetalhada] = None
     analise_profunda_contabil: List[AnaliseContabilProfunda] = []
+    analise_movimentos_mes: Optional[Dict[str, Any]] = None
     observacoes: List[str] = []
     alertas: List[str] = []

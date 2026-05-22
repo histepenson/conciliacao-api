@@ -5,7 +5,7 @@ from db import Base
 
 
 class UserSession(Base):
-    """Modelo para sessões de usuário (para invalidação)."""
+    """Modelo para sessoes de usuario (para invalidacao)."""
 
     __tablename__ = "user_session"
     __table_args__ = {"schema": "concilia"}
@@ -44,16 +44,16 @@ class UserSession(Base):
 
     @property
     def is_expired(self) -> bool:
-        """Verifica se a sessão expirou."""
+        """Verifica se a sessao expirou."""
         from datetime import datetime, timezone
         return datetime.now(timezone.utc) > self.expires_at
 
     @property
     def is_revoked(self) -> bool:
-        """Verifica se a sessão foi revogada."""
+        """Verifica se a sessao foi revogada."""
         return self.revoked_at is not None
 
     @property
     def is_valid(self) -> bool:
-        """Verifica se a sessão é válida."""
+        """Verifica se a sessao e valida."""
         return not self.is_expired and not self.is_revoked

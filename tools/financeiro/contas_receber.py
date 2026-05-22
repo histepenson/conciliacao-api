@@ -1,12 +1,12 @@
 """
-Módulo de processamento de Contas a Receber.
+Modulo de processamento de Contas a Receber.
 
 Processa planilhas de contas a receber (clientes) extraindo:
-- Código do cliente (formato C{base}{loja})
+- Codigo do cliente (formato C{base}{loja})
 - Nome do cliente
 - Valor total (vencido + a vencer)
 - Dias vencidos
-- Classificação de prazo
+- Classificacao de prazo
 """
 
 import logging
@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# CONFIGURAÇÃO DE COLUNAS PARA CONTAS A RECEBER
+# CONFIGURACAO DE COLUNAS PARA CONTAS A RECEBER
 # =============================================================================
 
 CONFIGURACAO_CONTAS_RECEBER = ConfiguracaoColunas(
-    # Colunas de identificação do cliente
+    # Colunas de identificacao do cliente
     codigo_cliente=[
         "codigo_lj_nome_do_cliente",
         "codigo_lj_nome_do_cliente_",
@@ -58,7 +58,7 @@ CONFIGURACAO_CONTAS_RECEBER = ConfiguracaoColunas(
         "a_vencer",
     ],
 
-    # Colunas de valor único (quando não há separação vencido/a vencer)
+    # Colunas de valor unico (quando nao ha separacao vencido/a vencer)
     valor_unico=[
         "valor_corrigido",
         "valor_total",
@@ -82,7 +82,7 @@ CONFIGURACAO_CONTAS_RECEBER = ConfiguracaoColunas(
         "dt_vencimento",
     ],
 
-    # Colunas de data de emissão
+    # Colunas de data de emissao
     data_emissao=[
         "data_de_emissao",
         "data_emissao",
@@ -90,7 +90,7 @@ CONFIGURACAO_CONTAS_RECEBER = ConfiguracaoColunas(
         "emissao",
     ],
 
-    # Colunas de número do documento
+    # Colunas de numero do documento
     numero_documento=[
         "prf_numero",
         "prf_num",
@@ -107,7 +107,7 @@ CONFIGURACAO_CONTAS_RECEBER = ConfiguracaoColunas(
         "parcela_num",
     ],
 
-    # Colunas de tipo do título (TP)
+    # Colunas de tipo do titulo (TP)
     tipo_titulo=[
         "tp",
         "tipo",
@@ -117,7 +117,7 @@ CONFIGURACAO_CONTAS_RECEBER = ConfiguracaoColunas(
         "tipo_tit",
     ],
 
-    # Substrings para busca flexível de valor vencido
+    # Substrings para busca flexivel de valor vencido
     substrings_vencido=[
         ["tit", "vencidos", "valor", "corrigido"],
         ["tit", "venc", "valor", "corrig"],
@@ -125,7 +125,7 @@ CONFIGURACAO_CONTAS_RECEBER = ConfiguracaoColunas(
         ["valor", "vencido"],
     ],
 
-    # Substrings para busca flexível de valor a vencer
+    # Substrings para busca flexivel de valor a vencer
     substrings_a_vencer=[
         ["titulos", "a_vencer", "valor", "atual"],
         ["tit", "a_vencer", "valor", "atual"],
@@ -144,8 +144,8 @@ class ProcessadorContasReceber(ProcessadorFinanceiroBase):
     Processador especializado para planilhas de Contas a Receber.
 
     Herda da classe base e implementa especificidades de contas a receber:
-    - Prefixo "C" para códigos de cliente
-    - Mapeamento de colunas específico para recebíveis
+    - Prefixo "C" para codigos de cliente
+    - Mapeamento de colunas especifico para recebiveis
 
     Exemplo de uso:
         >>> processador = ProcessadorContasReceber()
@@ -155,7 +155,7 @@ class ProcessadorContasReceber(ProcessadorFinanceiroBase):
     """
 
     def __init__(self):
-        """Inicializa o processador com configuração de Contas a Receber."""
+        """Inicializa o processador com configuracao de Contas a Receber."""
         super().__init__(CONFIGURACAO_CONTAS_RECEBER)
 
     def get_tipo(self) -> TipoFinanceiro:
@@ -163,19 +163,19 @@ class ProcessadorContasReceber(ProcessadorFinanceiroBase):
         return TipoFinanceiro.CONTAS_RECEBER
 
     def get_prefixo_codigo(self) -> str:
-        """Retorna o prefixo para códigos de cliente."""
+        """Retorna o prefixo para codigos de cliente."""
         return "C"
 
 
 # =============================================================================
-# FUNÇÕES DE CONVENIÊNCIA (COMPATIBILIDADE COM CÓDIGO LEGADO)
+# FUNCOES DE CONVENIENCIA (COMPATIBILIDADE COM CODIGO LEGADO)
 # =============================================================================
 
 _processador = None
 
 
 def _get_processador() -> ProcessadorContasReceber:
-    """Retorna instância singleton do processador."""
+    """Retorna instancia singleton do processador."""
     global _processador
     if _processador is None:
         _processador = ProcessadorContasReceber()
@@ -184,9 +184,9 @@ def _get_processador() -> ProcessadorContasReceber:
 
 def normalizar_planilha_financeira(entrada: Any) -> pd.DataFrame:
     """
-    Normaliza planilha de contas a receber e agrupa por código.
+    Normaliza planilha de contas a receber e agrupa por codigo.
 
-    Esta função mantém compatibilidade com o código legado.
+    Esta funcao mantem compatibilidade com o codigo legado.
 
     Args:
         entrada: DataFrame ou caminho para arquivo Excel
@@ -201,7 +201,7 @@ def normalizar_planilha_financeira_detalhada(entrada: Any) -> pd.DataFrame:
     """
     Normaliza planilha de contas a receber mantendo detalhes.
 
-    Esta função mantém compatibilidade com o código legado.
+    Esta funcao mantem compatibilidade com o codigo legado.
 
     Args:
         entrada: DataFrame ou caminho para arquivo Excel

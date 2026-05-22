@@ -1,5 +1,5 @@
 """
-Router para endpoints de efetivação de conciliações.
+Router para endpoints de efetivacao de conciliacoes.
 """
 import logging
 import json
@@ -24,33 +24,33 @@ from schemas.efetivacao_schema import (
 )
 from services.efetivacao_service import EfetivacaoService
 
-router = APIRouter(prefix="/conciliacoes", tags=["Efetivação"])
+router = APIRouter(prefix="/conciliacoes", tags=["Efetivacao"])
 logger = logging.getLogger(__name__)
 
 
 @router.post("/efetivar", response_model=EfetivarConciliacaoResponse, status_code=201)
 async def efetivar_conciliacao(
-    dados: str = Form(..., description="JSON com dados da conciliação"),
+    dados: str = Form(..., description="JSON com dados da conciliacao"),
     arquivo_origem: UploadFile = File(..., description="Arquivo Excel original de origem"),
-    arquivo_contabil_filtrado: UploadFile = File(..., description="Arquivo Excel contábil filtrado"),
-    arquivo_contabil_geral: UploadFile = File(..., description="Arquivo Excel contábil geral (razão)"),
+    arquivo_contabil_filtrado: UploadFile = File(..., description="Arquivo Excel contabil filtrado"),
+    arquivo_contabil_geral: UploadFile = File(..., description="Arquivo Excel contabil geral (razao)"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Efetiva uma conciliação.
+    Efetiva uma conciliacao.
 
     Requisitos:
-    - Não deve haver divergências (situação deve ser CONCILIADO)
-    - Período não pode ter sido efetivado anteriormente
+    - Nao deve haver divergencias (situacao deve ser CONCILIADO)
+    - Periodo nao pode ter sido efetivado anteriormente
 
-    Esta operação:
-    1. Valida o resultado da conciliação
-    2. Salva arquivos originais e normalizados em estrutura hierárquica
+    Esta operacao:
+    1. Valida o resultado da conciliacao
+    2. Salva arquivos originais e normalizados em estrutura hierarquica
     3. Cria registros no banco de dados
-    4. É irreversível (somente admin pode excluir)
+    4. E irreversivel (somente admin pode excluir)
     """
-    logger.info(f"Efetivando conciliação - usuário: {current_user.user_id}")
+    logger.info(f"Efetivando conciliacao - usuario: {current_user.user_id}")
 
     # Parse dos dados JSON
     try:
@@ -59,15 +59,15 @@ async def efetivar_conciliacao(
     except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"JSON inválido: {str(e)}"
+            detail=f"JSON invalido: {str(e)}"
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Dados inválidos: {str(e)}"
+            detail=f"Dados invalidos: {str(e)}"
         )
 
-    # Validar acesso à empresa
+    # Validar acesso a empresa
     if not current_user.is_admin and current_user.empresa_id != request.empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -94,7 +94,7 @@ async def efetivar_conciliacao(
 
     return EfetivarConciliacaoResponse(
         id=conciliacao.id,
-        message="Conciliação efetivada com sucesso",
+        message="Conciliacao efetivada com sucesso",
         status=StatusConciliacao.EFETIVADA,
         data_efetivacao=conciliacao.data_efetivacao
     )
@@ -102,23 +102,23 @@ async def efetivar_conciliacao(
 
 @router.get("/efetivadas", response_model=ListaConciliacoesEfetivadas)
 async def listar_conciliacoes_efetivadas(
-    empresa_id: int = Query(..., description="ID da empresa (obrigatório)"),
-    ano: int = Query(..., ge=2000, le=2100, description="Ano do período (obrigatório)"),
-    mes: int = Query(..., ge=1, le=12, description="Mês do período 1-12 (obrigatório)"),
+    empresa_id: int = Query(..., description="ID da empresa (obrigatorio)"),
+    ano: int = Query(..., ge=2000, le=2100, description="Ano do periodo (obrigatorio)"),
+    mes: int = Query(..., ge=1, le=12, description="Mes do periodo 1-12 (obrigatorio)"),
     skip: int = Query(0, ge=0, description="Registros a pular"),
-    limit: int = Query(50, ge=1, le=100, description="Máximo de registros"),
+    limit: int = Query(50, ge=1, le=100, description="Maximo de registros"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Lista todas as conciliações efetivadas para uma empresa/período.
+    Lista todas as conciliacoes efetivadas para uma empresa/periodo.
 
-    Filtros obrigatórios:
+    Filtros obrigatorios:
     - empresa_id: ID da empresa
-    - ano: Ano do período
-    - mes: Mês do período (1-12)
+    - ano: Ano do periodo
+    - mes: Mes do periodo (1-12)
     """
-    # Validar acesso à empresa
+    # Validar acesso a empresa
     if not current_user.is_admin and current_user.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -147,16 +147,16 @@ async def listar_conciliacoes_efetivadas(
 @router.get("/contas-efetivadas", response_model=ContasEfetivadas)
 async def listar_contas_efetivadas(
     empresa_id: int = Query(..., description="ID da empresa"),
-    periodo: str = Query(..., description="Período no formato YYYY-MM"),
+    periodo: str = Query(..., description="Periodo no formato YYYY-MM"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Lista IDs das contas já efetivadas para uma empresa/período.
+    Lista IDs das contas ja efetivadas para uma empresa/periodo.
 
-    Usado para desabilitar contas na tela de seleção de conciliação.
+    Usado para desabilitar contas na tela de selecao de conciliacao.
     """
-    # Validar acesso à empresa
+    # Validar acesso a empresa
     if not current_user.is_admin and current_user.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -177,12 +177,12 @@ async def obter_detalhes_conciliacao(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Obtém detalhes completos de uma conciliação efetivada.
+    Obtem detalhes completos de uma conciliacao efetivada.
 
-    Retorna o resultado_json completo com todos os dados de análise,
+    Retorna o resultado_json completo com todos os dados de analise,
     na mesma estrutura do resultado original do processamento.
     """
-    # Validar acesso à empresa
+    # Validar acesso a empresa
     if not current_user.is_admin and current_user.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -201,9 +201,9 @@ async def listar_arquivos_conciliacao(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Lista todos os arquivos disponíveis para download de uma conciliação.
+    Lista todos os arquivos disponiveis para download de uma conciliacao.
     """
-    # Validar acesso à empresa
+    # Validar acesso a empresa
     if not current_user.is_admin and current_user.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -245,20 +245,20 @@ async def download_arquivo(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Download de um arquivo de uma conciliação efetivada.
+    Download de um arquivo de uma conciliacao efetivada.
 
     tipo_arquivo:
     - origem: Dados de origem (financeiro)
-    - contabil_filtrado: Dados contábeis filtrados
-    - contabil_geral: Dados contábeis gerais (razão)
-    - relatorio: Relatório final
+    - contabil_filtrado: Dados contabeis filtrados
+    - contabil_geral: Dados contabeis gerais (razao)
+    - relatorio: Relatorio final
 
     formato:
     - original: Arquivo original como foi enviado
     - normalizado: Dados normalizados pelo sistema
     - json: Apenas para relatorio
     """
-    # Validar acesso à empresa
+    # Validar acesso a empresa
     if not current_user.is_admin and current_user.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -307,16 +307,16 @@ async def excluir_conciliacao(
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Exclui uma conciliação efetivada.
+    Exclui uma conciliacao efetivada.
 
-    **REQUER PERMISSÃO DE ADMINISTRADOR**
+    **REQUER PERMISSAO DE ADMINISTRADOR**
 
-    Esta operação:
+    Esta operacao:
     - Remove o registro do banco de dados
     - Remove os arquivos do sistema de arquivos
-    - Registra a ação no audit log
+    - Registra a acao no audit log
     """
-    # Validar acesso à empresa
+    # Validar acesso a empresa
     if not current_user.is_admin and current_user.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

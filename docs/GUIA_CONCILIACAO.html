@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Conciliações — Guia de Conciliação</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.65;
+    }
+
+    /* Capa */
+    .cover {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: #fff;
+      padding: 72px 64px;
+    }
+    .cover .label { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; opacity: .65; margin-bottom: 18px; }
+    .cover h1 { font-size: 44px; font-weight: 800; line-height: 1.15; margin-bottom: 12px; }
+    .cover .subtitle { font-size: 17px; opacity: .8; }
+    .cover .meta { margin-top: 36px; font-size: 13px; opacity: .55; }
+
+    /* Container */
+    .container { max-width: 960px; margin: 0 auto; padding: 0 48px 96px; }
+
+    /* Índice */
+    .toc {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 32px 40px;
+      margin: 52px 0 64px;
+    }
+    .toc-title { font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 18px; }
+    .toc ol { padding-left: 22px; }
+    .toc li { margin: 7px 0; }
+    .toc a { color: #2563eb; text-decoration: none; font-size: 15px; font-weight: 500; }
+    .toc a:hover { text-decoration: underline; }
+    .toc ul { list-style: disc; padding-left: 20px; margin-top: 5px; }
+    .toc ul a { font-weight: 400; color: #3b82f6; }
+
+    /* Seções */
+    section { margin-bottom: 80px; scroll-margin-top: 24px; }
+    section > h2 {
+      font-size: 30px;
+      font-weight: 800;
+      color: #0f172a;
+      padding-bottom: 14px;
+      border-bottom: 3px solid #2563eb;
+      margin-bottom: 32px;
+    }
+    h3 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 44px 0 16px; }
+    h4 { font-size: 15px; font-weight: 700; color: #334155; margin: 28px 0 12px; }
+    p { font-size: 15px; color: #475569; margin-bottom: 14px; }
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { font-size: 15px; color: #475569; margin-bottom: 6px; }
+
+    /* Steps */
+    .steps { display: flex; flex-direction: column; gap: 14px; margin: 20px 0; counter-reset: s; }
+    .step { display: flex; gap: 18px; align-items: flex-start; }
+    .step-n {
+      counter-increment: s;
+      content: counter(s);
+      min-width: 32px; height: 32px;
+      background: #2563eb; color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 14px; flex-shrink: 0; margin-top: 1px;
+    }
+    .step-n::after { content: counter(s); }
+    .step-body { flex: 1; padding-top: 4px; }
+    .step-body p { margin-bottom: 4px; }
+    .step-body strong { color: #1e293b; }
+
+    /* Screenshots */
+    .ss {
+      margin: 28px 0 40px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 20px rgba(0,0,0,.10);
+      border: 1px solid #e2e8f0;
+    }
+    .ss img { display: block; width: 100%; }
+    .ss-cap {
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      padding: 9px 18px;
+      font-size: 12.5px;
+      color: #64748b;
+      font-style: italic;
+    }
+
+    /* Callouts */
+    .callout {
+      display: flex; gap: 14px;
+      padding: 14px 18px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-size: 14px; line-height: 1.6;
+    }
+    .callout span { font-size: 18px; flex-shrink: 0; }
+    .info    { background: #eff6ff; border-left: 4px solid #2563eb; color: #1e40af; }
+    .warn    { background: #fffbeb; border-left: 4px solid #f59e0b; color: #92400e; }
+    .success { background: #f0fdf4; border-left: 4px solid #22c55e; color: #166534; }
+    .danger  { background: #fef2f2; border-left: 4px solid #ef4444; color: #991b1b; }
+
+    /* Tabelas */
+    table { width: 100%; border-collapse: collapse; margin: 18px 0 28px; font-size: 14px; }
+    th { background: #f1f5f9; color: #475569; font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; color: #374151; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+
+    /* Badges */
+    .b { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+    .bg { background:#dcfce7; color:#15803d; }
+    .br { background:#fee2e2; color:#b91c1c; }
+    .bo { background:#ffedd5; color:#c2410c; }
+    .bb { background:#dbeafe; color:#1d4ed8; }
+
+    /* Divider */
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 60px 0; }
+
+    /* Flow */
+    .flow { margin: 24px 0 36px; }
+    .flow-step {
+      display: flex; align-items: center; gap: 16px;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+      padding: 14px 20px; margin-bottom: 4px;
+      font-size: 14px; color: #334155;
+    }
+    .flow-step .fn {
+      min-width: 28px; height: 28px;
+      background: #2563eb; color: #fff;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 13px; flex-shrink: 0;
+    }
+    .flow-arrow { text-align: center; color: #94a3b8; font-size: 18px; margin: -1px 0; padding-left: 14px; }
+
+    kbd {
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      border-radius: 4px; padding: 1px 6px;
+      font-size: 12px; font-family: monospace; color: #334155;
+    }
+    code { background: #f1f5f9; border-radius: 4px; padding: 2px 6px; font-size: 13px; color: #0f172a; }
+
+    @media print {
+      body { background: #fff; }
+      .ss { box-shadow: none; page-break-inside: avoid; }
+      section { page-break-inside: avoid; }
+      .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- CAPA -->
+<div class="cover">
+  <div class="label">Smart Conciliações · Guia do Usuário</div>
+  <h1>Módulo de<br>Conciliação</h1>
+  <div class="subtitle">Passo a passo com capturas de tela</div>
+  <div class="meta">Versão 1.0 &nbsp;·&nbsp; Maio de 2026</div>
+</div>
+
+<div class="container">
+
+<!-- ÍNDICE -->
+<nav class="toc">
+  <div class="toc-title">Índice</div>
+  <ol>
+    <li><a href="#acesso">Acessar o Sistema</a></li>
+    <li><a href="#visao-geral">Visão Geral — Menu e Dashboard</a></li>
+    <li><a href="#fluxo">Fluxo de Conciliação</a></li>
+    <li>
+      <a href="#passo1">Passo 1 — Selecionar Período</a>
+      <ul>
+        <li><a href="#empresa">Selecionar Empresa e Data-Base</a></li>
+        <li><a href="#conta">Selecionar Conta e Tipo</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#passo2">Passo 2 — Configurar Fontes de Dados</a>
+      <ul>
+        <li><a href="#api-protheus">Via API Protheus (recomendado)</a></li>
+        <li><a href="#arquivo-excel">Via Arquivo Excel (alternativa)</a></li>
+        <li><a href="#params-ctbr140">Parâmetros CTBR140</a></li>
+        <li><a href="#params-ctbr480">Parâmetros CTBR480</a></li>
+        <li><a href="#params-finr">Parâmetros FINR130 / FINR150</a></li>
+      </ul>
+    </li>
+    <li><a href="#passo3">Passo 3 — Processar</a></li>
+    <li>
+      <a href="#passo4">Passo 4 — Analisar o Resultado</a>
+      <ul>
+        <li><a href="#resumo">Resumo Geral</a></li>
+        <li><a href="#tabela">Tabela de Diferenças</a></li>
+        <li><a href="#analise">Análise Detalhada por Código</a></li>
+      </ul>
+    </li>
+    <li><a href="#passo5">Passo 5 — Efetivar a Conciliação</a></li>
+    <li><a href="#acompanhamento">Acompanhamento de Fechamentos</a></li>
+    <li><a href="#tipos">Outros Tipos de Conciliação</a></li>
+    <li><a href="#glossario">Glossário</a></li>
+  </ol>
+</nav>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 1. ACESSO                                  -->
+<!-- ══════════════════════════════════════════ -->
+<section id="acesso">
+  <h2>1. Acessar o Sistema</h2>
+
+  <p>Acesse o sistema pelo navegador, informe seu <strong>e-mail corporativo</strong> e <strong>senha</strong> e clique em <strong>Entrar</strong>.</p>
+
+  <div class="ss">
+    <img src="screenshots/01_login.png" alt="Tela de Login" />
+    <div class="ss-cap">Tela de Login — informe e-mail e senha para acessar</div>
+  </div>
+
+  <div class="callout info">
+    <span>ℹ️</span>
+    <div>Usuários <strong>administradores</strong> entram diretamente no Dashboard. Usuários comuns com acesso a mais de uma empresa verão primeiro a tela de seleção de empresa.</div>
+  </div>
+
+  <h3>Esqueci minha senha</h3>
+  <p>Clique em <strong>"Esqueci minha senha"</strong> na tela de Login, informe o e-mail cadastrado e aguarde o link no e-mail. O link é válido por <strong>30 minutos</strong>.</p>
+
+  <div class="ss">
+    <img src="screenshots/21_esqueci_senha.png" alt="Recuperação de senha" />
+    <div class="ss-cap">Tela de Recuperação de Senha</div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 2. VISÃO GERAL                             -->
+<!-- ══════════════════════════════════════════ -->
+<section id="visao-geral">
+  <h2>2. Visão Geral — Menu e Dashboard</h2>
+
+  <div class="ss">
+    <img src="screenshots/04_dashboard.png" alt="Dashboard e Menu lateral" />
+    <div class="ss-cap">Dashboard — visão geral do sistema com menu lateral de navegação</div>
+  </div>
+
+  <p>A <strong>barra lateral</strong> à esquerda contém todos os módulos. Pressione <kbd>Ctrl+B</kbd> para recolhê-la e ganhar mais espaço na tela.</p>
+
+  <p>O caminho para a conciliação é: <strong>Conciliações → Conciliar Período</strong>.</p>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 3. FLUXO                                   -->
+<!-- ══════════════════════════════════════════ -->
+<section id="fluxo">
+  <h2>3. Fluxo de Conciliação</h2>
+
+  <div class="flow">
+    <div class="flow-step"><div class="fn">1</div><div><strong>Selecionar Período</strong> — empresa, data-base (último dia do mês) e conta contábil</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="fn">2</div><div><strong>Configurar fontes de dados</strong> — parâmetros da API Protheus (FINR130/150, CTBR140, CTBR480) ou arquivo Excel</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="fn">3</div><div><strong>Processar</strong> — o sistema busca, normaliza e calcula as diferenças automaticamente</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="fn">4</div><div><strong>Analisar resultado</strong> — resumo geral, tabela de diferenças e análise detalhada por código</div></div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step"><div class="fn">5</div><div><strong>Efetivar</strong> — registra oficialmente no histórico para auditoria</div></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Tipo de Conciliação</th><th>Bases utilizadas</th></tr></thead>
+    <tbody>
+      <tr><td><span class="b bb">A Receber</span></td><td>FINR130 · CTBR140 · CTBR480</td></tr>
+      <tr><td><span class="b bb">A Pagar</span></td><td>FINR150 · CTBR140 · CTBR480</td></tr>
+      <tr><td><span class="b bb">Bancária</span></td><td>FINR470 · Razão contábil da conta bancária</td></tr>
+      <tr><td><span class="b bb">Estoque</span></td><td>MATR900 · Saldos de NF-e</td></tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 4. PASSO 1 — SELECIONAR PERÍODO            -->
+<!-- ══════════════════════════════════════════ -->
+<section id="passo1">
+  <h2>4. Passo 1 — Selecionar Período</h2>
+
+  <p>Acesse <strong>Conciliações → Conciliar Período</strong> no menu lateral.</p>
+
+  <div class="ss">
+    <img src="screenshots/banco_01_periodo_vazio.png" alt="Conciliar Período — tela inicial" />
+    <div class="ss-cap">Tela inicial de "Conciliar Período" — selecione a empresa e informe a data-base antes de escolher a conta</div>
+  </div>
+
+  <h3 id="empresa">4.1 Selecionar Empresa e Data-Base</h3>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>No campo <strong>Empresa</strong>, selecione a empresa que será conciliada. A lista exibe apenas as empresas às quais você tem acesso.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>No campo <strong>Data-Base da Conciliação</strong>, informe o <strong>último dia do mês</strong> de referência.</p>
+        <p>Exemplo: para conciliar Janeiro/2026, informe <code>31/01/2026</code>. Use o botão <strong>"Mês Atual"</strong> para preencher automaticamente.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span>⚠️</span>
+    <div>O sistema valida a data automaticamente. Uma mensagem em laranja é exibida se a data não for o último dia do mês: <em>"Informe o último dia do mês (ex: 31/12/2025, 30/11/2025)"</em>. As contas são carregadas normalmente mesmo com o aviso.</div>
+  </div>
+
+  <div class="ss">
+    <img src="screenshots/banco_02_empresa_data.png" alt="Empresa SÃO MIGUEL e data 31/01/2026 selecionados — 268 contas carregadas" />
+    <div class="ss-cap">SÃO MIGUEL PARTICIPAÇÕES · 31/01/2026 — 268 contas conciliáveis listadas automaticamente após a seleção</div>
+  </div>
+
+  <h3 id="conta">4.2 Selecionar Conta e Tipo de Conciliação</h3>
+
+  <p>Após selecionar empresa e data, o sistema carrega a lista de <strong>Contas Contábeis Conciliáveis</strong> na hierarquia do plano de contas. Identifique a conta que deseja conciliar e clique no botão <strong>"Conciliar"</strong>.</p>
+
+  <div class="ss">
+    <img src="screenshots/banco_02b_contas_bancos.png" alt="Lista de contas — seção bancária" />
+    <div class="ss-cap">Lista de contas contábeis — contas com o badge verde "Conciliável" possuem o botão "Conciliar"; contas já efetivadas exibem "✓ Efetivada"</div>
+  </div>
+
+  <p>Ao clicar em <strong>"Conciliar"</strong>, o sistema abre um modal de seleção do tipo de conciliação em até <strong>3 etapas</strong>:</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p><strong>Etapa 1 — Tipo:</strong> Escolha entre <strong>Financeiro</strong> (A Receber / A Pagar / Bancária) ou <strong>Estoque</strong>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p><strong>Etapa 2 — Ativo ou Passivo</strong> (somente para Financeiro): selecione <strong>ATIVO</strong> para Contas a Receber ou <strong>PASSIVO</strong> para Contas a Pagar.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p><strong>Etapa 3 — Subtipo do Ativo</strong> (somente para Ativo): escolha <strong>BANCO</strong> para Conciliação Bancária ou <strong>CONTAS RECEBER</strong> para A Receber.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="ss">
+    <img src="screenshots/banco_modal_1.png" alt="Modal — Etapa 1: Escolha o tipo de conciliação" />
+    <div class="ss-cap">Etapa 1 — escolha entre Financeiro (A Receber / A Pagar / Bancária) ou Estoque</div>
+  </div>
+
+  <div class="ss">
+    <img src="screenshots/banco_modal_2.png" alt="Modal — Etapa 2: ATIVO ou PASSIVO" />
+    <div class="ss-cap">Etapa 2 — ATIVO (Contas a Receber) ou PASSIVO (Contas a Pagar)</div>
+  </div>
+
+  <div class="ss">
+    <img src="screenshots/banco_modal_3.png" alt="Modal — Etapa 3: BANCO ou CONTAS RECEBER" />
+    <div class="ss-cap">Etapa 3 — BANCO (Conciliação Bancária) ou CONTAS RECEBER (títulos a receber)</div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 5. PASSO 2 — FONTES DE DADOS               -->
+<!-- ══════════════════════════════════════════ -->
+<section id="passo2">
+  <h2>5. Passo 2 — Configurar Fontes de Dados</h2>
+
+  <p>A conciliação financeira usa <strong>três bases de dados</strong>. Para cada uma, você pode buscar os dados diretamente do Protheus via API ou carregar um arquivo Excel.</p>
+
+  <table>
+    <thead><tr><th>Base</th><th>Relatório</th><th>O que contém</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Origem (Financeiro)</strong></td>
+        <td>FINR130 · A Receber<br>FINR150 · A Pagar</td>
+        <td>Posição dos títulos por cliente ou fornecedor</td>
+      </tr>
+      <tr>
+        <td><strong>Contábil Filtrado</strong></td>
+        <td>CTBR140 · Balancete</td>
+        <td>Saldo contábil filtrado pela conta que está sendo conciliada</td>
+      </tr>
+      <tr>
+        <td><strong>Contábil Geral (Razão)</strong></td>
+        <td>CTBR480 · Razão Geral</td>
+        <td>Todos os lançamentos da conta — usado na análise detalhada por código</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Após selecionar o tipo de conciliação, o sistema abre a tela de processamento com os cards de carregamento de cada base. Abaixo estão as telas para cada tipo:</p>
+
+  <div class="ss">
+    <img src="screenshots/receber_02_tela.png" alt="Tela de Conciliação A Receber" />
+    <div class="ss-cap">Conciliação A Receber (FINR130) — SÃO MIGUEL · CDA - DISTRIBUIDORA ARAGUAIA · 31/01/2026 — três fontes de dados a carregar</div>
+  </div>
+
+  <div class="ss">
+    <img src="screenshots/pagar_02_tela.png" alt="Tela de Conciliação A Pagar" />
+    <div class="ss-cap">Conciliação A Pagar (FINR150) — SÃO MIGUEL · NIDERA SEMENTES LTDA · 31/01/2026 — mesma estrutura da A Receber</div>
+  </div>
+
+  <div class="ss">
+    <img src="screenshots/banco_03_tela.png" alt="Tela de Conciliação Bancária" />
+    <div class="ss-cap">Conciliação Bancária — SÃO MIGUEL · BANCO DO BRASIL 27985-4 · 31/01/2026 — duas fontes: extrato (FINR470) e razão contábil (CTBR400)</div>
+  </div>
+
+  <h3 id="api-protheus">5.1 Via API Protheus (recomendado)</h3>
+  <p>O sistema busca os dados diretamente no Protheus, sem necessidade de exportar arquivos manualmente.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Na tela de conciliação, clique no botão <strong>"Parâmetros Protheus"</strong> (ícone de engrenagem) ao lado da base que deseja configurar.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Uma janela de parâmetros será aberta. Preencha os campos — <strong>Data Fim é sempre obrigatório</strong>. Os demais são filtros opcionais.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Confirme. Os dados serão buscados automaticamente no momento do processamento.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span>ℹ️</span>
+    <div>A URL e as credenciais do Protheus são configuradas pelo administrador. Se precisar apontar para um ambiente diferente (homologação), informe a <strong>URL do Protheus</strong> no campo disponível no dialog.</div>
+  </div>
+
+  <h3 id="arquivo-excel">5.2 Via Arquivo Excel (alternativa)</h3>
+  <p>Caso a integração com o Protheus não esteja disponível:</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Exporte o relatório correspondente do Protheus em formato <strong>.xlsx</strong>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Arraste o arquivo para a área de carregamento ou clique para selecionar.</p>
+        <p>Formatos aceitos: <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code> — tamanho máximo: <strong>50 MB</strong>. O arquivo é lido localmente no seu computador.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Parâmetros CTBR140 -->
+  <h3 id="params-ctbr140">5.3 Parâmetros do CTBR140 (Balancete Contábil)</h3>
+
+  <table>
+    <thead><tr><th>Campo</th><th>Obrigatório</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Data Fim</strong></td><td><span class="b br">Sim</span></td><td>Data de fechamento do período — formato YYYYMMDD (ex.: <code>20260430</code>)</td></tr>
+      <tr><td>Data Início</td><td>Não</td><td>Início do período (padrão: 01/01 do ano da Data Fim)</td></tr>
+      <tr><td>Conta De / Conta Até</td><td>Não</td><td>Filtra por intervalo de contas contábeis</td></tr>
+      <tr><td>Item De / Item Até</td><td>Não</td><td>Filtra por intervalo de itens ou centros de custo</td></tr>
+      <tr><td>Incluir Valores Zerados</td><td>Não</td><td>Se marcado, inclui contas com saldo zero</td></tr>
+      <tr><td>Moeda</td><td>Não</td><td>Código da moeda (padrão: 1)</td></tr>
+      <tr><td>Considerar Filiais</td><td>Não</td><td>Inclui todas as filiais ou apenas a filial corrente</td></tr>
+      <tr><td>Filial De / Filial Até</td><td>Não</td><td>Intervalo de filiais (quando considera filiais)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Parâmetros CTBR480 -->
+  <h3 id="params-ctbr480">5.4 Parâmetros do CTBR480 (Razão Geral)</h3>
+
+  <table>
+    <thead><tr><th>Campo</th><th>Obrigatório</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Data Fim</strong></td><td><span class="b br">Sim</span></td><td>Data de fechamento do período — formato YYYYMMDD</td></tr>
+      <tr><td>Data Início</td><td>Não</td><td>Início do período</td></tr>
+      <tr><td>Conta De / Conta Até</td><td>Não</td><td>Intervalo de contas contábeis</td></tr>
+      <tr><td>Item De / Item Até</td><td>Não</td><td>Intervalo de itens contábeis</td></tr>
+      <tr><td>Centro de Custo De / Até</td><td>Não</td><td>Intervalo de centros de custo</td></tr>
+      <tr><td>Classe de Valor De / Até</td><td>Não</td><td>Intervalo de classes de valor</td></tr>
+      <tr><td>Moeda</td><td>Não</td><td>Código da moeda (padrão: 1)</td></tr>
+      <tr><td>Incluir Valores Zerados</td><td>Não</td><td>Se marcado, inclui registros com saldo zero</td></tr>
+      <tr><td>Considerar Filiais</td><td>Não</td><td>Inclui todas as filiais ou apenas a filial corrente</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Parâmetros FINR -->
+  <h3 id="params-finr">5.5 Parâmetros do FINR130 / FINR150 (Títulos Financeiros)</h3>
+
+  <table>
+    <thead><tr><th>Campo</th><th>Obrigatório</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Data Fim</strong></td><td><span class="b br">Sim</span></td><td>Data de posição dos títulos — formato YYYYMMDD</td></tr>
+      <tr><td>Data Início</td><td>Não</td><td>Data inicial do filtro</td></tr>
+      <tr><td>Cliente/Fornecedor De / Até</td><td>Não</td><td>Intervalo de clientes (FINR130) ou fornecedores (FINR150)</td></tr>
+      <tr><td>Loja De / Até</td><td>Não</td><td>Intervalo de lojas</td></tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 6. PASSO 3 — PROCESSAR                     -->
+<!-- ══════════════════════════════════════════ -->
+<section id="passo3">
+  <h2>6. Passo 3 — Processar</h2>
+
+  <p>Com as três bases configuradas, clique em <strong>"Processar Conciliação"</strong>.</p>
+
+  <p>O sistema executa automaticamente:</p>
+  <ol>
+    <li>Busca os dados nas APIs do Protheus (quando configurado via parâmetros)</li>
+    <li>Normaliza os dados de cada base — padroniza códigos, nomes de colunas e valores</li>
+    <li>Faz o <strong>merge</strong> entre financeiro e contábil pelo código do cliente/fornecedor</li>
+    <li>Calcula as diferenças (valor absoluto, percentual e classificação)</li>
+    <li>Busca os lançamentos individuais no razão geral (CTBR480) para a análise detalhada</li>
+  </ol>
+
+  <div class="callout info">
+    <span>ℹ️</span>
+    <div>O processamento pode levar alguns segundos a mais quando os dados são buscados via API Protheus, dependendo do volume de registros e da latência com o servidor.</div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 7. PASSO 4 — RESULTADO                     -->
+<!-- ══════════════════════════════════════════ -->
+<section id="passo4">
+  <h2>7. Passo 4 — Analisar o Resultado</h2>
+
+  <p>O resultado é exibido em três seções na mesma tela.</p>
+
+  <h3 id="resumo">7.1 Resumo Geral</h3>
+  <p>Cards no topo da tela mostram os totais consolidados:</p>
+
+  <table>
+    <thead><tr><th>Card</th><th>O que mostra</th></tr></thead>
+    <tbody>
+      <tr><td>Total de Registros</td><td>Quantidade total de códigos após o cruzamento das bases</td></tr>
+      <tr><td>Conciliados</td><td>Registros com diferença ≤ R$ 0,01 <span class="b bg">OK</span></td></tr>
+      <tr><td>Com Divergência</td><td>Registros com diferença acima do threshold <span class="b br">DIVERGENTE</span></td></tr>
+      <tr><td>Taxa de Sucesso</td><td>Percentual de registros conciliados sobre o total</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <span>ℹ️</span>
+    <div>O <strong>threshold</strong> de conciliação é <strong>R$ 0,01</strong>. Diferenças iguais ou menores que este valor são consideradas conciliadas automaticamente (arredondamento contábil).</div>
+  </div>
+
+  <h3 id="tabela">7.2 Tabela de Diferenças</h3>
+  <p>Tabela paginada com todos os registros cruzados. Use os filtros para localizar itens específicos:</p>
+
+  <table>
+    <thead><tr><th>Coluna</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td>Código</td><td>Código do cliente ou fornecedor</td></tr>
+      <tr><td>Cliente / Fornecedor</td><td>Nome</td></tr>
+      <tr><td>Valor Financeiro</td><td>Saldo no sistema financeiro (FINR130/150)</td></tr>
+      <tr><td>Valor Contábil</td><td>Saldo no balancete contábil (CTBR140)</td></tr>
+      <tr><td>Diferença</td><td>Contábil − Financeiro</td></tr>
+      <tr><td>Diferença %</td><td>Percentual da diferença sobre o valor financeiro</td></tr>
+      <tr><td>Tipo</td><td>Classificação: Sem diferença · Financeiro &gt; Contabilidade · Contabilidade &gt; Financeiro · Exclusivo</td></tr>
+      <tr><td>Origem</td><td>Ambos · Só Financeiro · Só Contabilidade</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Filtros disponíveis na tabela</h4>
+  <table>
+    <thead><tr><th>Filtro</th><th>Opções</th></tr></thead>
+    <tbody>
+      <tr><td>Busca</td><td>Por código ou nome do cliente/fornecedor</td></tr>
+      <tr><td>Status</td><td><span class="b bg">OK</span> Conciliado &nbsp;/&nbsp; <span class="b br">Com Diferença</span></td></tr>
+      <tr><td>Origem</td><td>Ambos · Só Financeiro · Só Contabilidade</td></tr>
+      <tr><td>Itens por página</td><td>10 · 20 · 50 · 100</td></tr>
+      <tr><td>Ordenação</td><td>Clique no cabeçalho de qualquer coluna</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="analise">7.3 Análise Detalhada por Código</h3>
+  <p>Para cada código com divergência, o sistema exibe os <strong>lançamentos individuais</strong> encontrados no razão geral (CTBR480), permitindo identificar exatamente quais lançamentos causam a diferença.</p>
+
+  <p>Cada lançamento mostra:</p>
+  <ul>
+    <li>Data do lançamento</li>
+    <li>Histórico / descrição</li>
+    <li>Débito, Crédito e Saldo Atual</li>
+    <li>Status: <span class="b bg">VERDE</span> (conciliado) ou <span class="b br">VERMELHO</span> (divergente)</li>
+    <li>Classificação: <code>CONCILIADO</code> · <code>SÓ_FINANCEIRO</code> · <code>SÓ_CONTABILIDADE</code> · <code>DIVERGENTE_VALOR</code></li>
+  </ul>
+
+  <h4>Exportar resultado</h4>
+  <table>
+    <thead><tr><th>Opção</th><th>Formato</th><th>O que contém</th></tr></thead>
+    <tbody>
+      <tr><td>Exportar CSV</td><td><code>.csv</code></td><td>Tabela de diferenças completa</td></tr>
+      <tr><td>Download Excel</td><td><code>.xlsx</code></td><td>5 abas: Total · Com Diferenças · Só Financeiro · Só Contabilidade · Resumo</td></tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 8. PASSO 5 — EFETIVAR                      -->
+<!-- ══════════════════════════════════════════ -->
+<section id="passo5">
+  <h2>8. Passo 5 — Efetivar a Conciliação</h2>
+
+  <p>Efetivar significa <strong>registrar oficialmente</strong> o resultado no histórico do sistema para fins de auditoria.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Após analisar e confirmar que o resultado está correto, clique em <strong>"Efetivar Conciliação"</strong>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Confirme a operação na janela de confirmação.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>O sistema salva o resultado com <strong>data, hora, usuário e empresa</strong>. A conciliação fica disponível no histórico de Acompanhamento.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span>⚠️</span>
+    <div>Por padrão, o sistema só permite efetivar conciliações <strong>sem divergências</strong>. Se a empresa estiver configurada para aceitar divergências, um alerta será exibido antes da confirmação.</div>
+  </div>
+
+  <div class="callout danger">
+    <span>🗑️</span>
+    <div>Uma efetivação pode ser <strong>excluída</strong> pelo administrador em Conciliações → Acompanhamento. A exclusão remove permanentemente todos os dados do registro e é irreversível.</div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 9. ACOMPANHAMENTO                          -->
+<!-- ══════════════════════════════════════════ -->
+<section id="acompanhamento">
+  <h2>9. Acompanhamento de Fechamentos</h2>
+
+  <p>Acesse <strong>Conciliações → Acompanhamento</strong> para visualizar o histórico de todas as conciliações efetivadas da empresa.</p>
+
+  <div class="ss">
+    <img src="screenshots/10_acompanhamento.png" alt="Acompanhamento de Fechamentos" />
+    <div class="ss-cap">Acompanhamento de Fechamentos — histórico de conciliações efetivadas por empresa, ano e mês</div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Selecione a <strong>Empresa</strong>, o <strong>Ano</strong> e o <strong>Mês</strong>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Clique em <strong>Buscar</strong>. O sistema lista todas as conciliações efetivadas no período informado.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n"></div>
+      <div class="step-body">
+        <p>Clique em qualquer registro para ver o <strong>detalhe completo</strong> ou fazer o <strong>download</strong> do arquivo Excel gerado.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 10. OUTROS TIPOS                           -->
+<!-- ══════════════════════════════════════════ -->
+<section id="tipos">
+  <h2>10. Outros Tipos de Conciliação</h2>
+
+  <h3>Conciliação A Receber</h3>
+  <p>Compara a posição de títulos a receber (<strong>FINR130</strong>) com o balancete contábil (<strong>CTBR140</strong>) e o razão geral (<strong>CTBR480</strong>). No modal, selecione: <em>Financeiro → Ativo → Contas Receber</em>.</p>
+
+  <div class="ss">
+    <img src="screenshots/receber_02_tela.png" alt="Conciliação A Receber" />
+    <div class="ss-cap">Conciliação A Receber — SÃO MIGUEL · CDA - DISTRIBUIDORA ARAGUAIA · 31/01/2026</div>
+  </div>
+
+  <h3>Conciliação A Pagar</h3>
+  <p>O fluxo é idêntico à A Receber, utilizando o <strong>FINR150</strong> (posição de títulos a pagar) como base de origem. No modal, selecione: <em>Financeiro → Passivo</em>.</p>
+
+  <div class="ss">
+    <img src="screenshots/pagar_02_tela.png" alt="Conciliação A Pagar" />
+    <div class="ss-cap">Conciliação A Pagar (FINR150) — SÃO MIGUEL · NIDERA SEMENTES LTDA · 31/01/2026</div>
+  </div>
+
+  <h3>Conciliação Bancária</h3>
+  <p>Compara o extrato bancário do Protheus (<strong>FINR470</strong>) com o razão contábil da conta bancária (<strong>CTBR400</strong>). No modal, selecione: <em>Financeiro → Ativo → Banco</em>.</p>
+
+  <div class="ss">
+    <img src="screenshots/banco_03_tela.png" alt="Conciliação Bancária" />
+    <div class="ss-cap">Conciliação Bancária — SÃO MIGUEL · BANCO DO BRASIL 27985-4 · 31/01/2026</div>
+  </div>
+
+  <h3>Conciliação de Estoque</h3>
+  <p>Compara os saldos do Kardex (<strong>MATR900</strong>) com as NF-e importadas da SEFAZ no sistema. No modal, selecione: <em>Estoque</em>.</p>
+</section>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- 11. GLOSSÁRIO                              -->
+<!-- ══════════════════════════════════════════ -->
+<section id="glossario">
+  <h2>11. Glossário</h2>
+
+  <table>
+    <thead><tr><th>Termo</th><th>Definição</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Conciliação</strong></td><td>Processo de comparar dois conjuntos de dados para verificar conformidade entre financeiro e contábil</td></tr>
+      <tr><td><strong>Efetivar</strong></td><td>Registrar oficialmente o resultado no histórico do sistema para auditoria</td></tr>
+      <tr><td><strong>Threshold</strong></td><td>Valor mínimo de diferença considerado relevante — padrão: R$ 0,01</td></tr>
+      <tr><td><strong>Data-base</strong></td><td>Último dia do mês de referência da conciliação</td></tr>
+      <tr><td><strong>Merge</strong></td><td>Cruzamento dos registros das duas bases pelo código do cliente/fornecedor</td></tr>
+      <tr><td><strong>FINR130</strong></td><td>Relatório Protheus de posição de títulos a receber</td></tr>
+      <tr><td><strong>FINR150</strong></td><td>Relatório Protheus de posição de títulos a pagar</td></tr>
+      <tr><td><strong>CTBR140</strong></td><td>Relatório Protheus de balancete contábil analítico por conta/item</td></tr>
+      <tr><td><strong>CTBR480</strong></td><td>Relatório Protheus de razão geral por item — usado na análise detalhada</td></tr>
+      <tr><td><strong>FINR470</strong></td><td>Relatório Protheus de extrato bancário</td></tr>
+      <tr><td><strong>MATR900</strong></td><td>Relatório Protheus de kardex físico-financeiro (estoque)</td></tr>
+      <tr><td><strong>API Protheus</strong></td><td>Integração direta com o servidor Protheus para busca automática dos dados</td></tr>
+      <tr><td><strong>SO_FINANCEIRO</strong></td><td>Código encontrado apenas na base financeira — ausente na contabilidade</td></tr>
+      <tr><td><strong>SO_CONTABILIDADE</strong></td><td>Código encontrado apenas na base contábil — ausente no financeiro</td></tr>
+      <tr><td><strong>DIVERGENTE_VALOR</strong></td><td>Código encontrado nas duas bases mas com valores diferentes</td></tr>
+      <tr><td><strong>CONCILIADO</strong></td><td>Diferença entre as bases ≤ R$ 0,01</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</div><!-- /container -->
+</body>
+</html>

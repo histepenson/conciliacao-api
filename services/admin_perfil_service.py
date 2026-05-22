@@ -29,7 +29,7 @@ def _validar_permissoes(permissoes: List[str]) -> None:
     if invalid:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Permissões inválidas: {', '.join(invalid)}",
+            detail=f"Permissoes invalidas: {', '.join(invalid)}",
         )
 
 
@@ -40,13 +40,13 @@ def listar_perfis(db: Session) -> List[Perfil]:
 def obter_perfil(db: Session, perfil_id: int) -> Perfil:
     perfil = db.query(Perfil).filter(Perfil.id == perfil_id).first()
     if not perfil:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil não encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil nao encontrado")
     return perfil
 
 
 def criar_perfil(db: Session, data: dict, created_by: Optional[int] = None) -> Perfil:
     if db.query(Perfil).filter(Perfil.nome == data.get("nome")).first():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Perfil já existe")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Perfil ja existe")
 
     permissoes = data.get("permissoes", [])
     _validar_permissoes(permissoes)
@@ -67,7 +67,7 @@ def criar_perfil(db: Session, data: dict, created_by: Optional[int] = None) -> P
 def atualizar_perfil(db: Session, perfil_id: int, data: dict, updated_by: Optional[int] = None) -> Perfil:
     perfil = obter_perfil(db, perfil_id)
     if perfil.is_system:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil do sistema não pode ser alterado")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil do sistema nao pode ser alterado")
 
     if "nome" in data and data["nome"] is not None:
         perfil.nome = data["nome"]
@@ -86,7 +86,7 @@ def atualizar_perfil(db: Session, perfil_id: int, data: dict, updated_by: Option
 def deletar_perfil(db: Session, perfil_id: int, deleted_by: Optional[int] = None) -> dict:
     perfil = obter_perfil(db, perfil_id)
     if perfil.is_system:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil do sistema não pode ser removido")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil do sistema nao pode ser removido")
 
     db.delete(perfil)
     _log_audit(db, deleted_by, AuditAction.DELETE, perfil.id)

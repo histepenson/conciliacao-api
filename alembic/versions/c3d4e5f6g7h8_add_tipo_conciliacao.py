@@ -27,7 +27,7 @@ def upgrade() -> None:
         schema='concilia'
     )
 
-    # Criar índice
+    # Criar indice
     op.create_index(
         'ix_conciliacoes_tipo_conciliacao',
         'conciliacoes',
@@ -36,7 +36,7 @@ def upgrade() -> None:
         schema='concilia'
     )
 
-    # Migrar dados existentes: detectar tipo "banco" pela presença de movimentos_por_dia no resultado_json
+    # Migrar dados existentes: detectar tipo "banco" pela presenca de movimentos_por_dia no resultado_json
     op.execute("""
         UPDATE concilia.conciliacoes
         SET tipo_conciliacao = 'banco'

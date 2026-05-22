@@ -5,7 +5,7 @@ from datetime import datetime
 
 class PlanoDeContasBase(BaseModel):
     """Schema base para Plano de Contas - alinhado com o modelo SQLAlchemy"""
-    empresa_id: int
+    empresa_id: Optional[int] = None
     conta_contabil: str
     descricao: str
     tipo_conta: str
@@ -41,11 +41,11 @@ PlanoDeContasOut = PlanoDeContasResponse
 
 
 # ============================================================
-# SCHEMAS PARA IMPORTAÇÃO
+# SCHEMAS PARA IMPORTACAO
 # ============================================================
 
 class ImportacaoResultado(BaseModel):
-    """Resultado da importação de plano de contas"""
+    """Resultado da importacao de plano de contas"""
     mensagem: str
     total_linhas: int
     importados: int
@@ -57,7 +57,7 @@ class ImportacaoResultado(BaseModel):
 
 
 class ImportacaoErro(BaseModel):
-    """Detalhes de erro durante importação"""
+    """Detalhes de erro durante importacao"""
     linha: int
     codigo_conta: Optional[str] = None
     erro: str

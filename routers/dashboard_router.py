@@ -38,7 +38,7 @@ async def get_dashboard(
     if not target_empresa_id:
         # Retornar dashboard vazio se nao houver empresa
         return DashboardResponse(
-            saudacao=f"Olá, {current_user.nome}!",
+            saudacao=f"Ola, {current_user.nome}!",
             data_atual="",
             empresa_nome="Selecione uma empresa",
             stats={

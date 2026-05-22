@@ -8,9 +8,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Configurações da aplicação."""
+    """Configuracoes da aplicacao."""
 
-    # Aplicação
+    # Aplicacao
     APP_NAME: str = "ConciliaAI"
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "ConciliaAI"
-    SMTP_FROM_EMAIL: str = "noreply@conciliaai.com"
+    SMTP_FROM_EMAIL: str = "histepenson@smartconciliacoes.com.br"
     SMTP_USE_TLS: bool = True
 
     # URLs
@@ -52,10 +52,25 @@ class Settings(BaseSettings):
     LOGIN_LOCKOUT_MINUTES: int = 15
 
     # CORS
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "https://dev.smartconciliacoes.com.br" ]
+
+    # Protheus
+    PROTHEUS_URL: str = ""
+    PROTHEUS_USER: str = ""
+    PROTHEUS_PASSWORD: str = ""
+    PROTHEUS_TENANT: str = "02,0201"
+    PROTHEUS_HTTP_TIMEOUT_SECONDS: float = 1800.0
+    PROTHEUS_HTTP_RETRY_ATTEMPTS: int = 5
+    PROTHEUS_HTTP_RETRY_BACKOFF_SECONDS: float = 15.0
+
+    # Redis / RQ
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     # Storage
     STORAGE_DIR: str = "data"
+
+    # Certificado Digital
+    CERT_ENCRYPTION_KEY: str = ""
 
     class Config:
         env_file = ".env"
@@ -65,7 +80,7 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Retorna instância cacheada das configurações."""
+    """Retorna instancia cacheada das configuracoes."""
     return Settings()
 
 
@@ -74,12 +89,12 @@ settings = get_settings()
 
 def resolve_storage_dir() -> Path:
     """
-    Resolve diretório de storage com fallback seguro para Railway.
+    Resolve diretorio de storage com fallback seguro para Railway.
 
     Regras:
     - Se STORAGE_DIR estiver definido e diferente de "data", usa valor informado.
     - Se estiver em Railway e STORAGE_DIR estiver ausente ou "data", usa "/data".
-    - Caso contrário, usa "data" (desenvolvimento local).
+    - Caso contrario, usa "data" (desenvolvimento local).
     """
     configured = os.environ.get("STORAGE_DIR", settings.STORAGE_DIR).strip()
     is_railway = os.environ.get("RAILWAY_ENVIRONMENT") is not None

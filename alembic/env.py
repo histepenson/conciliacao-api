@@ -9,12 +9,15 @@ from alembic import context
 # 1. PRIMEIRO: Importa TODOS os models
 from models import *
 
-# 2. DEPOIS: Importa Base (agora com metadata populado)
-from db import Base
+# 2. DEPOIS: Importa Base e DATABASE_URL (resolvida conforme APP_ENV)
+from db import Base, DATABASE_URL
 
 # ============================================================
 
 config = context.config
+
+# Usa DATABASE_URL do ambiente em vez da URL hardcoded no alembic.ini
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

@@ -1,18 +1,18 @@
 """
-Service para gerenciamento de armazenamento de arquivos de conciliação.
+Service para gerenciamento de armazenamento de arquivos de conciliacao.
 
-Estrutura de diretórios:
+Estrutura de diretorios:
 {STORAGE_DIR}/empresa_{id}/{ano}/{mes}/{tipo}/{conta_contabil}/
-  ├── originais/
-  │   ├── origem.xlsx
-  │   ├── contabil_filtrado.xlsx
-  │   └── contabil_geral.xlsx
-  ├── normalizados/
-  │   ├── origem.xlsx
-  │   ├── contabil_filtrado.xlsx
-  │   └── contabil_geral.xlsx
-  └── relatorio/
-      └── resultado.json
+  |-- originais/
+  |   |-- origem.xlsx
+  |   |-- contabil_filtrado.xlsx
+  |   +-- contabil_geral.xlsx
+  |-- normalizados/
+  |   |-- origem.xlsx
+  |   |-- contabil_filtrado.xlsx
+  |   +-- contabil_geral.xlsx
+  +-- relatorio/
+      +-- resultado.json
 
 Tipos: banco, receber, pagar
 """
@@ -29,18 +29,18 @@ from core.config import resolve_storage_dir
 
 logger = logging.getLogger(__name__)
 
-# Diretório base com fallback automático para /data na Railway.
+# Diretorio base com fallback automatico para /data na Railway.
 UPLOAD_BASE_DIR = resolve_storage_dir()
 UPLOAD_BASE_DIR.mkdir(parents=True, exist_ok=True)
 logger.info(f"FileStorageService: UPLOAD_BASE_DIR={UPLOAD_BASE_DIR}")
 
 
 class FileStorageService:
-    """Service para armazenamento hierárquico de arquivos de conciliação."""
+    """Service para armazenamento hierarquico de arquivos de conciliacao."""
 
     @staticmethod
     def _ensure_directory(path: Path) -> None:
-        """Cria diretório se não existir."""
+        """Cria diretorio se nao existir."""
         path.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -50,7 +50,7 @@ class FileStorageService:
 
     @staticmethod
     def _sanitize_conta(conta_contabil: str) -> str:
-        """Sanitiza código da conta para uso em path de arquivo."""
+        """Sanitiza codigo da conta para uso em path de arquivo."""
         return conta_contabil.replace(".", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
     def get_base_path(
@@ -62,13 +62,13 @@ class FileStorageService:
         tipo_conciliacao: str = "receber"
     ) -> Path:
         """
-        Retorna o path base para arquivos de uma conciliação.
+        Retorna o path base para arquivos de uma conciliacao.
 
         Args:
             empresa_id: ID da empresa
-            ano: Ano do período
-            mes: Mês do período (1-12)
-            conta_contabil: Código da conta contábil
+            ano: Ano do periodo
+            mes: Mes do periodo (1-12)
+            conta_contabil: Codigo da conta contabil
             tipo_conciliacao: banco, receber ou pagar
 
         Returns:
@@ -146,7 +146,7 @@ class FileStorageService:
         tipo_conciliacao: str = "receber"
     ) -> str:
         """
-        Salva resultado da conciliação como JSON.
+        Salva resultado da conciliacao como JSON.
 
         Returns:
             Caminho completo do arquivo salvo
@@ -183,14 +183,14 @@ class FileStorageService:
         df_contabil_geral: pd.DataFrame,
         # Resultado
         resultado: Dict[str, Any],
-        # Tipo de conciliação
+        # Tipo de conciliacao
         tipo_conciliacao: str = "receber"
     ) -> Dict[str, Dict[str, str]]:
         """
-        Salva todos os arquivos de uma conciliação contábil (receber/pagar).
+        Salva todos os arquivos de uma conciliacao contabil (receber/pagar).
 
         Returns:
-            Dicionário com estrutura:
+            Dicionario com estrutura:
             {
                 "origem": {"original": "path", "normalizado": "path"},
                 "contabil_filtrado": {"original": "path", "normalizado": "path"},
@@ -232,7 +232,7 @@ class FileStorageService:
             resultado, empresa_id, ano, mes, conta_contabil, tipo_conciliacao
         )
 
-        logger.info(f"Todos os arquivos salvos para empresa {empresa_id}, período {ano}-{mes:02d}, conta {conta_contabil}, tipo {tipo_conciliacao}")
+        logger.info(f"Todos os arquivos salvos para empresa {empresa_id}, periodo {ano}-{mes:02d}, conta {conta_contabil}, tipo {tipo_conciliacao}")
         return caminhos
 
     def save_bank_files(
@@ -248,10 +248,10 @@ class FileStorageService:
         nome_razao: str = "razao.xlsx"
     ) -> Dict[str, Dict[str, str]]:
         """
-        Salva arquivos de conciliação bancária (originais + resultado JSON).
+        Salva arquivos de conciliacao bancaria (originais + resultado JSON).
 
         Returns:
-            Dicionário com estrutura:
+            Dicionario com estrutura:
             {
                 "extrato": {"original": "path"},
                 "razao": {"original": "path"},
@@ -278,7 +278,7 @@ class FileStorageService:
             resultado, empresa_id, ano, mes, conta_contabil, "banco"
         )
 
-        logger.info(f"Arquivos bancários salvos para empresa {empresa_id}, período {ano}-{mes:02d}, conta {conta_contabil}")
+        logger.info(f"Arquivos bancarios salvos para empresa {empresa_id}, periodo {ano}-{mes:02d}, conta {conta_contabil}")
         return caminhos
 
     def save_stock_files(
@@ -294,10 +294,10 @@ class FileStorageService:
         nome_razao: str = "razao.xlsx"
     ) -> Dict[str, Dict[str, str]]:
         """
-        Salva arquivos de conciliação de estoque (originais + resultado JSON).
+        Salva arquivos de conciliacao de estoque (originais + resultado JSON).
 
         Returns:
-            Dicionário com estrutura:
+            Dicionario com estrutura:
             {
                 "kardex": {"original": "path"},
                 "razao": {"original": "path"},
@@ -324,7 +324,7 @@ class FileStorageService:
             resultado, empresa_id, ano, mes, conta_contabil, "estoque"
         )
 
-        logger.info(f"Arquivos de estoque salvos para empresa {empresa_id}, período {ano}-{mes:02d}, conta {conta_contabil}")
+        logger.info(f"Arquivos de estoque salvos para empresa {empresa_id}, periodo {ano}-{mes:02d}, conta {conta_contabil}")
         return caminhos
 
     def file_exists(self, file_path: str) -> bool:
@@ -347,10 +347,10 @@ class FileStorageService:
         tipo_conciliacao: str = "receber"
     ) -> bool:
         """
-        Remove todos os arquivos de uma conciliação.
+        Remove todos os arquivos de uma conciliacao.
 
         Returns:
-            True se removido com sucesso, False caso contrário
+            True se removido com sucesso, False caso contrario
         """
         base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
 
@@ -375,7 +375,7 @@ class FileStorageService:
         tipo_conciliacao: str = "receber"
     ) -> Optional[str]:
         """
-        Obtém o caminho de um arquivo específico.
+        Obtem o caminho de um arquivo especifico.
 
         Args:
             tipo_arquivo: origem, contabil_filtrado, contabil_geral, relatorio
@@ -383,7 +383,7 @@ class FileStorageService:
             tipo_conciliacao: banco, receber, pagar
 
         Returns:
-            Caminho do arquivo ou None se não existir
+            Caminho do arquivo ou None se nao existir
         """
         base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
 

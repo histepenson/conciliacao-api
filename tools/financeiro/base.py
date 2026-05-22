@@ -1,11 +1,11 @@
 """
-Módulo base com utilitários compartilhados para processamento financeiro.
+Modulo base com utilitarios compartilhados para processamento financeiro.
 
-Este módulo contém funções de uso comum entre Contas a Receber e Contas a Pagar:
-- Normalização de colunas
-- Parse de números em formato brasileiro
-- Extração de códigos de cliente/fornecedor
-- Busca flexível de colunas
+Este modulo contem funcoes de uso comum entre Contas a Receber e Contas a Pagar:
+- Normalizacao de colunas
+- Parse de numeros em formato brasileiro
+- Extracao de codigos de cliente/fornecedor
+- Busca flexivel de colunas
 """
 
 import pandas as pd
@@ -25,21 +25,21 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 class TipoFinanceiro(str, Enum):
-    """Tipos de processamento financeiro disponíveis."""
+    """Tipos de processamento financeiro disponiveis."""
     CONTAS_RECEBER = "contas_receber"
     CONTAS_PAGAR = "contas_pagar"
 
 
 class TipoPrazo(str, Enum):
-    """Classificação por prazo de vencimento."""
+    """Classificacao por prazo de vencimento."""
     CURTO_PRAZO = "CURTO PRAZO"
     LONGO_PRAZO = "LONGO PRAZO"
 
 
 @dataclass
 class ConfiguracaoColunas:
-    """Configuração de mapeamento de colunas para cada tipo de planilha."""
-    # Colunas de identificação
+    """Configuracao de mapeamento de colunas para cada tipo de planilha."""
+    # Colunas de identificacao
     codigo_cliente: List[str]
 
     # Colunas de valor
@@ -56,16 +56,16 @@ class ConfiguracaoColunas:
     parcela: List[str]
     tipo_titulo: List[str]
 
-    # Substrings para busca flexível de valor vencido
+    # Substrings para busca flexivel de valor vencido
     substrings_vencido: List[List[str]]
 
-    # Substrings para busca flexível de valor a vencer
+    # Substrings para busca flexivel de valor a vencer
     substrings_a_vencer: List[List[str]]
 
 
 @dataclass
 class ResultadoValidacaoLayout:
-    """Resultado da validação do layout do arquivo."""
+    """Resultado da validacao do layout do arquivo."""
     valido: bool
     mensagem: str
     colunas_encontradas: List[str]
@@ -75,34 +75,34 @@ class ResultadoValidacaoLayout:
 
 
 # =============================================================================
-# CORREÇÃO DE LINHA DE TÍTULO
+# CORRECAO DE LINHA DE TITULO
 # =============================================================================
 
 def corrigir_header_titulo(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Corrige DataFrames onde a primeira linha é um título de relatório.
+    Corrige DataFrames onde a primeira linha e um titulo de relatorio.
 
-    Isso ocorre quando o frontend lê um Excel com título na linha 1
-    (ex: "Títulos a Pagar", "Razão Geral") e envia as colunas como
-    'empty', 'empty_1', etc. A linha real de cabeçalhos fica como
+    Isso ocorre quando o frontend le um Excel com titulo na linha 1
+    (ex: "Titulos a Pagar", "Razao Geral") e envia as colunas como
+    'empty', 'empty_1', etc. A linha real de cabecalhos fica como
     primeiro registro de dados.
 
-    Aplica a correção apenas quando mais de 50% das colunas têm nomes
-    genéricos E a primeira linha de dados contém nomes reais.
+    Aplica a correcao apenas quando mais de 50% das colunas tem nomes
+    genericos E a primeira linha de dados contem nomes reais.
 
     Args:
-        df: DataFrame com possível linha de título
+        df: DataFrame com possivel linha de titulo
 
     Returns:
-        DataFrame com os cabeçalhos reais (ou o original se não detectado)
+        DataFrame com os cabecalhos reais (ou o original se nao detectado)
     """
     if df is None or df.empty or len(df) < 2:
         return df
 
     colunas = list(df.columns)
-    # Padrões genéricos incluem:
+    # Padroes genericos incluem:
     # - empty, empty_1 ... (pandas renomeia duplicatas)
-    # - __EMPTY, __EMPTY_1 ... (XLSX.js usa este padrão para células de header vazias)
+    # - __EMPTY, __EMPTY_1 ... (XLSX.js usa este padrao para celulas de header vazias)
     # - nan, nan0, nan1 ...
     # - unnamed..., _0, _1 ...
     padrao_generica = re.compile(
@@ -132,15 +132,15 @@ def corrigir_header_titulo(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # =============================================================================
-# FUNÇÕES DE NORMALIZAÇÃO DE COLUNAS
+# FUNCOES DE NORMALIZACAO DE COLUNAS
 # =============================================================================
 
 def normalizar_nome_colunas(df: pd.DataFrame) -> pd.DataFrame:
     """
     Normaliza os nomes das colunas de um DataFrame.
 
-    Transformações aplicadas:
-    - Converte para minúsculas
+    Transformacoes aplicadas:
+    - Converte para minusculas
     - Remove quebras de linha
     - Substitui caracteres especiais por underscore
     - Remove underscores duplicados e nas extremidades
@@ -173,7 +173,7 @@ def obter_coluna(df: pd.DataFrame, possiveis: List[str]) -> str:
 
     Args:
         df: DataFrame onde buscar
-        possiveis: Lista de nomes de colunas possíveis, em ordem de prioridade
+        possiveis: Lista de nomes de colunas possiveis, em ordem de prioridade
 
     Returns:
         Nome da primeira coluna encontrada
@@ -192,11 +192,11 @@ def obter_coluna(df: pd.DataFrame, possiveis: List[str]) -> str:
 
 def obter_coluna_opcional(df: pd.DataFrame, possiveis: List[str]) -> Optional[str]:
     """
-    Busca a primeira coluna existente de uma lista, sem erro se não encontrar.
+    Busca a primeira coluna existente de uma lista, sem erro se nao encontrar.
 
     Args:
         df: DataFrame onde buscar
-        possiveis: Lista de nomes de colunas possíveis
+        possiveis: Lista de nomes de colunas possiveis
 
     Returns:
         Nome da coluna encontrada ou None
@@ -212,7 +212,7 @@ def encontrar_coluna_por_substrings(
     substrings: List[str]
 ) -> Optional[str]:
     """
-    Encontra uma coluna que contém todas as substrings especificadas.
+    Encontra uma coluna que contem todas as substrings especificadas.
 
     Args:
         df: DataFrame onde buscar
@@ -232,7 +232,7 @@ def buscar_coluna_flexivel(
     lista_substrings: List[List[str]]
 ) -> Optional[str]:
     """
-    Tenta encontrar uma coluna usando múltiplas combinações de substrings.
+    Tenta encontrar uma coluna usando multiplas combinacoes de substrings.
 
     Args:
         df: DataFrame onde buscar
@@ -249,25 +249,25 @@ def buscar_coluna_flexivel(
 
 
 # =============================================================================
-# FUNÇÕES DE PARSE DE NÚMEROS
+# FUNCOES DE PARSE DE NUMEROS
 # =============================================================================
 
 def parse_numero_brasileiro(valor: Any) -> float:
     """
-    Converte números em formato brasileiro para float.
+    Converte numeros em formato brasileiro para float.
 
     Formatos suportados:
     - 1.234.567,89 (BR com milhar)
     - 1234,89 (BR sem milhar)
-    - (1.234,89) (negativo por parênteses)
+    - (1.234,89) (negativo por parenteses)
     - 1234,89- (negativo por sufixo)
-    - 1000D / 1000C (débito/crédito)
+    - 1000D / 1000C (debito/credito)
 
     Args:
         valor: Valor a converter (pode ser string, int, float ou None)
 
     Returns:
-        Valor numérico como float (NaN se não puder converter)
+        Valor numerico como float (NaN se nao puder converter)
     """
     if pd.isna(valor):
         return float("nan")
@@ -279,10 +279,10 @@ def parse_numero_brasileiro(valor: Any) -> float:
     if not s:
         return float("nan")
 
-    # Remover espaços e símbolos comuns
+    # Remover espacos e simbolos comuns
     s = s.replace("\u00a0", "").replace(" ", "")
 
-    # Detectar sufixo D/C (Débito/Crédito)
+    # Detectar sufixo D/C (Debito/Credito)
     credito = False
     if s.upper().endswith("C"):
         credito = True
@@ -290,10 +290,10 @@ def parse_numero_brasileiro(valor: Any) -> float:
     elif s.upper().endswith("D"):
         s = s[:-1]
 
-    # Remover caracteres não numéricos (exceto , . - ())
+    # Remover caracteres nao numericos (exceto , . - ())
     s = re.sub(r"[^0-9,\.\-()]", "", s)
 
-    # Detectar negativo por parênteses ou sufixo
+    # Detectar negativo por parenteses ou sufixo
     negativo = False
     if s.startswith("(") and s.endswith(")"):
         negativo = True
@@ -302,12 +302,12 @@ def parse_numero_brasileiro(valor: Any) -> float:
         negativo = True
         s = s[:-1]
 
-    # Converter formato BR para padrão
+    # Converter formato BR para padrao
     if "," in s:
         # Formato BR: 1.234.567,89
         s = s.replace(".", "").replace(",", ".")
     else:
-        # Sem vírgula: pode ser decimal com ponto ou milhar com vários pontos
+        # Sem virgula: pode ser decimal com ponto ou milhar com varios pontos
         if s.count(".") > 1:
             s = s.replace(".", "")
 
@@ -322,39 +322,39 @@ def parse_numero_brasileiro(valor: Any) -> float:
 
 def serie_para_numerico(df: pd.DataFrame, coluna: str) -> pd.Series:
     """
-    Converte uma coluna do DataFrame para valores numéricos.
+    Converte uma coluna do DataFrame para valores numericos.
 
     Args:
         df: DataFrame de origem
         coluna: Nome da coluna a converter
 
     Returns:
-        Series com valores numéricos
+        Series com valores numericos
     """
     return df[coluna].apply(parse_numero_brasileiro)
 
 
 # =============================================================================
-# FUNÇÕES DE EXTRAÇÃO DE CÓDIGO
+# FUNCOES DE EXTRACAO DE CODIGO
 # =============================================================================
 
 def extrair_base_loja(texto: str) -> Tuple[str, str]:
     """
-    Extrai código base e loja de um texto usando o separador '-'.
+    Extrai codigo base e loja de um texto usando o separador '-'.
 
-    Suporta qualquer quantidade de dígitos em base e loja.
+    Suporta qualquer quantidade de digitos em base e loja.
 
     Formatos suportados:
-    - "01704361-81-NOME CLIENTE" → ("01704361", "81")
-    - "123456-789"               → ("123456", "789")
-    - "123456-87"                → ("123456", "87")
-    - "12345678" (sem separador) → ("12345678", "")
+    - "01704361-81-NOME CLIENTE" -> ("01704361", "81")
+    - "123456-789"               -> ("123456", "789")
+    - "123456-87"                -> ("123456", "87")
+    - "12345678" (sem separador) -> ("12345678", "")
 
     Args:
-        texto: Texto contendo o código
+        texto: Texto contendo o codigo
 
     Returns:
-        Tupla (base, loja) extraídos pelo separador '-'
+        Tupla (base, loja) extraidos pelo separador '-'
     """
     texto = str(texto or "").strip()
     if not texto:
@@ -375,49 +375,49 @@ def extrair_base_loja(texto: str) -> Tuple[str, str]:
 
 def formatar_codigo(base: str, loja: str, prefixo: str = "C") -> str:
     """
-    Formata código no padrão do sistema.
+    Formata codigo no padrao do sistema.
 
     Args:
-        base: Código base (tamanho variável)
-        loja: Código loja (tamanho variável)
-        prefixo: Prefixo do código (default: "C" para cliente)
+        base: Codigo base (tamanho variavel)
+        loja: Codigo loja (tamanho variavel)
+        prefixo: Prefixo do codigo (default: "C" para cliente)
 
     Returns:
-        Código formatado (ex: "C0170436181")
+        Codigo formatado (ex: "C0170436181")
     """
     return f"{prefixo}{base}{loja}"
 
 
 def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> pd.DataFrame:
     """
-    Normaliza uma série de códigos de cliente/fornecedor.
+    Normaliza uma serie de codigos de cliente/fornecedor.
 
-    Processa códigos no formato "BASE-LOJA-NOME" usando o separador '-'.
-    Suporta qualquer quantidade de dígitos em base e loja.
+    Processa codigos no formato "BASE-LOJA-NOME" usando o separador '-'.
+    Suporta qualquer quantidade de digitos em base e loja.
 
     Args:
         serie_cliente: Series com os valores originais
-        prefixo: Prefixo para o código (C=cliente, F=fornecedor)
+        prefixo: Prefixo para o codigo (C=cliente, F=fornecedor)
 
     Returns:
         DataFrame com colunas 'codigo' e 'cliente'
     """
     serie_cliente = serie_cliente.astype(str).str.strip()
 
-    # Separar por hífen (formato: BASE-LOJA-NOME)
+    # Separar por hifen (formato: BASE-LOJA-NOME)
     partes = serie_cliente.str.split("-", n=2, expand=True)
 
     base_split = partes[0] if 0 in partes.columns else serie_cliente
     loja_split = partes[1] if 1 in partes.columns else pd.Series("", index=serie_cliente.index)
 
-    # Extrair base (preserva letras + dígitos) e loja (apenas dígitos)
+    # Extrair base (preserva letras + digitos) e loja (apenas digitos)
     base_clean = base_split.astype(str).str.replace(r"[^a-zA-Z0-9]", "", regex=True)
     loja_digits = loja_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
 
-    # Quando não tem separador '-', loja fica vazia (todos os dígitos são o código)
+    # Quando nao tem separador '-', loja fica vazia (todos os digitos sao o codigo)
     loja_digits = loja_digits.where(loja_digits.str.len() > 0, "")
 
-    # Formatar código final
+    # Formatar codigo final
     codigo = prefixo + base_clean + loja_digits
 
     # Extrair nome do cliente
@@ -431,7 +431,7 @@ def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> p
 
 
 # =============================================================================
-# FUNÇÕES DE CLASSIFICAÇÃO
+# FUNCOES DE CLASSIFICACAO
 # =============================================================================
 
 def classificar_prazo(dias_vencidos: int, limite_curto_prazo: int = 365) -> str:
@@ -439,7 +439,7 @@ def classificar_prazo(dias_vencidos: int, limite_curto_prazo: int = 365) -> str:
     Classifica o prazo baseado nos dias vencidos.
 
     Args:
-        dias_vencidos: Número de dias vencidos
+        dias_vencidos: Numero de dias vencidos
         limite_curto_prazo: Limite em dias para curto prazo (default: 365)
 
     Returns:
@@ -456,7 +456,7 @@ def calcular_dias_vencidos(data_vencimento: pd.Series, data_referencia: datetime
 
     Args:
         data_vencimento: Series com datas de vencimento
-        data_referencia: Data de referência (default: hoje)
+        data_referencia: Data de referencia (default: hoje)
 
     Returns:
         Series com dias vencidos
@@ -481,10 +481,10 @@ class ProcessadorFinanceiroBase(ABC):
 
     def __init__(self, config: ConfiguracaoColunas):
         """
-        Inicializa o processador com configuração de colunas.
+        Inicializa o processador com configuracao de colunas.
 
         Args:
-            config: Configuração de mapeamento de colunas
+            config: Configuracao de mapeamento de colunas
         """
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -496,7 +496,7 @@ class ProcessadorFinanceiroBase(ABC):
 
     @abstractmethod
     def get_prefixo_codigo(self) -> str:
-        """Retorna o prefixo para códigos (C=cliente, F=fornecedor)."""
+        """Retorna o prefixo para codigos (C=cliente, F=fornecedor)."""
         pass
 
     def carregar_dados(self, entrada: Any) -> pd.DataFrame:
@@ -520,24 +520,24 @@ class ProcessadorFinanceiroBase(ABC):
 
     def normalizar_base(self, entrada: Any) -> pd.DataFrame:
         """
-        Executa normalização base comum a todos os tipos.
+        Executa normalizacao base comum a todos os tipos.
 
         Args:
             entrada: DataFrame ou caminho para arquivo
 
         Returns:
-            DataFrame normalizado com colunas padrão
+            DataFrame normalizado com colunas padrao
         """
         df = self.carregar_dados(entrada)
         df = normalizar_nome_colunas(df)
 
-        # Encontrar coluna de código/cliente
+        # Encontrar coluna de codigo/cliente
         col_cliente = obter_coluna(df, self.config.codigo_cliente)
 
         # Calcular valor
         df = self._calcular_valor(df)
 
-        # Normalizar código
+        # Normalizar codigo
         codigo_df = normalizar_codigo_cliente(
             df[col_cliente],
             prefixo=self.get_prefixo_codigo()
@@ -558,7 +558,7 @@ class ProcessadorFinanceiroBase(ABC):
 
     def _calcular_valor(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Calcula o valor total (vencido + a vencer ou valor único).
+        Calcula o valor total (vencido + a vencer ou valor unico).
 
         Args:
             df: DataFrame com dados
@@ -570,7 +570,7 @@ class ProcessadorFinanceiroBase(ABC):
         col_vencido = obter_coluna_opcional(df, self.config.valor_vencido)
         col_a_vencer = obter_coluna_opcional(df, self.config.valor_a_vencer)
 
-        # Se não encontrou, tentar busca flexível
+        # Se nao encontrou, tentar busca flexivel
         if not col_vencido:
             col_vencido = buscar_coluna_flexivel(df, self.config.substrings_vencido)
 
@@ -579,7 +579,7 @@ class ProcessadorFinanceiroBase(ABC):
 
         # Se temos ambas colunas, somar
         if col_vencido and col_a_vencer:
-            self.logger.info(f"Valor será calculado por soma: {col_vencido} + {col_a_vencer}")
+            self.logger.info(f"Valor sera calculado por soma: {col_vencido} + {col_a_vencer}")
             serie_vencido = serie_para_numerico(df, col_vencido).fillna(0.0)
             serie_a_vencer = serie_para_numerico(df, col_a_vencer).fillna(0.0)
             df["valor"] = serie_vencido + serie_a_vencer
@@ -589,7 +589,7 @@ class ProcessadorFinanceiroBase(ABC):
                 f"Total: {df['valor'].sum():.2f}"
             )
         else:
-            # Usar coluna única de valor
+            # Usar coluna unica de valor
             col_valor = obter_coluna_opcional(df, self.config.valor_unico)
             if not col_valor:
                 col_valor = next((c for c in df.columns if "valor" in c), None)
@@ -599,7 +599,7 @@ class ProcessadorFinanceiroBase(ABC):
                     f"Nenhuma coluna de valor encontrada. Colunas: {list(df.columns)}"
                 )
 
-            self.logger.info(f"Valor será lido diretamente da coluna: {col_valor}")
+            self.logger.info(f"Valor sera lido diretamente da coluna: {col_valor}")
             df["valor"] = serie_para_numerico(df, col_valor)
 
         return df
@@ -618,7 +618,7 @@ class ProcessadorFinanceiroBase(ABC):
         col_vencimento = obter_coluna(df, self.config.data_vencimento)
         df["data_vencimento"] = pd.to_datetime(df[col_vencimento], errors="coerce")
 
-        # Data de emissão (opcional)
+        # Data de emissao (opcional)
         col_emissao = obter_coluna_opcional(df, self.config.data_emissao)
         if not col_emissao:
             col_emissao = buscar_coluna_flexivel(df, [
@@ -639,7 +639,7 @@ class ProcessadorFinanceiroBase(ABC):
 
     def _processar_campos_auxiliares(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Processa campos auxiliares (número documento, parcela).
+        Processa campos auxiliares (numero documento, parcela).
 
         Args:
             df: DataFrame com dados
@@ -647,7 +647,7 @@ class ProcessadorFinanceiroBase(ABC):
         Returns:
             DataFrame com campos auxiliares
         """
-        # Número do documento
+        # Numero do documento
         col_doc = obter_coluna_opcional(df, self.config.numero_documento)
         if not col_doc:
             col_doc = buscar_coluna_flexivel(df, [
@@ -662,7 +662,7 @@ class ProcessadorFinanceiroBase(ABC):
         col_parcela = obter_coluna_opcional(df, self.config.parcela)
         df["parcela"] = df[col_parcela] if col_parcela else None
 
-        # Tipo do título (TP)
+        # Tipo do titulo (TP)
         col_tipo = obter_coluna_opcional(df, self.config.tipo_titulo)
         if not col_tipo:
             col_tipo = buscar_coluna_flexivel(df, [
@@ -677,14 +677,14 @@ class ProcessadorFinanceiroBase(ABC):
         """
         Valida se o arquivo possui o layout esperado.
 
-        Verifica se as colunas obrigatórias estão presentes no arquivo
+        Verifica se as colunas obrigatorias estao presentes no arquivo
         antes de iniciar o processamento.
 
         Args:
             entrada: DataFrame ou caminho para arquivo
 
         Returns:
-            ResultadoValidacaoLayout com detalhes da validação
+            ResultadoValidacaoLayout com detalhes da validacao
         """
         df = self.carregar_dados(entrada)
         df = normalizar_nome_colunas(df)
@@ -694,19 +694,19 @@ class ProcessadorFinanceiroBase(ABC):
         colunas_faltando = []
         avisos = []
 
-        # 1. Verificar coluna de código/cliente (OBRIGATÓRIA)
+        # 1. Verificar coluna de codigo/cliente (OBRIGATORIA)
         col_cliente = obter_coluna_opcional(df, self.config.codigo_cliente)
         if col_cliente:
-            colunas_encontradas.append(f"Código/Cliente: {col_cliente}")
+            colunas_encontradas.append(f"Codigo/Cliente: {col_cliente}")
         else:
-            colunas_faltando.append("Código do Cliente/Fornecedor")
+            colunas_faltando.append("Codigo do Cliente/Fornecedor")
 
         # 2. Verificar colunas de valor (pelo menos uma forma de obter valor)
         col_vencido = obter_coluna_opcional(df, self.config.valor_vencido)
         col_a_vencer = obter_coluna_opcional(df, self.config.valor_a_vencer)
         col_valor_unico = obter_coluna_opcional(df, self.config.valor_unico)
 
-        # Busca flexível
+        # Busca flexivel
         if not col_vencido:
             col_vencido = buscar_coluna_flexivel(df, self.config.substrings_vencido)
         if not col_a_vencer:
@@ -722,46 +722,46 @@ class ProcessadorFinanceiroBase(ABC):
             colunas_encontradas.append(f"Valor: {col_valor_unico}")
         elif col_vencido:
             colunas_encontradas.append(f"Valor Vencido: {col_vencido}")
-            avisos.append("Coluna de valor a vencer não encontrada - usando apenas valor vencido")
+            avisos.append("Coluna de valor a vencer nao encontrada - usando apenas valor vencido")
         elif col_a_vencer:
             colunas_encontradas.append(f"Valor a Vencer: {col_a_vencer}")
-            avisos.append("Coluna de valor vencido não encontrada - usando apenas valor a vencer")
+            avisos.append("Coluna de valor vencido nao encontrada - usando apenas valor a vencer")
         else:
-            colunas_faltando.append("Valor (vencido/a vencer ou valor único)")
+            colunas_faltando.append("Valor (vencido/a vencer ou valor unico)")
 
-        # 3. Verificar data de vencimento (OBRIGATÓRIA)
+        # 3. Verificar data de vencimento (OBRIGATORIA)
         col_vencimento = obter_coluna_opcional(df, self.config.data_vencimento)
         if col_vencimento:
             colunas_encontradas.append(f"Data Vencimento: {col_vencimento}")
         else:
             colunas_faltando.append("Data de Vencimento")
 
-        # 4. Verificar data de emissão (opcional - apenas aviso)
+        # 4. Verificar data de emissao (opcional - apenas aviso)
         col_emissao = obter_coluna_opcional(df, self.config.data_emissao)
         if col_emissao:
-            colunas_encontradas.append(f"Data Emissão: {col_emissao}")
+            colunas_encontradas.append(f"Data Emissao: {col_emissao}")
         else:
-            avisos.append("Coluna de data de emissão não encontrada (opcional)")
+            avisos.append("Coluna de data de emissao nao encontrada (opcional)")
 
-        # 5. Verificar número do documento (opcional - apenas aviso)
+        # 5. Verificar numero do documento (opcional - apenas aviso)
         col_doc = obter_coluna_opcional(df, self.config.numero_documento)
         if col_doc:
-            colunas_encontradas.append(f"Número Documento: {col_doc}")
+            colunas_encontradas.append(f"Numero Documento: {col_doc}")
         else:
-            avisos.append("Coluna de número do documento não encontrada (opcional)")
+            avisos.append("Coluna de numero do documento nao encontrada (opcional)")
 
         # Determinar resultado
         valido = len(colunas_faltando) == 0
 
         if valido:
-            mensagem = f"Layout válido. {len(colunas_encontradas)} colunas mapeadas corretamente."
+            mensagem = f"Layout valido. {len(colunas_encontradas)} colunas mapeadas corretamente."
         else:
             mensagem = (
-                f"Layout inválido! Colunas obrigatórias não encontradas: {', '.join(colunas_faltando)}. "
+                f"Layout invalido! Colunas obrigatorias nao encontradas: {', '.join(colunas_faltando)}. "
                 f"Verifique se o arquivo possui o formato esperado para {self.get_tipo().value}."
             )
 
-        self.logger.info(f"Validação de layout: {'VÁLIDO' if valido else 'INVÁLIDO'}")
+        self.logger.info(f"Validacao de layout: {'VALIDO' if valido else 'INVALIDO'}")
         self.logger.info(f"Colunas encontradas: {colunas_encontradas}")
         if colunas_faltando:
             self.logger.warning(f"Colunas faltando: {colunas_faltando}")
@@ -779,7 +779,7 @@ class ProcessadorFinanceiroBase(ABC):
 
     def normalizar(self, entrada: Any) -> pd.DataFrame:
         """
-        Normaliza planilha e agrupa por código.
+        Normaliza planilha e agrupa por codigo.
 
         Args:
             entrada: DataFrame ou caminho para arquivo
@@ -789,7 +789,7 @@ class ProcessadorFinanceiroBase(ABC):
         """
         df = self.normalizar_base(entrada)
 
-        # Agrupar por código
+        # Agrupar por codigo
         df_agrupado = (
             df.groupby("codigo", as_index=False)
             .agg(
@@ -803,7 +803,7 @@ class ProcessadorFinanceiroBase(ABC):
         df_agrupado["TIPO"] = df_agrupado["dias_vencidos"].apply(classificar_prazo)
 
         self.logger.info(
-            f"{self.get_tipo().value} normalizado: {df_agrupado['codigo'].nunique()} códigos | "
+            f"{self.get_tipo().value} normalizado: {df_agrupado['codigo'].nunique()} codigos | "
             f"total valor: {df_agrupado['valor'].sum():.2f}"
         )
 
