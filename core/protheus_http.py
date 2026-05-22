@@ -9,11 +9,20 @@ from core.config import settings
 
 TRANSIENT_STATUS_CODES: set[int] = {502, 503, 504}
 
+# Timeout de conexão curto (falha rápido se o servidor não responde ao TCP).
+# Timeout de leitura longo (queries grandes no Protheus podem demorar vários minutos).
+_PROTHEUS_TIMEOUT = httpx.Timeout(
+    connect=20.0,
+    read=settings.PROTHEUS_HTTP_TIMEOUT_SECONDS,
+    write=30.0,
+    pool=30.0,
+)
+
 
 def protheus_async_client(auth: tuple[str, str] | None = None) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         verify=False,
-        timeout=settings.PROTHEUS_HTTP_TIMEOUT_SECONDS,
+        timeout=_PROTHEUS_TIMEOUT,
         auth=auth,
     )
 
