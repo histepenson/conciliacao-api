@@ -298,48 +298,42 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
     parametros["data_base"] = parametros.get("data_base") or data_base
     parametros_hash = calcular_parametros_hash(parametros)
 
-    existente = (
+    _filtro_base = [
+        ProtheusCarga.empresa_id == empresa_id,
+        ProtheusCarga.tipo_relatorio == tipo,
+        ProtheusCarga.data_base == data_base,
+        ProtheusCarga.parametros_hash == parametros_hash,
+    ]
+
+    # 1. Existe uma carga concluida com dados? Oferece reutilizacao.
+    concluida = (
         db.query(ProtheusCarga)
-        .filter(
-            ProtheusCarga.empresa_id == empresa_id,
-            ProtheusCarga.tipo_relatorio == tipo,
-            ProtheusCarga.data_base == data_base,
-            ProtheusCarga.parametros_hash == parametros_hash,
-        )
+        .filter(*_filtro_base, ProtheusCarga.status == "concluido")
+        .order_by(ProtheusCarga.created_at.desc())
         .first()
     )
-    if existente and existente.status in STATUS_REUTILIZAVEIS and (existente.total_registros or 0) > 0:
-        return existente, True
+    if concluida and (concluida.total_registros or 0) > 0:
+        return concluida, True
 
-    if existente and existente.status == "processando":
-        if existente.rq_job_id and job_esta_ativo(existente.rq_job_id):
-            return existente, False
+    # 2. Existe uma carga ativa (pendente ou processando)? Reconecta.
+    ativa = (
+        db.query(ProtheusCarga)
+        .filter(*_filtro_base, ProtheusCarga.status.in_(["pendente", "processando"]))
+        .order_by(ProtheusCarga.created_at.desc())
+        .first()
+    )
+    if ativa:
+        if ativa.rq_job_id and job_esta_ativo(ativa.rq_job_id):
+            return ativa, False
         # job morreu sem atualizar o banco - reenfileira
-        existente.status = "pendente"
-        existente.erro = None
-        existente.iniciado_em = None
-        existente.finalizado_em = None
-        _tentar_enfileirar(db, existente)
-        return existente, False
+        ativa.status = "pendente"
+        ativa.erro = None
+        ativa.iniciado_em = None
+        ativa.finalizado_em = None
+        _tentar_enfileirar(db, ativa)
+        return ativa, False
 
-    if existente and existente.status == "pendente":
-        if existente.rq_job_id and job_esta_ativo(existente.rq_job_id):
-            return existente, False
-        # job sumiu da fila sem atualizar o banco - reenfileira
-        existente.erro = None
-        existente.iniciado_em = None
-        existente.finalizado_em = None
-        _tentar_enfileirar(db, existente)
-        return existente, False
-
-    if existente and existente.status in {"erro", "cancelado"}:
-        existente.status = "pendente"
-        existente.erro = None
-        existente.iniciado_em = None
-        existente.finalizado_em = None
-        _tentar_enfileirar(db, existente)
-        return existente, False
-
+    # 3. Sem carga util: cria nova.
     carga = ProtheusCarga(
         config_id=payload.config_id,
         empresa_id=empresa_id,

@@ -32,6 +32,7 @@ async def protheus_get(
 
     for attempt in range(1, attempts + 1):
         try:
+            logger.info("HTTP GET %s tentativa=%s/%s  params=%s", url, attempt, attempts, params)
             response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
             return response
@@ -42,12 +43,13 @@ async def protheus_get(
 
             wait_seconds = backoff * attempt
             logger.warning(
-                "%s falhou com HTTP %s na tentativa %s/%s; nova tentativa em %.1fs",
+                "%s falhou com HTTP %s na tentativa %s/%s; nova tentativa em %.1fs  url=%s",
                 operation,
                 status_code,
                 attempt,
                 attempts,
                 wait_seconds,
+                url,
             )
             await asyncio.sleep(wait_seconds)
         except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.ConnectError, httpx.NetworkError) as exc:
@@ -56,12 +58,13 @@ async def protheus_get(
 
             wait_seconds = backoff * attempt
             logger.warning(
-                "%s falhou por %s na tentativa %s/%s; nova tentativa em %.1fs",
+                "%s falhou por %s na tentativa %s/%s; nova tentativa em %.1fs  url=%s",
                 operation,
                 exc.__class__.__name__,
                 attempt,
                 attempts,
                 wait_seconds,
+                url,
             )
             await asyncio.sleep(wait_seconds)
 
