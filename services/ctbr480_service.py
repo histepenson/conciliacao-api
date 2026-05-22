@@ -78,7 +78,7 @@ class Ctbr480Service:
         page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_CTBR480 and v is not None}
         query["pageSize"] = page_size
-        query.setdefault("moeda", "01")
+        query["moeda"] = str(query.get("moeda") or "01").zfill(2)
         return query
 
 

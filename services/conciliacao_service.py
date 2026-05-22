@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -399,6 +400,19 @@ class ConciliacaoService:
                 if (df_fin_mes is not None and not df_fin_mes.empty)
                 else financeiro_norm
             )
+
+            # Mapa de saldo anterior por codigo (item do CTBR140) para o grid de Lancamentos Razao
+            saldo_ant_map: dict[str, float] = {}
+            for reg in (request.base_contabil_filtrada.registros or []):
+                codigo_raw = str(reg.get("Codigo", "")).strip()
+                codigo_norm = re.sub(r"\s+", "", codigo_raw)
+                saldo_ant_val = reg.get("Saldo anterior")
+                if codigo_norm and saldo_ant_val is not None:
+                    try:
+                        saldo_ant_map[codigo_norm] = float(saldo_ant_val)
+                    except (ValueError, TypeError):
+                        pass
+
             analise_detalhada = analise_service.processar_analise_detalhada(
                 df_financeiro=df_fin_para_analise,
                 df_contabilidade_filtrada=contabil_norm,
@@ -407,6 +421,7 @@ class ConciliacaoService:
                 df_razao_geral=df_razao_geral,
                 conta_contabil=conta_contabil,
                 data_base=request.parametros.get("data_base"),
+                saldo_ant_map=saldo_ant_map if saldo_ant_map else None,
             )
 
             if analise_detalhada:

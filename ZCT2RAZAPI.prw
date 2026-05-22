@@ -133,7 +133,7 @@ Return .T.
 EndIf
 
 // --- Defaults e normalizacao ---
-cMoeda     := IIf(Empty(cMoeda),     "01", cMoeda)
+cMoeda     := IIf(Empty(cMoeda), "01", PadL(AllTrim(cMoeda), 2, "0"))
 cSaldo     := IIf(Empty(cSaldo),     "1",  cSaldo)
 cVlrZerado := IIf(Empty(cVlrZerado),"2",  cVlrZerado)
 cConsidFil := IIf(Empty(cConsidFil), "2",  cConsidFil)
@@ -150,6 +150,8 @@ ConOut("[ZCT2RAZ] conta_de=[" + cContaDe + "] conta_ate=[" + cContaAte + "]" + ;
     " item=" + cItemDe + "/" + cItemAte + ;
     " clvl=" + cClvlDe + "/" + cClvlAte + ;
     " vlr_zerado=" + cVlrZerado + " consid_filiais=" + cConsidFil + ;
+    " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
+    " filial_atual=" + cFilialAtual + ;
     " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize))
 
 // --- WHERE comum (data, moeda, valor zerado, filial) ---
@@ -161,8 +163,11 @@ If cVlrZerado == "2"
     cWhere += " AND CT2_VALOR <> 0"
 EndIf
 
-If cConsidFil == "1" .And. !Empty(cFilialDe) .And. !Empty(cFilialAte)
-    cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
+If cConsidFil == "1"
+    If !Empty(cFilialDe) .And. !Empty(cFilialAte)
+        cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
+    // consid_filiais=1 sem range = todas as filiais, sem filtro
+    EndIf
 Else
     cWhere += " AND CT2_FILORI = '" + cFilialAtual + "'"
 EndIf

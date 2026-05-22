@@ -135,16 +135,19 @@ class Ctbr140Service:
     def _linha_para_registro(linha: dict) -> dict:
         normal_cta = str(linha.get("normal_cta") or "1").strip()
         saldo_atu = float(linha.get("saldo_atu") or 0)
+        saldo_ant_raw = float(linha.get("saldo_ant") or 0)
 
         # Conta credito-normal (passivo, receita, contas a pagar):
-        # saldo_atu negativo = creditos > debitos = saldo na direcao certa.
+        # saldo negativo = creditos > debitos = saldo na direcao certa.
         # Invertemos para que o valor fique positivo, igual ao que o relatorio exibe.
         value = -saldo_atu if normal_cta == "2" else saldo_atu
+        saldo_ant = -saldo_ant_raw if normal_cta == "2" else saldo_ant_raw
 
         return {
             "Codigo": linha.get("item", ""),         # CT2_ITEM -> codigo do item/CC
             "Descricao": linha.get("desc_item", ""), # Descricao do item
             "Saldo atual": value,                    # Valor na direcao normal da conta
+            "Saldo anterior": saldo_ant,             # Saldo antes do periodo
         }
 
 
