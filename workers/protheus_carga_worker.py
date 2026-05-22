@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 _PAGE_SIZE = 5000
 _PAGE_SIZE_POR_TIPO: dict[str, int] = {
     "CTBR140": 3000,
-    "CTBR400": 3000,
-    "CTBR480": 3000,
 }
 _INSERT_CHUNK_SIZE = 1000
 
