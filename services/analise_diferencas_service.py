@@ -75,6 +75,7 @@ class AnaliseDiferencasService:
         df_financeiro_detalhado: Optional[pd.DataFrame] = None,
         df_razao_geral: Optional[pd.DataFrame] = None,
         data_base: Optional[str] = None,
+        saldo_ant_map: Optional[Dict[str, float]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Consolida valores por codigo e gera uma analise detalhada financeira.
@@ -123,6 +124,8 @@ class AnaliseDiferencasService:
         col_historico_geral = None
         col_debito_geral = None
         col_credito_geral = None
+        col_xpartida_geral = None
+        col_conta_razao_geral = None
         if df_razao_geral is not None and not df_razao_geral.empty:
             col_itemconta_geral = self._encontrar_coluna(
                 df_razao_geral,
@@ -216,6 +219,14 @@ class AnaliseDiferencasService:
                         "credito",
                         "vlr_credito",
                     ],
+                )
+                col_xpartida_geral = self._encontrar_coluna(
+                    df_razao_geral_norm,
+                    ["xpartida", "XPARTIDA", "partida", "PARTIDA", "contrapartida"],
+                )
+                col_conta_razao_geral = self._encontrar_coluna(
+                    df_razao_geral_norm,
+                    ["conta", "CONTA"],
                 )
 
         df_merge = fin_agg.merge(cont_agg, on="codigo", how="outer")
@@ -369,6 +380,10 @@ class AnaliseDiferencasService:
                             "descricao_conta": nome_cliente if nome_cliente else "",
                             "valor": round(valor_lancamento, 2),
                             "tipo_lancamento": tipo_lancamento,
+                            "debito": round(valor_debito, 2),
+                            "credito": round(valor_credito, 2),
+                            "xpartida": str(r.get(col_xpartida_geral, "")) if col_xpartida_geral else "",
+                            "conta": str(r.get(col_conta_razao_geral, "")) if col_conta_razao_geral else "",
                             "data_lancamento": data_lanc,
                             "documento": str(r.get(col_documento_geral, ""))
                             if col_documento_geral
@@ -437,6 +452,10 @@ class AnaliseDiferencasService:
                                 "descricao_conta": nome_cliente if nome_cliente else "",
                                 "valor": round(valor_lancamento, 2),
                                 "tipo_lancamento": tipo_lancamento,
+                                "debito": round(valor_debito, 2),
+                                "credito": round(valor_credito, 2),
+                                "xpartida": str(r.get(col_xpartida_geral, "")) if col_xpartida_geral else "",
+                                "conta": str(r.get(col_conta_razao_geral, "")) if col_conta_razao_geral else "",
                                 "data_lancamento": data_lanc,
                                 "documento": str(r.get(col_documento_geral, ""))
                                 if col_documento_geral
@@ -518,6 +537,10 @@ class AnaliseDiferencasService:
                             "descricao_conta": nome_cliente if nome_cliente else "",
                             "valor": round(valor_lancamento, 2),
                             "tipo_lancamento": tipo_lancamento,
+                            "debito": round(valor_debito, 2),
+                            "credito": round(valor_credito, 2),
+                            "xpartida": str(r.get(col_xpartida_geral, "")) if col_xpartida_geral else "",
+                            "conta": str(r.get(col_conta_razao_geral, "")) if col_conta_razao_geral else "",
                             "data_lancamento": data_lanc,
                             "documento": str(r.get(col_documento_geral, ""))
                             if col_documento_geral
@@ -674,6 +697,10 @@ class AnaliseDiferencasService:
                             "descricao_conta": nome_cliente if nome_cliente else "",
                             "valor": round(valor_lancamento, 2),
                             "tipo_lancamento": tipo_lanc,
+                            "debito": round(valor_debito, 2),
+                            "credito": round(valor_credito, 2),
+                            "xpartida": str(r.get(col_xpartida_geral, "")) if col_xpartida_geral else "",
+                            "conta": str(r.get(col_conta_razao_geral, "")) if col_conta_razao_geral else "",
                             "data_lancamento": data_lanc,
                             "documento": str(r.get(col_documento_geral, ""))
                             if col_documento_geral
@@ -795,6 +822,8 @@ class AnaliseDiferencasService:
                 key=lambda x: self._parse_data_ordenacao(x.get("data_lancamento", ""))
             )
 
+            saldo_anterior = saldo_ant_map.get(codigo) if saldo_ant_map else None
+
             analises.append(
                 {
                     "codigo": codigo,
@@ -805,6 +834,7 @@ class AnaliseDiferencasService:
                     "diferenca": round(diferenca, 2),
                     "tipo_diferenca": tipo,
                     "status": status,
+                    "saldo_anterior": saldo_anterior,
                     "lancamentos_razao": lancamentos_razao,
                     "lancamentos_razao_detalhes": (
                         lancamentos_razao_detalhes
@@ -863,6 +893,10 @@ class AnaliseDiferencasService:
                     "descricao_conta": lanc.get("descricao_conta", ""),
                     "valor": 0.0,
                     "tipo_lancamento": tipo,
+                    "debito": 0.0,
+                    "credito": 0.0,
+                    "xpartida": lanc.get("xpartida", ""),
+                    "conta": lanc.get("conta", ""),
                     "data_lancamento": lanc.get("data_lancamento", ""),
                     "documento": nf,
                     "historico": lanc.get("historico", ""),
@@ -870,6 +904,12 @@ class AnaliseDiferencasService:
                 }
             agrupados[chave]["valor"] = round(
                 agrupados[chave]["valor"] + float(lanc.get("valor", 0) or 0), 2
+            )
+            agrupados[chave]["debito"] = round(
+                agrupados[chave]["debito"] + float(lanc.get("debito", 0) or 0), 2
+            )
+            agrupados[chave]["credito"] = round(
+                agrupados[chave]["credito"] + float(lanc.get("credito", 0) or 0), 2
             )
 
         return list(agrupados.values()) + sem_nf

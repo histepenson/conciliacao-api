@@ -78,7 +78,7 @@ class Ctbr400Service:
         page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_CTBR400 and v is not None}
         query["pageSize"] = page_size
-        query.setdefault("moeda", "01")
+        query["moeda"] = str(query.get("moeda") or "01").zfill(2)
         return query
 
     def _decode_response(self, raw: bytes) -> dict[str, Any]:
