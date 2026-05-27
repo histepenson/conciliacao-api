@@ -140,7 +140,9 @@
       "Bash(Write-Output \"Backup criado: ZCT2RAZAPI_BKP.prw\")",
       "PowerShell(Copy-Item \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI.prw\" \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI_BKP.prw\")",
       "Bash(not exist *)",
-      "Bash(Get-ChildItem -Path \"C:\\\\conciliacao-app\\\\src\\\\pages\\\\\" -Name)"
+      "Bash(Get-ChildItem -Path \"C:\\\\conciliacao-app\\\\src\\\\pages\\\\\" -Name)",
+      "Bash(git -C c:\\\\conciliacao-api status --short)",
+      "Bash(git -C c:\\\\conciliacao-api log --oneline -3)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
