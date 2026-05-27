@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 _PARAMS_SFT = [
     "data_ini", "data_fim",
     "filial_de", "filial_ate",
-    "entrsa",
     "page", "pageSize",
 ]
 

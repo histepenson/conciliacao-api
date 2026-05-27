@@ -335,6 +335,24 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
         _tentar_enfileirar(db, ativa)
         return ativa, False
 
+    # 2.5. Existe uma carga com erro ou cancelada? Reprocessa para evitar violação de UniqueConstraint.
+    falha = (
+        db.query(ProtheusCarga)
+        .filter(*_filtro_base, ProtheusCarga.status.in_(["erro", "cancelado"]))
+        .order_by(ProtheusCarga.created_at.desc())
+        .first()
+    )
+    if falha:
+        falha.status = "pendente"
+        falha.erro = None
+        falha.iniciado_em = None
+        falha.finalizado_em = None
+        falha.total_registros = 0
+        db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == falha.id).delete()
+        db.commit()
+        _tentar_enfileirar(db, falha)
+        return falha, False
+
     # 3. Sem carga util: cria nova.
     carga = ProtheusCarga(
         config_id=payload.config_id,

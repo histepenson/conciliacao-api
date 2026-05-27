@@ -12,7 +12,6 @@ Parametros:
   data_fim      = data final   YYYYMMDD  (obrigatorio)
   filial_de     = filial inicial (default "")
   filial_ate    = filial final   (default "zzzzzzzzz")
-  entrsa        = E=Entradas | S=Saidas | vazio=Todas (default vazio)
   page          = pagina (default 1)
   pageSize      = registros por pagina (default 5000, max 5000)
 
@@ -43,7 +42,6 @@ wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
     wsdata data_fim       as string
     wsdata filial_de      as string
     wsdata filial_ate     as string
-    wsdata entrsa         as string
 
     wsmethod GET getSftEnt description "Livro Fiscal SFT SQL direto" wssyntax "/api/v1/sftent" PATH "/api/v1/sftent"
 
@@ -67,7 +65,6 @@ Local cDataIni   := AllTrim(Self:data_ini)
 Local cDataFim   := AllTrim(Self:data_fim)
 Local cFilialDe  := AllTrim(Self:filial_de)
 Local cFilialAte := AllTrim(Self:filial_ate)
-Local cEntrSa    := Upper(AllTrim(Self:entrsa))
 Local nPage      := Max(1, Val(AllTrim(Self:page)))
 Local nPageSize  := Val(AllTrim(Self:pageSize))
 
@@ -96,17 +93,12 @@ nOffset    := (nPage - 1) * nPageSize
 
 ConOut("[ZSFTENTAPI] data=" + cDataIni + "/" + cDataFim + ;
     " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
-    " entrsa=" + cEntrSa + ;
     " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize))
 
 // --- WHERE ---
 cWhere := " D_E_L_E_T_ = ' '"
 cWhere += " AND FT_EMISSAO BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
 cWhere += " AND FT_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
-
-If !Empty(cEntrSa) .And. (cEntrSa == "E" .Or. cEntrSa == "S")
-    cWhere += " AND FT_ENTRSA = '" + cEntrSa + "'"
-EndIf
 
 // --- SQL ---
 cSql := " SELECT"
@@ -230,7 +222,6 @@ oParams["data_ini"]   := cDataIni
 oParams["data_fim"]   := cDataFim
 oParams["filial_de"]  := cFilialDe
 oParams["filial_ate"] := cFilialAte
-oParams["entrsa"]     := cEntrSa
 oParams["page"]       := nPage
 oParams["pageSize"]   := nPageSize
 
