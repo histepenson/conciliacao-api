@@ -139,7 +139,8 @@
       "Bash(Copy-Item \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI.prw\" \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI_BKP.prw\")",
       "Bash(Write-Output \"Backup criado: ZCT2RAZAPI_BKP.prw\")",
       "PowerShell(Copy-Item \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI.prw\" \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI_BKP.prw\")",
-      "Bash(not exist *)"
+      "Bash(not exist *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\conciliacao-app\\\\src\\\\pages\\\\\" -Name)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

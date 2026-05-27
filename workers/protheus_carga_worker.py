@@ -14,6 +14,7 @@ from services.finr130_service import FinR130Service
 from services.finr150_service import FinR150Service
 from services.finr470_service import FinR470Service
 from services.matr900_service import Matr900Service
+from services.sft_ent_service import SftEntService
 from services.protheus_carga_service import marcar_concluido, marcar_erro, marcar_processando
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -124,6 +125,7 @@ async def _iterar_paginas(
         "CTBR480": Ctbr480Service,
         "FINR470": FinR470Service,
         "MATR900": Matr900Service,
+        "SFTENT":  SftEntService,
     }
 
     if tipo not in services:

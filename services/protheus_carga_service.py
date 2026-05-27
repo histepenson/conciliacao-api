@@ -23,6 +23,7 @@ RELATORIOS_SUPORTADOS = {
     "CTBR480",
     "FINR470",
     "MATR900",
+    "SFTENT",
 }
 
 STATUS_REUTILIZAVEIS = {"concluido"}

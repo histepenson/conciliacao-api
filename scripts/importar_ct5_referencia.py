@@ -3,10 +3,12 @@ Importa lançamentos padrão (CT5) de um arquivo Excel para a tabela ct5_referen
 
 Uso:
     python scripts/importar_ct5_referencia.py --arquivo Downloads/ctba090.xlsx --empresa-id 1
+    python scripts/importar_ct5_referencia.py --arquivo Downloads/ctba090.xlsx --empresa-id 1 --dry-run
 
 O script:
   - Lê o xlsx (colunas: Filial, Lcto Padrao, Chave Busca, Ordem Busca, Descricao, Alias Arq)
-  - Para alias SD1 e SF1 calcula campo_nf='FT_NFISCAL', nf_posicao_ini=10, nf_tamanho=9
+  - Para alias SD1 e SF1: parseia a chave busca para calcular a posição do campo NF (D1_DOC/F1_DOC)
+    dentro do CT2_KEY, baseado nos tamanhos conhecidos dos campos Protheus
   - Faz upsert (INSERT ... ON CONFLICT DO UPDATE) para ser idempotente
 """
 
@@ -23,12 +25,82 @@ from db import SessionLocal
 
 ALIASES_COM_NF = {"SD1", "SF1"}
 
-# Posição e tamanho da NF dentro do CT2_KEY para LPs de SD1/SF1:
-# Estrutura do CT2_KEY: D1_FILIAL(2) + D1_DOC(9) + ...
-# + FILIAL(2) = pos 1-2
-# + DOC(9)    = pos 3-11  ← NF aqui
-NF_POSICAO_INI = 3
-NF_TAMANHO = 9
+# Campo NF por alias
+CAMPO_NF_POR_ALIAS = {
+    "SD1": "D1_DOC",
+    "SF1": "F1_DOC",
+}
+
+# Tamanhos padrão dos campos Protheus (baseado no dicionário SX3)
+TAMANHOS_CAMPO = {
+    # SD1 - Itens das notas de entrada
+    "D1_FILIAL":  2,
+    "D1_DOC":     9,
+    "D1_SERIE":   3,
+    "D1_FORNECE": 6,
+    "D1_LOJA":    2,
+    "D1_TIPO":    2,
+    "D1_COD":    15,
+    "D1_ITEM":    4,
+    "D1_SEQUEN":  4,
+    # SF1 - Cabeçalho das notas de entrada
+    "F1_FILIAL":  2,
+    "F1_DOC":     9,
+    "F1_SERIE":   3,
+    "F1_FORNECE": 6,
+    "F1_LOJA":    2,
+    "F1_TIPO":    2,
+    "F1_SEQUEN":  4,
+    # SE1 - Contas a receber
+    "E1_FILIAL":  2,
+    "E1_CLIENTE": 6,
+    "E1_LOJA":    2,
+    "E1_PREFIXO": 3,
+    "E1_NUM":     9,
+    "E1_PARCELA": 2,
+    "E1_TIPO":    3,
+    # SE2 - Contas a pagar
+    "E2_FILIAL":  2,
+    "E2_FORNECE": 6,
+    "E2_LOJA":    2,
+    "E2_PREFIXO": 3,
+    "E2_NUM":     9,
+    "E2_PARCELA": 2,
+    "E2_TIPO":    3,
+}
+
+
+def calcular_posicao_nf(chave_busca: str, alias: str) -> tuple[int | None, int | None, list[str]]:
+    """
+    Parseia a fórmula da chave busca e retorna (posicao_ini, tamanho, avisos).
+
+    posicao_ini: posição 1-based do campo NF dentro do CT2_KEY
+    tamanho: tamanho do campo NF
+    avisos: campos cujo tamanho não foi encontrado no dicionário
+    """
+    campo_nf = CAMPO_NF_POR_ALIAS.get(alias)
+    if not campo_nf:
+        return None, None, []
+
+    campos = [c.strip() for c in chave_busca.split("+") if c.strip()]
+    avisos = []
+    posicao = 1
+
+    for campo in campos:
+        tamanho = TAMANHOS_CAMPO.get(campo)
+        if tamanho is None:
+            avisos.append(campo)
+            # Não é possível calcular posição com campo desconhecido antes do NF
+            if campo == campo_nf:
+                break
+            return None, None, avisos
+
+        if campo == campo_nf:
+            return posicao, tamanho, avisos
+
+        posicao += tamanho
+
+    return None, None, avisos
 
 
 def parse_xlsx(arquivo: str):
@@ -42,47 +114,69 @@ def parse_xlsx(arquivo: str):
     expected = {"Filial", "Lcto Padrao", "Chave Busca", "Ordem Busca", "Descricao", "Alias Arq"}
     missing = expected - set(header)
     if missing:
-        raise ValueError(f"Colunas ausentes no arquivo: {missing}\nColunas encontradas: {header}")
+        raise ValueError(f"Colunas ausentes: {missing}\nEncontradas: {header}")
 
     idx = {c: header.index(c) for c in expected}
-
     registros = []
+    todos_avisos = []
+
     for i, row in enumerate(rows[1:], start=2):
         lp = str(row[idx["Lcto Padrao"]]).strip() if row[idx["Lcto Padrao"]] is not None else ""
         if not lp:
             continue
 
         alias = str(row[idx["Alias Arq"]]).strip() if row[idx["Alias Arq"]] else ""
+        chave = str(row[idx["Chave Busca"]]).strip() if row[idx["Chave Busca"]] else ""
         tem_nf = alias in ALIASES_COM_NF
 
+        nf_pos, nf_tam, avisos = (None, None, [])
+        if tem_nf and chave:
+            nf_pos, nf_tam, avisos = calcular_posicao_nf(chave, alias)
+            if avisos:
+                todos_avisos.append(f"  LP {lp} ({alias}): campos sem tamanho definido: {avisos}")
+            if tem_nf and nf_pos is None:
+                todos_avisos.append(f"  LP {lp} ({alias}): não foi possível calcular posição do NF")
+
+        filial_raw = row[idx["Filial"]]
+        filial = str(filial_raw).split("-")[0].strip() if filial_raw else None
+
         registros.append({
-            "filial":        str(row[idx["Filial"]]).split("-")[0].strip() if row[idx["Filial"]] else None,
-            "lp_codigo":     lp,
-            "chave_busca":   str(row[idx["Chave Busca"]]).strip() if row[idx["Chave Busca"]] else None,
-            "ordem_busca":   str(row[idx["Ordem Busca"]]).strip() if row[idx["Ordem Busca"]] is not None else None,
-            "descricao":     str(row[idx["Descricao"]]).strip() if row[idx["Descricao"]] else None,
-            "alias_arq":     alias or None,
-            "campo_nf":      "FT_NFISCAL" if tem_nf else None,
-            "nf_posicao_ini": NF_POSICAO_INI if tem_nf else None,
-            "nf_tamanho":    NF_TAMANHO if tem_nf else None,
+            "filial":         filial,
+            "lp_codigo":      lp,
+            "chave_busca":    chave or None,
+            "ordem_busca":    str(row[idx["Ordem Busca"]]).strip() if row[idx["Ordem Busca"]] is not None else None,
+            "descricao":      str(row[idx["Descricao"]]).strip() if row[idx["Descricao"]] else None,
+            "alias_arq":      alias or None,
+            "campo_nf":       "FT_NFISCAL" if tem_nf and nf_pos else None,
+            "nf_posicao_ini": nf_pos,
+            "nf_tamanho":     nf_tam,
         })
 
-    return registros
+    return registros, todos_avisos
 
 
 def importar(empresa_id: int, arquivo: str, dry_run: bool = False):
-    registros = parse_xlsx(arquivo)
+    registros, avisos = parse_xlsx(arquivo)
     print(f"Lidos {len(registros)} lançamentos padrão do arquivo.")
 
-    nf_count = sum(1 for r in registros if r["campo_nf"])
-    print(f"  Com mapeamento de NF (SD1/SF1): {nf_count}")
-    print(f"  Sem mapeamento de NF:           {len(registros) - nf_count}")
+    nf_mapeados = sum(1 for r in registros if r["nf_posicao_ini"])
+    print(f"  Com posição NF calculada (SD1/SF1): {nf_mapeados}")
+    print(f"  Sem mapeamento de NF:               {len(registros) - nf_mapeados}")
+
+    if avisos:
+        print(f"\nAvisos ({len(avisos)}):")
+        for a in avisos:
+            print(a)
+
+    # Mostrar resumo dos LPs com NF
+    print("\nLP | Alias | Pos NF | Tam | Descrição")
+    print("-" * 70)
+    for r in registros:
+        if r["nf_posicao_ini"]:
+            print(f"  {r['lp_codigo']:<8} {r['alias_arq']:<6} pos={r['nf_posicao_ini']:<4} tam={r['nf_tamanho']}  {(r['descricao'] or '')[:40]}")
 
     if dry_run:
         print("\n[DRY RUN] Nenhuma alteração gravada.")
-        for r in registros[:5]:
-            print(" ", r)
-        print("  ...")
         return
 
     upsert_sql = text("""
@@ -96,15 +190,15 @@ def importar(empresa_id: int, arquivo: str, dry_run: bool = False):
              now(), now())
         ON CONFLICT (empresa_id, lp_codigo)
         DO UPDATE SET
-            filial        = EXCLUDED.filial,
-            chave_busca   = EXCLUDED.chave_busca,
-            ordem_busca   = EXCLUDED.ordem_busca,
-            descricao     = EXCLUDED.descricao,
-            alias_arq     = EXCLUDED.alias_arq,
-            campo_nf      = EXCLUDED.campo_nf,
+            filial         = EXCLUDED.filial,
+            chave_busca    = EXCLUDED.chave_busca,
+            ordem_busca    = EXCLUDED.ordem_busca,
+            descricao      = EXCLUDED.descricao,
+            alias_arq      = EXCLUDED.alias_arq,
+            campo_nf       = EXCLUDED.campo_nf,
             nf_posicao_ini = EXCLUDED.nf_posicao_ini,
-            nf_tamanho    = EXCLUDED.nf_tamanho,
-            updated_at    = now()
+            nf_tamanho     = EXCLUDED.nf_tamanho,
+            updated_at     = now()
     """)
 
     db = SessionLocal()
