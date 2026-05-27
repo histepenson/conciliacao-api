@@ -12,8 +12,8 @@ na CT5 pelo campo CT2_ORIGEM (primeiros 7 caracteres).
 Endpoint: GET /rest/zct2razct5/api/v1/ct2razct5
 
 Parametros:
-  conta_de      = conta contabil inicial        (obrigatorio)
-  conta_ate     = conta contabil final          (obrigatorio)
+  conta_de      = conta contabil inicial        (default "")
+  conta_ate     = conta contabil final          (default "zzzzzzzzzzzzz")
   data_ini      = data inicial YYYYMMDD         (obrigatorio)
   data_fim      = data final   YYYYMMDD         (obrigatorio)
   moeda         = codigo da moeda (default "01")
@@ -116,14 +116,6 @@ Local lIncDeb     := .T.
 Self:SetContentType("application/json")
 
 // --- Validacoes obrigatorias ---
-If Empty(cContaDe) .Or. Empty(cContaAte)
-    Self:SetResponse(CT2RazCT5_MontaErro("VALIDATION_ERROR", "Parametros conta_de e conta_ate sao obrigatorios", ""))
-    FreeObj(oResp)
-    FreeObj(oParams)
-    RestArea(aArea)
-Return .T.
-EndIf
-
 If Empty(cDataIni) .Or. Len(cDataIni) <> 8 .Or. Empty(cDataFim) .Or. Len(cDataFim) <> 8
     Self:SetResponse(CT2RazCT5_MontaErro("VALIDATION_ERROR", "Parametros data_ini e data_fim sao obrigatorios no formato YYYYMMDD", ""))
     FreeObj(oResp)
@@ -136,6 +128,8 @@ EndIf
 cMoeda     := IIf(Empty(cMoeda), "01", PadL(AllTrim(cMoeda), 2, "0"))
 cSaldo     := IIf(Empty(cSaldo),     "1",  cSaldo)
 cVlrZerado := IIf(Empty(cVlrZerado),"2",  cVlrZerado)
+cContaDe   := IIf(Empty(cContaDe),  "",             cContaDe)
+cContaAte  := IIf(Empty(cContaAte), "zzzzzzzzzzzzz", cContaAte)
 cFilialDe  := IIf(Empty(cFilialDe),  "",          cFilialDe)
 cFilialAte := IIf(Empty(cFilialAte), "zzzzzzzzz", cFilialAte)
 nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)

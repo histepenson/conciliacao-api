@@ -3,13 +3,13 @@
 #Include "APWEBSRV.ch"
 
 /*/{Protheus.doc} ZSFTENTAPI
-API REST de entradas/saidas do Livro Fiscal via consulta SQL direta na tabela SFT.
+API REST do Livro Fiscal via consulta SQL direta na tabela SFT.
 
 Endpoint: GET /rest/zsftentapi/api/v1/sftent
 
 Parametros:
-  data_ini      = data inicial YYYYMMDD         (obrigatorio)
-  data_fim      = data final   YYYYMMDD         (obrigatorio)
+  data_ini      = data inicial YYYYMMDD  (obrigatorio)
+  data_fim      = data final   YYYYMMDD  (obrigatorio)
   filial_de     = filial inicial (default "")
   filial_ate    = filial final   (default "zzzzzzzzz")
   entrsa        = E=Entradas | S=Saidas | vazio=Todas (default vazio)
@@ -25,17 +25,17 @@ Retorno JSON:
   linhas          = registros da pagina
 
 Campos por linha:
-  filial, nf, serie, tipo, data, emissao,
-  fornece, loja, cfop, tpnf, entrsa,
-  valmerc, valipi, valfre, valliq,
-  basicm, valicm, valdesc, valout, valcont
+  filial, nf, tes, emissao, cliefor, estado, cfop, especie, quant,
+  valcont, aliqicm, baseicm, valicm, isenicm, outricm,
+  icmscom, icmsdif, difal, icmsret,
+  produto, cstpis, codbcc, valpis, valcof, valipi
 
 @author Equipe Desenvolvimento
 @since 27/05/2026
-@version 1.2
+@version 1.3
 /*/
 
-wsrestful ZSFTENTAPI description "SFT - Livro Fiscal Entradas/Saidas SQL Direto"
+wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
 
     wsdata page           as string
     wsdata pageSize       as string
@@ -101,7 +101,7 @@ ConOut("[ZSFTENTAPI] data=" + cDataIni + "/" + cDataFim + ;
 
 // --- WHERE ---
 cWhere := " D_E_L_E_T_ = ' '"
-cWhere += " AND FT_DATA BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
+cWhere += " AND FT_EMISSAO BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
 cWhere += " AND FT_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 
 If !Empty(cEntrSa) .And. (cEntrSa == "E" .Or. cEntrSa == "S")
@@ -112,67 +112,81 @@ EndIf
 cSql := " SELECT"
 cSql += "     FT_FILIAL,"
 cSql += "     FT_NFISCAL,"
-cSql += "     FT_SERIE,"
-cSql += "     FT_TIPO,"
-cSql += "     FT_DATA,"
+cSql += "     FT_TES,"
 cSql += "     FT_EMISSAO,"
-cSql += "     FT_FORNECE,"
-cSql += "     FT_LOJA,"
+cSql += "     FT_CLIEFOR,"
+cSql += "     FT_ESTADO,"
 cSql += "     FT_CFOP,"
-cSql += "     FT_TPNF,"
-cSql += "     FT_ENTRSA,"
-cSql += "     FT_VALMERC,"
-cSql += "     FT_VALIPI,"
-cSql += "     FT_VALFRE,"
-cSql += "     FT_VALLIQ,"
-cSql += "     FT_BASICM,"
+cSql += "     FT_ESPECIE,"
+cSql += "     FT_QUANT,"
+cSql += "     FT_VALCONT,"
+cSql += "     FT_ALIQICM,"
+cSql += "     FT_BASEICM,"
 cSql += "     FT_VALICM,"
-cSql += "     FT_VALDESC,"
-cSql += "     FT_VALOUT,"
-cSql += "     FT_VALCONT"
+cSql += "     FT_ISENICM,"
+cSql += "     FT_OUTRICM,"
+cSql += "     FT_ICMSCOM,"
+cSql += "     FT_ICMSDIF,"
+cSql += "     FT_DIFAL,"
+cSql += "     FT_ICMSRET,"
+cSql += "     FT_PRODUTO,"
+cSql += "     FT_CSTPIS,"
+cSql += "     FT_CODBCC,"
+cSql += "     FT_VALPIS,"
+cSql += "     FT_VALCOF,"
+cSql += "     FT_VALIPI"
 cSql += " FROM " + cTabela
 cSql += " WHERE " + cWhere
-cSql += " ORDER BY FT_DATA, FT_FILIAL, FT_NFISCAL, FT_SERIE"
+cSql += " ORDER BY FT_EMISSAO, FT_FILIAL, FT_NFISCAL"
 
 ConOut("[ZSFTENTAPI] SQL montado | tabela=" + cTabela)
 
 Begin Sequence
     dbUseArea(.T., "TOPCONN", TCGenQry(,, cSql), cAlias, .T., .F.)
-    TCSetField(cAlias, "FT_DATA",    "D",  8, 0)
     TCSetField(cAlias, "FT_EMISSAO", "D",  8, 0)
-    TCSetField(cAlias, "FT_VALMERC", "N", 16, 2)
-    TCSetField(cAlias, "FT_VALIPI",  "N", 16, 2)
-    TCSetField(cAlias, "FT_VALFRE",  "N", 16, 2)
-    TCSetField(cAlias, "FT_VALLIQ",  "N", 16, 2)
-    TCSetField(cAlias, "FT_BASICM",  "N", 16, 2)
-    TCSetField(cAlias, "FT_VALICM",  "N", 16, 2)
-    TCSetField(cAlias, "FT_VALDESC", "N", 16, 2)
-    TCSetField(cAlias, "FT_VALOUT",  "N", 16, 2)
+    TCSetField(cAlias, "FT_QUANT",   "N", 16, 3)
     TCSetField(cAlias, "FT_VALCONT", "N", 16, 2)
+    TCSetField(cAlias, "FT_ALIQICM", "N",  8, 4)
+    TCSetField(cAlias, "FT_BASEICM", "N", 16, 2)
+    TCSetField(cAlias, "FT_VALICM",  "N", 16, 2)
+    TCSetField(cAlias, "FT_ISENICM", "N", 16, 2)
+    TCSetField(cAlias, "FT_OUTRICM", "N", 16, 2)
+    TCSetField(cAlias, "FT_ICMSCOM", "N", 16, 2)
+    TCSetField(cAlias, "FT_ICMSDIF", "N", 16, 2)
+    TCSetField(cAlias, "FT_DIFAL",   "N", 16, 2)
+    TCSetField(cAlias, "FT_ICMSRET", "N", 16, 2)
+    TCSetField(cAlias, "FT_VALPIS",  "N", 16, 2)
+    TCSetField(cAlias, "FT_VALCOF",  "N", 16, 2)
+    TCSetField(cAlias, "FT_VALIPI",  "N", 16, 2)
 
     (cAlias)->(DbGoTop())
     While !(cAlias)->(Eof())
         oLinha := JsonObject():New()
         oLinha["filial"]   := AllTrim((cAlias)->FT_FILIAL)
         oLinha["nf"]       := AllTrim((cAlias)->FT_NFISCAL)
-        oLinha["serie"]    := AllTrim((cAlias)->FT_SERIE)
-        oLinha["tipo"]     := AllTrim((cAlias)->FT_TIPO)
-        oLinha["data"]     := DtoC((cAlias)->FT_DATA)
+        oLinha["tes"]      := AllTrim((cAlias)->FT_TES)
         oLinha["emissao"]  := DtoC((cAlias)->FT_EMISSAO)
-        oLinha["fornece"]  := AllTrim((cAlias)->FT_FORNECE)
-        oLinha["loja"]     := AllTrim((cAlias)->FT_LOJA)
+        oLinha["cliefor"]  := AllTrim((cAlias)->FT_CLIEFOR)
+        oLinha["estado"]   := AllTrim((cAlias)->FT_ESTADO)
         oLinha["cfop"]     := AllTrim((cAlias)->FT_CFOP)
-        oLinha["tpnf"]     := AllTrim((cAlias)->FT_TPNF)
-        oLinha["entrsa"]   := AllTrim((cAlias)->FT_ENTRSA)
-        oLinha["valmerc"]  := Round((cAlias)->FT_VALMERC, 2)
-        oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
-        oLinha["valfre"]   := Round((cAlias)->FT_VALFRE,  2)
-        oLinha["valliq"]   := Round((cAlias)->FT_VALLIQ,  2)
-        oLinha["basicm"]   := Round((cAlias)->FT_BASICM,  2)
+        oLinha["especie"]  := AllTrim((cAlias)->FT_ESPECIE)
+        oLinha["quant"]    := Round((cAlias)->FT_QUANT,   3)
+        oLinha["valcont"]  := Round((cAlias)->FT_VALCONT, 2)
+        oLinha["aliqicm"]  := Round((cAlias)->FT_ALIQICM, 4)
+        oLinha["baseicm"]  := Round((cAlias)->FT_BASEICM, 2)
         oLinha["valicm"]   := Round((cAlias)->FT_VALICM,  2)
-        oLinha["valdesc"]  := Round((cAlias)->FT_VALDESC,  2)
-        oLinha["valout"]   := Round((cAlias)->FT_VALOUT,   2)
-        oLinha["valcont"]  := Round((cAlias)->FT_VALCONT,  2)
+        oLinha["isenicm"]  := Round((cAlias)->FT_ISENICM, 2)
+        oLinha["outricm"]  := Round((cAlias)->FT_OUTRICM, 2)
+        oLinha["icmscom"]  := Round((cAlias)->FT_ICMSCOM, 2)
+        oLinha["icmsdif"]  := Round((cAlias)->FT_ICMSDIF, 2)
+        oLinha["difal"]    := Round((cAlias)->FT_DIFAL,   2)
+        oLinha["icmsret"]  := Round((cAlias)->FT_ICMSRET, 2)
+        oLinha["produto"]  := AllTrim((cAlias)->FT_PRODUTO)
+        oLinha["cstpis"]   := AllTrim((cAlias)->FT_CSTPIS)
+        oLinha["codbcc"]   := AllTrim((cAlias)->FT_CODBCC)
+        oLinha["valpis"]   := Round((cAlias)->FT_VALPIS,  2)
+        oLinha["valcof"]   := Round((cAlias)->FT_VALCOF,  2)
+        oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
         AAdd(aAllLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo

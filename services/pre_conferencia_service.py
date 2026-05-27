@@ -39,16 +39,12 @@ TAMANHOS_CAMPO: dict[str, int] = {
 MAPA_CAMPO_SFT: dict[str, str] = {
     "D1_FILIAL":  "filial",
     "D1_DOC":     "nf",
-    "D1_SERIE":   "serie",
-    "D1_FORNECE": "fornece",
-    "D1_LOJA":    "loja",
-    "D1_TIPO":    "tipo",
+    "D1_FORNECE": "cliefor",
+    # D1_SERIE, D1_LOJA, D1_TIPO: sem equivalente nas colunas SFT disponíveis
     "F1_FILIAL":  "filial",
     "F1_DOC":     "nf",
-    "F1_SERIE":   "serie",
-    "F1_FORNECE": "fornece",
-    "F1_LOJA":    "loja",
-    "F1_TIPO":    "tipo",
+    "F1_FORNECE": "cliefor",
+    # F1_SERIE, F1_LOJA, F1_TIPO: sem equivalente nas colunas SFT disponíveis
 }
 
 
