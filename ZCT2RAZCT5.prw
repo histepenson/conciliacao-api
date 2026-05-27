@@ -23,9 +23,8 @@ Parametros:
   clvl_de       = classe de valor inicial
   clvl_ate      = classe de valor final
   vlr_zerado    = 1=Incluir zeros | 2=Excluir zeros (default "2")
-  consid_filiais= 1=Range filiais | 2=Filial corrente (default "2")
-  filial_de     = filial inicial (quando consid_filiais=1)
-  filial_ate    = filial final   (quando consid_filiais=1)
+  filial_de     = filial inicial (default "")
+  filial_ate    = filial final   (default "zzzzzzzzz")
   custo_de      = centro de custo inicial (aceito, nao filtra em CT2)
   custo_ate     = centro de custo final   (aceito, nao filtra em CT2)
   page          = pagina (default 1)
@@ -88,6 +87,7 @@ Local cSql       := ""
 Local cWhere     := ""
 Local cTabela    := RetSqlName("CT2")
 Local cTabelaCT5 := RetSqlName("CT5")
+Local cErrMsg    := ""
 
 Local cContaDe      := AllTrim(Self:conta_de)
 Local cContaAte     := AllTrim(Self:conta_ate)
@@ -100,7 +100,6 @@ Local cItemAte      := AllTrim(Self:item_ate)
 Local cClvlDe       := AllTrim(Self:clvl_de)
 Local cClvlAte      := AllTrim(Self:clvl_ate)
 Local cVlrZerado    := AllTrim(Self:vlr_zerado)
-Local cConsidFil    := AllTrim(Self:consid_filiais)
 Local cFilialDe     := AllTrim(Self:filial_de)
 Local cFilialAte    := AllTrim(Self:filial_ate)
 Local nPage         := Max(1, Val(AllTrim(Self:page)))
@@ -113,7 +112,6 @@ Local nRecAtual   := 0
 Local lHasMore    := .F.
 Local lIncCred    := .T.
 Local lIncDeb     := .T.
-Local cFilialAtual := xFilial("CT2")
 
 Self:SetContentType("application/json")
 
@@ -138,7 +136,8 @@ EndIf
 cMoeda     := IIf(Empty(cMoeda), "01", PadL(AllTrim(cMoeda), 2, "0"))
 cSaldo     := IIf(Empty(cSaldo),     "1",  cSaldo)
 cVlrZerado := IIf(Empty(cVlrZerado),"2",  cVlrZerado)
-cConsidFil := IIf(Empty(cConsidFil), "2",  cConsidFil)
+cFilialDe  := IIf(Empty(cFilialDe),  "",          cFilialDe)
+cFilialAte := IIf(Empty(cFilialAte), "zzzzzzzzz", cFilialAte)
 nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset    := (nPage - 1) * nPageSize
 
@@ -151,9 +150,8 @@ ConOut("[ZCT2RAZCT5] conta_de=[" + cContaDe + "] conta_ate=[" + cContaAte + "]" 
     " moeda=" + cMoeda + " saldo=" + cSaldo + ;
     " item=" + cItemDe + "/" + cItemAte + ;
     " clvl=" + cClvlDe + "/" + cClvlAte + ;
-    " vlr_zerado=" + cVlrZerado + " consid_filiais=" + cConsidFil + ;
+    " vlr_zerado=" + cVlrZerado + ;
     " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
-    " filial_atual=" + cFilialAtual + ;
     " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize))
 
 // --- WHERE comum (CT2. prefixo em D_E_L_E_T_ para evitar ambiguidade com CT5) ---
@@ -165,14 +163,7 @@ If cVlrZerado == "2"
     cWhere += " AND CT2_VALOR <> 0"
 EndIf
 
-If cConsidFil == "1"
-    If !Empty(cFilialDe) .And. !Empty(cFilialAte)
-        cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
-    // consid_filiais=1 sem range = todas as filiais, sem filtro
-    EndIf
-Else
-    cWhere += " AND CT2_FILORI = '" + cFilialAtual + "'"
-EndIf
+cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 
 // --- Bloco CREDITO (DC=2 e DC=3) ---
 If lIncCred
@@ -293,8 +284,12 @@ Recover Using oError
     If Select(cAlias) > 0
         (cAlias)->(DbCloseArea())
     EndIf
-    ConOut("[ZCT2RAZCT5] ERRO: " + oError:Description)
-    Self:SetResponse(CT2RazCT5_MontaErro("INTERNAL_ERROR", "Erro ao consultar CT2: " + oError:Description, ""))
+    cErrMsg := "Erro ao consultar CT2"
+    If ValType(oError) == "O"
+        cErrMsg += ": " + AllTrim(oError:Description)
+    EndIf
+    ConOut("[ZCT2RAZCT5] ERRO: " + cErrMsg)
+    Self:SetResponse(CT2RazCT5_MontaErro("INTERNAL_ERROR", cErrMsg, ""))
     FreeObj(oResp)
     FreeObj(oParams)
     AEval(aAllLinhas, {|o| FreeObj(o)})
@@ -319,7 +314,6 @@ oParams["item_ate"]       := cItemAte
 oParams["clvl_de"]        := cClvlDe
 oParams["clvl_ate"]       := cClvlAte
 oParams["vlr_zerado"]     := cVlrZerado
-oParams["consid_filiais"] := cConsidFil
 oParams["filial_de"]      := cFilialDe
 oParams["filial_ate"]     := cFilialAte
 oParams["page"]           := nPage

@@ -3,16 +3,15 @@
 #Include "APWEBSRV.ch"
 
 /*/{Protheus.doc} ZSFTENTAPI
-API REST de entradas do Livro Fiscal via consulta SQL direta na tabela SFT.
+API REST de entradas/saidas do Livro Fiscal via consulta SQL direta na tabela SFT.
 
 Endpoint: GET /rest/zsftentapi/api/v1/sftent
 
 Parametros:
   data_ini      = data inicial YYYYMMDD         (obrigatorio)
   data_fim      = data final   YYYYMMDD         (obrigatorio)
-  consid_filiais= 1=Range filiais | 2=Filial corrente (default "2")
-  filial_de     = filial inicial (quando consid_filiais=1)
-  filial_ate    = filial final   (quando consid_filiais=1)
+  filial_de     = filial inicial (default "")
+  filial_ate    = filial final   (default "zzzzzzzzz")
   entrsa        = E=Entradas | S=Saidas | vazio=Todas (default vazio)
   page          = pagina (default 1)
   pageSize      = registros por pagina (default 5000, max 5000)
@@ -29,12 +28,11 @@ Campos por linha:
   filial, nf, serie, tipo, data, emissao,
   fornece, loja, cfop, tpnf, entrsa,
   valmerc, valipi, valfre, valliq,
-  basicm, valicm, valdesc, valout, valcont,
-  chvnfe
+  basicm, valicm, valdesc, valout, valcont
 
 @author Equipe Desenvolvimento
 @since 27/05/2026
-@version 1.0
+@version 1.2
 /*/
 
 wsrestful ZSFTENTAPI description "SFT - Livro Fiscal Entradas/Saidas SQL Direto"
@@ -43,7 +41,6 @@ wsrestful ZSFTENTAPI description "SFT - Livro Fiscal Entradas/Saidas SQL Direto"
     wsdata pageSize       as string
     wsdata data_ini       as string
     wsdata data_fim       as string
-    wsdata consid_filiais as string
     wsdata filial_de      as string
     wsdata filial_ate     as string
     wsdata entrsa         as string
@@ -64,22 +61,21 @@ Local cAlias     := GetNextAlias()
 Local cSql       := ""
 Local cWhere     := ""
 Local cTabela    := RetSqlName("SFT")
+Local cErrMsg    := ""
 
-Local cDataIni      := AllTrim(Self:data_ini)
-Local cDataFim      := AllTrim(Self:data_fim)
-Local cConsidFil    := AllTrim(Self:consid_filiais)
-Local cFilialDe     := AllTrim(Self:filial_de)
-Local cFilialAte    := AllTrim(Self:filial_ate)
-Local cEntrSa       := Upper(AllTrim(Self:entrsa))
-Local nPage         := Max(1, Val(AllTrim(Self:page)))
-Local nPageSize     := Val(AllTrim(Self:pageSize))
+Local cDataIni   := AllTrim(Self:data_ini)
+Local cDataFim   := AllTrim(Self:data_fim)
+Local cFilialDe  := AllTrim(Self:filial_de)
+Local cFilialAte := AllTrim(Self:filial_ate)
+Local cEntrSa    := Upper(AllTrim(Self:entrsa))
+Local nPage      := Max(1, Val(AllTrim(Self:page)))
+Local nPageSize  := Val(AllTrim(Self:pageSize))
 
 Local nTotalReg   := 0
 Local nTotalPages := 1
 Local nOffset     := 0
 Local nRecAtual   := 0
 Local lHasMore    := .F.
-Local cFilialAtual := xFilial("SFT")
 
 Self:SetContentType("application/json")
 
@@ -93,28 +89,20 @@ Return .T.
 EndIf
 
 // --- Defaults ---
-cConsidFil := IIf(Empty(cConsidFil), "2", cConsidFil)
+cFilialDe  := IIf(Empty(cFilialDe),  "",          cFilialDe)
+cFilialAte := IIf(Empty(cFilialAte), "zzzzzzzzz", cFilialAte)
 nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset    := (nPage - 1) * nPageSize
 
 ConOut("[ZSFTENTAPI] data=" + cDataIni + "/" + cDataFim + ;
-    " consid_filiais=" + cConsidFil + ;
     " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
     " entrsa=" + cEntrSa + ;
-    " filial_atual=" + cFilialAtual + ;
     " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize))
 
 // --- WHERE ---
 cWhere := " D_E_L_E_T_ = ' '"
 cWhere += " AND FT_DATA BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
-
-If cConsidFil == "1"
-    If !Empty(cFilialDe) .And. !Empty(cFilialAte)
-        cWhere += " AND FT_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
-    EndIf
-Else
-    cWhere += " AND FT_FILIAL = '" + cFilialAtual + "'"
-EndIf
+cWhere += " AND FT_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 
 If !Empty(cEntrSa) .And. (cEntrSa == "E" .Or. cEntrSa == "S")
     cWhere += " AND FT_ENTRSA = '" + cEntrSa + "'"
@@ -141,8 +129,7 @@ cSql += "     FT_BASICM,"
 cSql += "     FT_VALICM,"
 cSql += "     FT_VALDESC,"
 cSql += "     FT_VALOUT,"
-cSql += "     FT_VALCONT,"
-cSql += "     FT_CHVNFE"
+cSql += "     FT_VALCONT"
 cSql += " FROM " + cTabela
 cSql += " WHERE " + cWhere
 cSql += " ORDER BY FT_DATA, FT_FILIAL, FT_NFISCAL, FT_SERIE"
@@ -186,7 +173,6 @@ Begin Sequence
         oLinha["valdesc"]  := Round((cAlias)->FT_VALDESC,  2)
         oLinha["valout"]   := Round((cAlias)->FT_VALOUT,   2)
         oLinha["valcont"]  := Round((cAlias)->FT_VALCONT,  2)
-        oLinha["chvnfe"]   := AllTrim((cAlias)->FT_CHVNFE)
         AAdd(aAllLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo
@@ -207,8 +193,12 @@ Recover Using oError
     If Select(cAlias) > 0
         (cAlias)->(DbCloseArea())
     EndIf
-    ConOut("[ZSFTENTAPI] ERRO: " + oError:Description)
-    Self:SetResponse(SftEnt_MontaErro("INTERNAL_ERROR", "Erro ao consultar SFT: " + oError:Description, ""))
+    cErrMsg := "Erro ao consultar SFT"
+    If ValType(oError) == "O"
+        cErrMsg += ": " + AllTrim(oError:Description)
+    EndIf
+    ConOut("[ZSFTENTAPI] ERRO: " + cErrMsg)
+    Self:SetResponse(SftEnt_MontaErro("INTERNAL_ERROR", cErrMsg, ""))
     FreeObj(oResp)
     FreeObj(oParams)
     AEval(aAllLinhas, {|o| FreeObj(o)})
@@ -222,14 +212,13 @@ ConOut("[ZSFTENTAPI] total=" + cValToChar(nTotalReg) + ;
     " linhas_pagina=" + cValToChar(Len(aLinhas)) + ;
     " hasMore=" + IIf(lHasMore, "S", "N"))
 
-oParams["data_ini"]       := cDataIni
-oParams["data_fim"]       := cDataFim
-oParams["consid_filiais"] := cConsidFil
-oParams["filial_de"]      := cFilialDe
-oParams["filial_ate"]     := cFilialAte
-oParams["entrsa"]         := cEntrSa
-oParams["page"]           := nPage
-oParams["pageSize"]       := nPageSize
+oParams["data_ini"]   := cDataIni
+oParams["data_fim"]   := cDataFim
+oParams["filial_de"]  := cFilialDe
+oParams["filial_ate"] := cFilialAte
+oParams["entrsa"]     := cEntrSa
+oParams["page"]       := nPage
+oParams["pageSize"]   := nPageSize
 
 oResp["parametros"]      := oParams
 oResp["total_registros"] := nTotalReg

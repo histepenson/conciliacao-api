@@ -32,6 +32,7 @@ from routers.produto_fornecedor_router import router as produto_fornecedor_route
 from routers.certificado_router import router as certificado_router
 from routers.nfe_router import router as nfe_router
 from routers.estoque_router import router as estoque_router
+from routers.pre_conferencia_router import router as pre_conferencia_router
 
 
 @asynccontextmanager
@@ -129,3 +130,4 @@ app.include_router(produto_fornecedor_router, prefix="/api")
 app.include_router(certificado_router, prefix="/api")
 app.include_router(nfe_router, prefix="/api")
 app.include_router(estoque_router)
+app.include_router(pre_conferencia_router, prefix="/api")

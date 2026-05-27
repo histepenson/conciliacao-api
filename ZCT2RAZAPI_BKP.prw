@@ -42,7 +42,7 @@ Retorno JSON:
 Campos por linha (compativel com CTBR400 / CTBR480):
   data, lote_sub_doc_linha, historico, xpartida,
   c_custo, item_conta, cod_cl_val,
-  debito, credito, saldo_atual, conta
+  debito, credito, saldo_atual, conta, ct2_key
 
 @author Equipe Desenvolvimento
 @since 21/05/2026
@@ -252,6 +252,7 @@ Begin Sequence
         oLinha["credito"]            := Round((cAlias)->credito, 2)
         oLinha["saldo_atual"]        := 0
         oLinha["conta"]              := AllTrim((cAlias)->conta)
+        oLinha["ct2_key"]            := AllTrim((cAlias)->CT2_KEY)
         AAdd(aAllLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo
