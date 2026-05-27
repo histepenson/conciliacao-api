@@ -80,6 +80,8 @@ class SftEntService:
         page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_SFT and v is not None}
         query["pageSize"] = page_size
+        query["filial_de"] = str(query.get("filial_de") or "").strip()
+        query["filial_ate"] = str(query.get("filial_ate") or "").strip() or "zzzzzzzzz"
         return query
 
 
