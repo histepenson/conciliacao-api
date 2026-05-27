@@ -63,6 +63,8 @@ class Ct2RazCt5Service:
         query = {k: v for k, v in params.items() if k in _PARAMS_CT2RAZCT5 and v is not None}
         query["pageSize"] = page_size
         query["moeda"] = str(query.get("moeda") or "01").zfill(2)
+        query["conta_de"] = str(query.get("conta_de") or "").strip() or "0"
+        query["conta_ate"] = str(query.get("conta_ate") or "").strip() or "zzzzzzzzzzzzz"
         return query
 
 
