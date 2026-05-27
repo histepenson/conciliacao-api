@@ -228,6 +228,10 @@ class AnaliseDiferencasService:
                     df_razao_geral_norm,
                     ["conta", "CONTA"],
                 )
+                col_ct5_desc_geral = self._encontrar_coluna(
+                    df_razao_geral_norm,
+                    ["ct5_desc", "CT5_DESC"],
+                )
 
         df_merge = fin_agg.merge(cont_agg, on="codigo", how="outer")
         if not razao_agg.empty:
@@ -392,6 +396,7 @@ class AnaliseDiferencasService:
                             if col_historico_geral
                             else "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
+                            "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                         }
                     )
             if tipo == "SO_CONTABILIDADE" and lancamentos_razao_geral:
@@ -464,6 +469,7 @@ class AnaliseDiferencasService:
                                 if col_historico_geral
                                 else "",
                                 "tipo_movimento": "NAO_IDENTIFICADO",
+                                "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                             }
                         )
 
@@ -549,6 +555,7 @@ class AnaliseDiferencasService:
                             if col_historico_geral
                             else "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
+                            "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                         }
                     )
 
@@ -709,6 +716,7 @@ class AnaliseDiferencasService:
                             if col_historico_geral
                             else "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
+                            "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                         }
                     )
 
@@ -901,6 +909,7 @@ class AnaliseDiferencasService:
                     "documento": nf,
                     "historico": lanc.get("historico", ""),
                     "tipo_movimento": lanc.get("tipo_movimento", ""),
+                    "ct5_desc": lanc.get("ct5_desc", ""),
                 }
             agrupados[chave]["valor"] = round(
                 agrupados[chave]["valor"] + float(lanc.get("valor", 0) or 0), 2
@@ -1370,6 +1379,9 @@ class AnaliseDiferencasService:
         col_centro_custo = self._encontrar_coluna(
             df_razao_geral, ["CCUSTO", "ccusto", "c_custo", "C CUSTO", "centro_custo"]
         )
+        col_ct5_desc = self._encontrar_coluna(
+            df_razao_geral, ["ct5_desc", "CT5_DESC"]
+        )
 
         logger.info(
             "[ANALISE PROFUNDA] Colunas identificadas - codigo: %s, conta: %s, xpartida: %s, debito: %s, credito: %s",
@@ -1538,6 +1550,7 @@ class AnaliseDiferencasService:
                             "documento": documento,
                             "historico": historico,
                             "tipo_movimento": tipo_movimento,
+                            "ct5_desc": str(row.get(col_ct5_desc, "")) if col_ct5_desc else "",
                         }
                     )
 

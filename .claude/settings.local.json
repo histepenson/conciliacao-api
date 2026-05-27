@@ -135,7 +135,11 @@
       "PowerShell(Head 30)",
       "Bash(.venv/Scripts/python -)",
       "Bash(mkdir \"C:\\\\conciliacao-app\\\\src\\\\hooks\")",
-      "Read(//c//**)"
+      "Read(//c//**)",
+      "Bash(Copy-Item \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI.prw\" \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI_BKP.prw\")",
+      "Bash(Write-Output \"Backup criado: ZCT2RAZAPI_BKP.prw\")",
+      "PowerShell(Copy-Item \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI.prw\" \"c:\\\\conciliacao-api\\\\ZCT2RAZAPI_BKP.prw\")",
+      "Bash(not exist *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
