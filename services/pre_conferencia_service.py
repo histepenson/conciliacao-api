@@ -132,7 +132,13 @@ def conferir(
             continue
 
         cfops_set = {str(c).strip() for c in config.cfops}
-        sft_lp = [s for cfop, lst in sft_por_cfop.items() for s in lst if any(c in cfop for c in cfops_set)]
+        tes_set = {str(t).strip() for t in config.tes_codes} if config.tes_codes else None
+        sft_lp = [
+            s for cfop, lst in sft_por_cfop.items()
+            if any(c in cfop for c in cfops_set)
+            for s in lst
+            if tes_set is None or any(t in str(s.get("tes") or "").strip() for t in tes_set)
+        ]
 
         total_sft = round(sum(float(s.get("valcont") or 0) for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)

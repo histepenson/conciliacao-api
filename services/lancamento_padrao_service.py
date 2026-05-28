@@ -30,7 +30,7 @@ def obter(db: Session, lp_id: int, empresa_id: int) -> LancamentoPadrao:
 
 def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> LancamentoPadrao:
     lp = obter(db, lp_id, empresa_id)
-    campos = ("descricao", "cfops", "colunas_sft", "ativo")
+    campos = ("descricao", "cfops", "tes_codes", "colunas_sft", "ativo")
     for campo in campos:
         if campo in dados:
             setattr(lp, campo, dados[campo])

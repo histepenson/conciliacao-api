@@ -17,6 +17,7 @@ class LancamentoPadrao(Base):
     lp_codigo = Column(String(10), nullable=False)
     descricao = Column(String(200), nullable=False, server_default="")
     cfops = Column(JSON)        # ["1101", "2101", "3101"]
+    tes_codes = Column(JSON)    # ["001", "002"] — filtro de TES no SFT
     colunas_sft = Column(JSON)  # ["filial", "nf", "cliefor"]
     ativo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
