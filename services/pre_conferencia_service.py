@@ -135,6 +135,34 @@ def conferir(
             if tes_set is None or any(t in str(s.get("tes") or "").strip() for t in tes_set)
         ]
 
+    # ── Matching por valor: CT2.debito ↔ SFT.valcont (±0.01) ────────────────
+    def _match_ct2_sft(ct2_recs: list, sft_recs: list) -> tuple:
+        from collections import defaultdict
+        sft_pool: dict = defaultdict(list)
+        for i, s in enumerate(sft_recs):
+            v = round(float(s.get("valcont") or 0), 2)
+            sft_pool[v].append(i)
+
+        sft_matched: set = set()
+        ct2_resultado = []
+
+        for rec in ct2_recs:
+            debito = round(float(rec.get("debito") or 0), 2)
+            matched = False
+            if debito > 0:
+                for idx in sft_pool.get(debito, []):
+                    if idx not in sft_matched:
+                        sft_matched.add(idx)
+                        matched = True
+                        break
+            ct2_resultado.append({**rec, "matched": matched})
+
+        sft_resultado = [
+            {**s, "matched": i in sft_matched}
+            for i, s in enumerate(sft_recs)
+        ]
+        return ct2_resultado, sft_resultado
+
     # ── Processar GRUPOS ─────────────────────────────────────────────────────
     grupos_configs: dict[str, list[LancamentoPadrao]] = {}
     for lp in todos_lps:
@@ -146,14 +174,6 @@ def conferir(
         total_ct2 = round(sum(float(r.get("debito") or 0) for r in ct2_recs), 2)
         lp_codes = sorted({m.lp_codigo for m in members})
         lp_codigo_display = lp_codes[0] if len(lp_codes) == 1 else f"{lp_codes[0]}+{len(lp_codes)-1}"
-
-        ct2_detalhes = sorted(
-            [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
-              "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
-              "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or "")}
-             for r in ct2_recs],
-            key=lambda x: x["data"],
-        )
 
         cfops_set = set()
         tes_parts: list[str] = []
@@ -167,6 +187,14 @@ def conferir(
         tes_set = set(tes_parts) if tes_parts else None
 
         if not has_cfops:
+            ct2_detalhes = sorted(
+                [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
+                  "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
+                  "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
+                  "matched": False}
+                 for r in ct2_recs],
+                key=lambda x: x["data"],
+            )
             lps_sem_cfop.append(grupo_nome)
             resultados.append({
                 "lp_codigo": lp_codigo_display, "descricao": grupo_nome, "is_grupo": True,
@@ -179,11 +207,23 @@ def conferir(
         sft_lp = _filtrar_sft(cfops_set, tes_set)
         total_sft = round(sum(float(s.get("valcont") or 0) for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)
+
+        ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
+
+        ct2_detalhes = sorted(
+            [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
+              "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
+              "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
+              "matched": r["matched"]}
+             for r in ct2_matched],
+            key=lambda x: x["data"],
+        )
         sft_detalhes = sorted(
             [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
               "emissao": str(s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
               "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
-              "valcont": round(float(s.get("valcont") or 0), 2)} for s in sft_lp],
+              "valcont": round(float(s.get("valcont") or 0), 2), "matched": s["matched"]}
+             for s in sft_matched],
             key=lambda x: (x["filial"], x["nf"]),
         )
         resultados.append({
@@ -203,22 +243,15 @@ def conferir(
         if not descricao and config and config.descricao:
             descricao = config.descricao
 
-        ct2_detalhes = sorted(
-            [
-                {
-                    "data":      str(r.get("data") or ""),
-                    "lote":      str(r.get("lote_sub_doc_linha") or ""),
-                    "historico": str(r.get("historico") or "")[:80],
-                    "debito":    round(float(r.get("debito") or 0), 2),
-                    "credito":   round(float(r.get("credito") or 0), 2),
-                    "conta":     str(r.get("conta") or ""),
-                }
-                for r in ct2_recs
-            ],
-            key=lambda x: x["data"],
-        )
-
         if not config or not config.cfops:
+            ct2_detalhes = sorted(
+                [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
+                  "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
+                  "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
+                  "matched": False}
+                 for r in ct2_recs],
+                key=lambda x: x["data"],
+            )
             lps_sem_cfop.append(f"{lp_codigo} {descricao}".strip())
             resultados.append({
                 "lp_codigo":    lp_codigo,
@@ -242,19 +275,22 @@ def conferir(
         diferenca = round(total_ct2 - total_sft, 2)
         lp_status = "ok" if abs(diferenca) <= 0.01 else "diferente"
 
+        ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
+
+        ct2_detalhes = sorted(
+            [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
+              "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
+              "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
+              "matched": r["matched"]}
+             for r in ct2_matched],
+            key=lambda x: x["data"],
+        )
         sft_detalhes = sorted(
-            [
-                {
-                    "filial":  str(s.get("filial") or ""),
-                    "nf":      str(s.get("nf") or ""),
-                    "emissao": str(s.get("emissao") or ""),
-                    "cliefor": str(s.get("cliefor") or ""),
-                    "cfop":    str(s.get("cfop") or ""),
-                    "tes":     str(s.get("tes") or ""),
-                    "valcont": round(float(s.get("valcont") or 0), 2),
-                }
-                for s in sft_lp
-            ],
+            [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
+              "emissao": str(s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
+              "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
+              "valcont": round(float(s.get("valcont") or 0), 2), "matched": s["matched"]}
+             for s in sft_matched],
             key=lambda x: (x["filial"], x["nf"]),
         )
 
