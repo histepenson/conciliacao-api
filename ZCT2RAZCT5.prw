@@ -7,7 +7,7 @@ API REST de razao contabil via consulta SQL direta na tabela CT2,
 com JOIN na CT5 para retornar a descricao do lancamento padrao (CT5_DESC).
 
 Personalizacao especifica: inclui o campo CT5_DESC obtido via LEFT JOIN
-na CT5 pelo campo CT2_LP (agrupado por CT5_LANPAD para evitar duplicatas).
+na CT5 pelo campo CT2_ORIGEM (primeiros 7 caracteres).
 
 Endpoint: GET /rest/zct2razct5/api/v1/ct2razct5
 
@@ -175,8 +175,9 @@ If lIncCred
     cSql += "     CT2.CT2_ORIGEM,"
     cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc"
     cSql += " FROM " + cTabela + " CT2"
-    cSql += " LEFT JOIN (SELECT CT5_LANPAD, MAX(CT5_DESC) AS CT5_DESC FROM " + cTabelaCT5 + " WHERE D_E_L_E_T_ = ' ' GROUP BY CT5_LANPAD) CT5"
-    cSql += "     ON RTRIM(CT5.CT5_LANPAD) = RTRIM(CT2.CT2_LP)"
+    cSql += " LEFT JOIN " + cTabelaCT5 + " CT5"
+    cSql += "     ON CT5.D_E_L_E_T_ = ' '"
+    cSql += "    AND (RTRIM(CT5.CT5_LANPAD) + '-' + RTRIM(CT5.CT5_SEQUEN)) = SUBSTRING(CT2.CT2_ORIGEM,1,7)"
     cSql += " WHERE " + cWhere
     cSql += "   AND CT2_DC IN ('2','3')"
     cSql += "   AND CT2_CREDIT BETWEEN '" + cContaDe + "' AND '" + cContaAte + "'"
@@ -209,8 +210,9 @@ If lIncDeb
     cSql += "     CT2.CT2_ORIGEM,"
     cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc"
     cSql += " FROM " + cTabela + " CT2"
-    cSql += " LEFT JOIN (SELECT CT5_LANPAD, MAX(CT5_DESC) AS CT5_DESC FROM " + cTabelaCT5 + " WHERE D_E_L_E_T_ = ' ' GROUP BY CT5_LANPAD) CT5"
-    cSql += "     ON RTRIM(CT5.CT5_LANPAD) = RTRIM(CT2.CT2_LP)"
+    cSql += " LEFT JOIN " + cTabelaCT5 + " CT5"
+    cSql += "     ON CT5.D_E_L_E_T_ = ' '"
+    cSql += "    AND (RTRIM(CT5.CT5_LANPAD) + '-' + RTRIM(CT5.CT5_SEQUEN)) = SUBSTRING(CT2.CT2_ORIGEM,1,7)"
     cSql += " WHERE " + cWhere
     cSql += "   AND CT2_DC IN ('1','3')"
     cSql += "   AND CT2_DEBITO BETWEEN '" + cContaDe + "' AND '" + cContaAte + "'"
