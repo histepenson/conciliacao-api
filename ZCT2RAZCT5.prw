@@ -69,6 +69,7 @@ wsrestful ZCT2RAZCT5 description "CT2 - Razao Contabil SQL Direto com CT5_DESC"
     wsdata filial_ate    as string
     wsdata custo_de      as string
     wsdata custo_ate     as string
+    wsdata lote          as string
 
     wsmethod GET getRazaoCT5 description "Razao contabil CT2 SQL direto com CT5_DESC" wssyntax "/api/v1/ct2razct5" PATH "/api/v1/ct2razct5"
 
@@ -102,6 +103,7 @@ Local cClvlAte      := AllTrim(Self:clvl_ate)
 Local cVlrZerado    := AllTrim(Self:vlr_zerado)
 Local cFilialDe     := AllTrim(Self:filial_de)
 Local cFilialAte    := AllTrim(Self:filial_ate)
+Local cLote         := IIf(Empty(AllTrim(Self:lote)), "008810", AllTrim(Self:lote))
 Local nPage         := Max(1, Val(AllTrim(Self:page)))
 Local nPageSize     := Val(AllTrim(Self:pageSize))
 
@@ -146,6 +148,7 @@ ConOut("[ZCT2RAZCT5] conta_de=[" + cContaDe + "] conta_ate=[" + cContaAte + "]" 
     " clvl=" + cClvlDe + "/" + cClvlAte + ;
     " vlr_zerado=" + cVlrZerado + ;
     " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
+    " lote=" + cLote + ;
     " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize))
 
 // --- WHERE comum (CT2. prefixo em D_E_L_E_T_ para evitar ambiguidade com CT5) ---
@@ -158,6 +161,8 @@ If cVlrZerado == "2"
 EndIf
 
 cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
+
+cWhere += " AND CT2_LOTE = '" + cLote + "'"
 
 // --- Bloco CREDITO (DC=2 e DC=3) ---
 If lIncCred
@@ -310,6 +315,7 @@ oParams["clvl_ate"]       := cClvlAte
 oParams["vlr_zerado"]     := cVlrZerado
 oParams["filial_de"]      := cFilialDe
 oParams["filial_ate"]     := cFilialAte
+oParams["lote"]           := cLote
 oParams["page"]           := nPage
 oParams["pageSize"]       := nPageSize
 

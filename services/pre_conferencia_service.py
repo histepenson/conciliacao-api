@@ -73,8 +73,8 @@ def conferir(
             raise HTTPException(404, f"Carga SFTENT {carga_id_sft} nao encontrada.")
 
     # ── Configuracoes de LP ──────────────────────────────────────────────────
-    lp_configs: dict[str, LancamentoPadrao] = {
-        lp.lp_codigo: lp
+    lp_configs: dict[tuple[str, str], LancamentoPadrao] = {
+        (lp.lp_codigo, lp.descricao or ""): lp
         for lp in db.query(LancamentoPadrao)
         .filter(LancamentoPadrao.empresa_id == empresa_id, LancamentoPadrao.ativo.is_(True))
         .all()
@@ -96,28 +96,28 @@ def conferir(
         if cfop:
             sft_por_cfop.setdefault(cfop, []).append(s)
 
-    # ── Agrupar CT2 por LP ───────────────────────────────────────────────────
-    ct2_por_lp: dict[str, list[dict]] = {}
+    # ── Agrupar CT2 por (LP, descricao) ─────────────────────────────────────
+    ct2_por_lp: dict[tuple[str, str], list[dict]] = {}
     for rec in ct2_data:
         lp = str(rec.get("ct2_lp") or "").strip()
+        desc = str(rec.get("ct5_desc") or "").strip()
         if lp:
-            ct2_por_lp.setdefault(lp, []).append(rec)
+            ct2_por_lp.setdefault((lp, desc), []).append(rec)
 
     # ── Processar cada LP ────────────────────────────────────────────────────
     resultados: list[dict] = []
     lps_sem_cfop: list[str] = []
 
-    for lp_codigo, ct2_recs in sorted(ct2_por_lp.items()):
-        config = lp_configs.get(lp_codigo)
-
-        descricao = (ct2_recs[0].get("ct5_desc") or "").strip() if ct2_recs else ""
-        if not descricao and config and config.descricao:
-            descricao = config.descricao
+    for (lp_codigo, descricao), ct2_recs in sorted(ct2_por_lp.items()):
+        config = lp_configs.get((lp_codigo, descricao))
 
         total_ct2 = round(sum(float(r.get("debito") or 0) for r in ct2_recs), 2)
 
+        if not descricao and config and config.descricao:
+            descricao = config.descricao
+
         if not config or not config.cfops:
-            lps_sem_cfop.append(lp_codigo)
+            lps_sem_cfop.append(f"{lp_codigo} {descricao}".strip())
             resultados.append({
                 "lp_codigo": lp_codigo,
                 "descricao": descricao,
@@ -132,7 +132,7 @@ def conferir(
             continue
 
         cfops_set = {str(c).strip() for c in config.cfops}
-        sft_lp = [s for cfop, lst in sft_por_cfop.items() for s in lst if cfop in cfops_set]
+        sft_lp = [s for cfop, lst in sft_por_cfop.items() for s in lst if any(c in cfop for c in cfops_set)]
 
         total_sft = round(sum(float(s.get("valcont") or 0) for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)

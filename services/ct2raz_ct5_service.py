@@ -17,6 +17,7 @@ _PARAMS_CT2RAZCT5 = [
     "moeda", "saldo",
     "vlr_zerado",
     "consid_filiais", "filial_de", "filial_ate",
+    "lote",
 ]
 
 

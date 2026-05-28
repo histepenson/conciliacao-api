@@ -13,7 +13,7 @@ def listar(db: Session, empresa_id: int) -> list[LancamentoPadrao]:
     return (
         db.query(LancamentoPadrao)
         .filter(LancamentoPadrao.empresa_id == empresa_id)
-        .order_by(LancamentoPadrao.lp_codigo)
+        .order_by(LancamentoPadrao.lp_codigo, LancamentoPadrao.descricao)
         .all()
     )
 
@@ -42,35 +42,32 @@ def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> Lancamen
 def upsert_de_carga(db: Session, empresa_id: int, registros: list[dict]) -> int:
     """
     Chamado após carga CT2RAZCT5 concluída.
-    Insere novos LPs sem sobrescrever configurações existentes (cfops/colunas_sft).
+    Agrupa por (ct2_lp, ct5_desc) — um LP pode ter múltiplas descrições (sequências 001, 002...).
+    Insere novos pares sem sobrescrever configurações existentes (cfops/colunas_sft).
     Retorna quantidade de novos registros criados.
     """
-    lps_vistos: dict[str, str] = {}
+    pares_vistos: set[tuple[str, str]] = set()
     for r in registros:
         lp = str(r.get("ct2_lp") or "").strip()
         desc = str(r.get("ct5_desc") or "").strip()
-        if lp and lp not in lps_vistos:
-            lps_vistos[lp] = desc
+        if lp:
+            pares_vistos.add((lp, desc))
 
-    existentes = {
-        row.lp_codigo: row
+    existentes: set[tuple[str, str]] = {
+        (row.lp_codigo, row.descricao or "")
         for row in db.query(LancamentoPadrao).filter(LancamentoPadrao.empresa_id == empresa_id).all()
     }
 
     novos = 0
-    for lp_codigo, descricao in lps_vistos.items():
-        if lp_codigo in existentes:
-            ex = existentes[lp_codigo]
-            if descricao and not ex.descricao:
-                ex.descricao = descricao
-        else:
+    for lp_codigo, descricao in sorted(pares_vistos):
+        if (lp_codigo, descricao) not in existentes:
             db.add(LancamentoPadrao(
                 empresa_id=empresa_id,
                 lp_codigo=lp_codigo,
-                descricao=descricao or None,
+                descricao=descricao,
             ))
             novos += 1
 
     db.commit()
-    logger.info("upsert_de_carga empresa=%s: %s LPs novos de %s total", empresa_id, novos, len(lps_vistos))
+    logger.info("upsert_de_carga empresa=%s: %s novos de %s pares únicos", empresa_id, novos, len(pares_vistos))
     return novos
