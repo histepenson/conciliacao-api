@@ -116,18 +116,34 @@ def conferir(
         if not descricao and config and config.descricao:
             descricao = config.descricao
 
+        ct2_detalhes = sorted(
+            [
+                {
+                    "data":      str(r.get("data") or ""),
+                    "lote":      str(r.get("lote_sub_doc_linha") or ""),
+                    "historico": str(r.get("historico") or "")[:80],
+                    "debito":    round(float(r.get("debito") or 0), 2),
+                    "credito":   round(float(r.get("credito") or 0), 2),
+                    "conta":     str(r.get("conta") or ""),
+                }
+                for r in ct2_recs
+            ],
+            key=lambda x: x["data"],
+        )
+
         if not config or not config.cfops:
             lps_sem_cfop.append(f"{lp_codigo} {descricao}".strip())
             resultados.append({
-                "lp_codigo": lp_codigo,
-                "descricao": descricao,
-                "status": "sem_mapeamento",
-                "total_ct2": total_ct2,
-                "total_sft": None,
-                "diferenca": None,
-                "qt_ct2": len(ct2_recs),
-                "qt_sft": 0,
-                "detalhes": [],
+                "lp_codigo":    lp_codigo,
+                "descricao":    descricao,
+                "status":       "sem_mapeamento",
+                "total_ct2":    total_ct2,
+                "total_sft":    None,
+                "diferenca":    None,
+                "qt_ct2":       len(ct2_recs),
+                "qt_sft":       0,
+                "ct2_detalhes": ct2_detalhes,
+                "sft_detalhes": [],
             })
             continue
 
@@ -144,41 +160,33 @@ def conferir(
         diferenca = round(total_ct2 - total_sft, 2)
         lp_status = "ok" if abs(diferenca) <= 0.01 else "diferente"
 
-        # Detalhes: agrupa SFT por filial + CFOP
-        det_map: dict[str, dict] = {}
-        for s in sft_lp:
-            filial = str(s.get("filial") or "").strip()
-            cfop   = str(s.get("cfop")   or "").strip()
-            chave  = f"{filial}|{cfop}"
-            if chave not in det_map:
-                det_map[chave] = {"filial": filial, "cfop": cfop, "qt": 0, "val_sft": 0.0}
-            det_map[chave]["qt"] += 1
-            det_map[chave]["val_sft"] += float(s.get("valcont") or 0)
-
-        detalhes = [
-            {
-                "chave": chave,
-                "nf": "",
-                "qt_ct2": 0,
-                "qt_sft": d["qt"],
-                "val_ct2": 0.0,
-                "val_sft": round(d["val_sft"], 2),
-                "diferenca": 0.0,
-                "status": "so_sft",
-            }
-            for chave, d in sorted(det_map.items())
-        ]
+        sft_detalhes = sorted(
+            [
+                {
+                    "filial":  str(s.get("filial") or ""),
+                    "nf":      str(s.get("nf") or ""),
+                    "emissao": str(s.get("emissao") or ""),
+                    "cliefor": str(s.get("cliefor") or ""),
+                    "cfop":    str(s.get("cfop") or ""),
+                    "tes":     str(s.get("tes") or ""),
+                    "valcont": round(float(s.get("valcont") or 0), 2),
+                }
+                for s in sft_lp
+            ],
+            key=lambda x: (x["filial"], x["nf"]),
+        )
 
         resultados.append({
-            "lp_codigo": lp_codigo,
-            "descricao": descricao,
-            "status": lp_status,
-            "total_ct2": total_ct2,
-            "total_sft": total_sft,
-            "diferenca": diferenca,
-            "qt_ct2": len(ct2_recs),
-            "qt_sft": len(sft_lp),
-            "detalhes": detalhes,
+            "lp_codigo":    lp_codigo,
+            "descricao":    descricao,
+            "status":       lp_status,
+            "total_ct2":    total_ct2,
+            "total_sft":    total_sft,
+            "diferenca":    diferenca,
+            "qt_ct2":       len(ct2_recs),
+            "qt_sft":       len(sft_lp),
+            "ct2_detalhes": ct2_detalhes,
+            "sft_detalhes": sft_detalhes,
         })
 
     # ── Resumo ───────────────────────────────────────────────────────────────
