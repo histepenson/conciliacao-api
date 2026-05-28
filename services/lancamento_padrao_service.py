@@ -30,13 +30,26 @@ def obter(db: Session, lp_id: int, empresa_id: int) -> LancamentoPadrao:
 
 def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> LancamentoPadrao:
     lp = obter(db, lp_id, empresa_id)
-    campos = ("descricao", "cfops", "tes_codes", "colunas_sft", "ativo")
+    campos = ("descricao", "grupo", "cfops", "tes_codes", "colunas_sft", "ativo")
     for campo in campos:
         if campo in dados:
             setattr(lp, campo, dados[campo])
     db.commit()
     db.refresh(lp)
     return lp
+
+
+def bulk_definir_grupo(db: Session, empresa_id: int, ids: list[int], grupo: str | None) -> int:
+    """Define (ou remove) o grupo de múltiplos LPs de uma vez."""
+    atualizados = (
+        db.query(LancamentoPadrao)
+        .filter(LancamentoPadrao.empresa_id == empresa_id, LancamentoPadrao.id.in_(ids))
+        .all()
+    )
+    for lp in atualizados:
+        lp.grupo = grupo or None
+    db.commit()
+    return len(atualizados)
 
 
 def upsert_de_carga(db: Session, empresa_id: int, registros: list[dict]) -> int:

@@ -41,3 +41,18 @@ def atualizar(
 ):
     eid = resolve_empresa_id(context, empresa_id)
     return service.atualizar(db, lp_id, eid, body)
+
+
+@router.put("/bulk/grupo")
+def bulk_grupo(
+    body: dict[str, Any],
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    """body: {ids: [1,2,3], grupo: "NOME"} — grupo null/vazio remove o grupo."""
+    eid = resolve_empresa_id(context, empresa_id)
+    ids = body.get("ids", [])
+    grupo = body.get("grupo") or None
+    atualizados = service.bulk_definir_grupo(db, eid, ids, grupo)
+    return {"atualizados": atualizados}

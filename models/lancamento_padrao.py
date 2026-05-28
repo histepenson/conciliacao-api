@@ -16,6 +16,7 @@ class LancamentoPadrao(Base):
     empresa_id = Column(Integer, ForeignKey("concilia.empresa.id", ondelete="CASCADE"), nullable=False, index=True)
     lp_codigo = Column(String(10), nullable=False)
     descricao = Column(String(200), nullable=False, server_default="")
+    grupo = Column(String(100))  # nome do grupo para agregação na pré-conferência
     cfops = Column(JSON)        # ["1101", "2101", "3101"]
     tes_codes = Column(JSON)    # ["001", "002"] — filtro de TES no SFT
     colunas_sft = Column(JSON)  # ["filial", "nf", "cliefor"]

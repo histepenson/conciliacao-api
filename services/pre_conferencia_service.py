@@ -73,11 +73,19 @@ def conferir(
             raise HTTPException(404, f"Carga SFTENT {carga_id_sft} nao encontrada.")
 
     # ── Configuracoes de LP ──────────────────────────────────────────────────
-    lp_configs: dict[tuple[str, str], LancamentoPadrao] = {
-        (lp.lp_codigo, lp.descricao or ""): lp
-        for lp in db.query(LancamentoPadrao)
+    todos_lps = (
+        db.query(LancamentoPadrao)
         .filter(LancamentoPadrao.empresa_id == empresa_id, LancamentoPadrao.ativo.is_(True))
         .all()
+    )
+    lp_configs: dict[tuple[str, str], LancamentoPadrao] = {
+        (lp.lp_codigo, lp.descricao or ""): lp for lp in todos_lps
+    }
+    # Mapeia (lp_codigo, descricao) → nome do grupo
+    key_to_grupo: dict[tuple[str, str], str] = {
+        (lp.lp_codigo, lp.descricao or ""): lp.grupo
+        for lp in todos_lps
+        if lp.grupo
     }
 
     # ── Dados das cargas ─────────────────────────────────────────────────────
@@ -104,11 +112,90 @@ def conferir(
         if lp:
             ct2_por_lp.setdefault((lp, desc), []).append(rec)
 
+    # ── Separar CT2: keys que pertencem a um grupo vs individuais ────────────
+    ct2_por_grupo: dict[str, list[dict]] = {}
+    ct2_individual: dict[tuple[str, str], list[dict]] = {}
+    for key, recs in ct2_por_lp.items():
+        grupo = key_to_grupo.get(key)
+        if grupo:
+            ct2_por_grupo.setdefault(grupo, []).extend(recs)
+        else:
+            ct2_individual[key] = recs
+
     # ── Processar cada LP ────────────────────────────────────────────────────
     resultados: list[dict] = []
     lps_sem_cfop: list[str] = []
 
-    for (lp_codigo, descricao), ct2_recs in sorted(ct2_por_lp.items()):
+    # ── Helper para filtrar SFT dado cfops_set e tes_set ────────────────────
+    def _filtrar_sft(cfops_set, tes_set):
+        return [
+            s for cfop, lst in sft_por_cfop.items()
+            if any(c in cfop for c in cfops_set)
+            for s in lst
+            if tes_set is None or any(t in str(s.get("tes") or "").strip() for t in tes_set)
+        ]
+
+    # ── Processar GRUPOS ─────────────────────────────────────────────────────
+    grupos_configs: dict[str, list[LancamentoPadrao]] = {}
+    for lp in todos_lps:
+        if lp.grupo:
+            grupos_configs.setdefault(lp.grupo, []).append(lp)
+
+    for grupo_nome, members in sorted(grupos_configs.items()):
+        ct2_recs = ct2_por_grupo.get(grupo_nome, [])
+        total_ct2 = round(sum(float(r.get("debito") or 0) for r in ct2_recs), 2)
+        lp_codes = sorted({m.lp_codigo for m in members})
+        lp_codigo_display = lp_codes[0] if len(lp_codes) == 1 else f"{lp_codes[0]}+{len(lp_codes)-1}"
+
+        ct2_detalhes = sorted(
+            [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
+              "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
+              "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or "")}
+             for r in ct2_recs],
+            key=lambda x: x["data"],
+        )
+
+        cfops_set = set()
+        tes_parts: list[str] = []
+        has_cfops = False
+        for m in members:
+            if m.cfops:
+                has_cfops = True
+                cfops_set.update(str(c).strip() for c in m.cfops)
+            if m.tes_codes:
+                tes_parts.extend(str(t).strip() for t in m.tes_codes)
+        tes_set = set(tes_parts) if tes_parts else None
+
+        if not has_cfops:
+            lps_sem_cfop.append(grupo_nome)
+            resultados.append({
+                "lp_codigo": lp_codigo_display, "descricao": grupo_nome, "is_grupo": True,
+                "status": "sem_mapeamento", "total_ct2": total_ct2, "total_sft": None,
+                "diferenca": None, "qt_ct2": len(ct2_recs), "qt_sft": 0,
+                "ct2_detalhes": ct2_detalhes, "sft_detalhes": [],
+            })
+            continue
+
+        sft_lp = _filtrar_sft(cfops_set, tes_set)
+        total_sft = round(sum(float(s.get("valcont") or 0) for s in sft_lp), 2)
+        diferenca = round(total_ct2 - total_sft, 2)
+        sft_detalhes = sorted(
+            [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
+              "emissao": str(s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
+              "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
+              "valcont": round(float(s.get("valcont") or 0), 2)} for s in sft_lp],
+            key=lambda x: (x["filial"], x["nf"]),
+        )
+        resultados.append({
+            "lp_codigo": lp_codigo_display, "descricao": grupo_nome, "is_grupo": True,
+            "status": "ok" if abs(diferenca) <= 0.01 else "diferente",
+            "total_ct2": total_ct2, "total_sft": total_sft, "diferenca": diferenca,
+            "qt_ct2": len(ct2_recs), "qt_sft": len(sft_lp),
+            "ct2_detalhes": ct2_detalhes, "sft_detalhes": sft_detalhes,
+        })
+
+    # ── Processar INDIVIDUAIS (sem grupo) ────────────────────────────────────
+    for (lp_codigo, descricao), ct2_recs in sorted(ct2_individual.items()):
         config = lp_configs.get((lp_codigo, descricao))
 
         total_ct2 = round(sum(float(r.get("debito") or 0) for r in ct2_recs), 2)
@@ -149,12 +236,7 @@ def conferir(
 
         cfops_set = {str(c).strip() for c in config.cfops}
         tes_set = {str(t).strip() for t in config.tes_codes} if config.tes_codes else None
-        sft_lp = [
-            s for cfop, lst in sft_por_cfop.items()
-            if any(c in cfop for c in cfops_set)
-            for s in lst
-            if tes_set is None or any(t in str(s.get("tes") or "").strip() for t in tes_set)
-        ]
+        sft_lp = _filtrar_sft(cfops_set, tes_set)
 
         total_sft = round(sum(float(s.get("valcont") or 0) for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)
