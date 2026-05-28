@@ -142,7 +142,8 @@
       "Bash(not exist *)",
       "Bash(Get-ChildItem -Path \"C:\\\\conciliacao-app\\\\src\\\\pages\\\\\" -Name)",
       "Bash(git -C c:\\\\conciliacao-api status --short)",
-      "Bash(git -C c:\\\\conciliacao-api log --oneline -3)"
+      "Bash(git -C c:\\\\conciliacao-api log --oneline -3)",
+      "Bash(alembic revision *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

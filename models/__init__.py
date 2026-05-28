@@ -45,6 +45,7 @@ from .nfe import NfeEntrada, NfeEntradaItem, NfeSaida, NfeSaidaItem
 from .estoque_alerta import EstoqueAlerta
 from .estoque import EstoqueSaldo, EstoqueMovimentacao
 from .protheus_carga import ProtheusCarga, ProtheusCargaConfig, ProtheusCargaRegistro
+from .lancamento_padrao import LancamentoPadrao
 
 # Lista todos os modelos exportados
 __all__ = [
@@ -77,4 +78,6 @@ __all__ = [
     "ProtheusCargaConfig",
     "ProtheusCarga",
     "ProtheusCargaRegistro",
+    # Cadastros Fiscal
+    "LancamentoPadrao",
 ]

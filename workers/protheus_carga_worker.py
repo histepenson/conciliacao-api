@@ -17,6 +17,7 @@ from services.matr900_service import Matr900Service
 from services.sft_ent_service import SftEntService
 from services.ct2raz_ct5_service import Ct2RazCt5Service
 from services.protheus_carga_service import marcar_concluido, marcar_erro, marcar_processando
+from services.lancamento_padrao_service import upsert_de_carga as lp_upsert_de_carga
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -97,6 +98,18 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         marcar_concluido(db, carga, total)
         logger.info("Carga Protheus %s concluida com %s registros", carga.id, total)
         print(f"[PROTHEUS_CARGA] concluida carga_id={carga.id} total={total}", flush=True)
+
+        if tipo_upper == "CT2RAZCT5":
+            try:
+                registros_all = (
+                    db.query(ProtheusCargaRegistro)
+                    .filter_by(carga_id=carga.id)
+                    .all()
+                )
+                lp_upsert_de_carga(db, carga.empresa_id, [r.dados_json for r in registros_all])
+                print(f"[PROTHEUS_CARGA] lancamentos_padrao atualizados empresa={carga.empresa_id}", flush=True)
+            except Exception as exc_lp:
+                logger.warning("Falha ao popular lancamentos_padrao carga=%s: %s", carga.id, exc_lp)
 
     except Exception as exc:
         print(f"[PROTHEUS_CARGA] erro carga_id={carga_id}: {exc}", flush=True)
