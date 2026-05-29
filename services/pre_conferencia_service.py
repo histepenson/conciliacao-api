@@ -187,6 +187,19 @@ def conferir(
                 "filial": f, "nf": n, "cliefor": c, "emissao": emissao,
                 "sft_total": sft_total, "ct2_total": ct2_total, "status": status,
             })
+
+        # Validação: cada (filial, nf, cliefor) deve aparecer exatamente 1 vez.
+        # Se disparar, indica bug na lógica de agregação acima.
+        seen: set = set()
+        for item in result:
+            chave = (item["filial"], item["nf"], item["cliefor"])
+            if chave in seen:
+                raise ValueError(
+                    f"nf_cruzamento: duplicata detectada — "
+                    f"filial={item['filial']} nf={item['nf']} cliefor={item['cliefor']}"
+                )
+            seen.add(chave)
+
         return result
 
     # ── Matching CT2 ↔ SFT por (filial, nf, fornece) extraído de CT2_KEY ──────
