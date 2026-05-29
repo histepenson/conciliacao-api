@@ -79,8 +79,14 @@ class SftEntService:
         page_size = int(params.get("pageSize") or 5000)
         query = {k: v for k, v in params.items() if k in _PARAMS_SFT and v is not None}
         query["pageSize"] = page_size
-        query["filial_de"] = str(query.get("filial_de") or "").strip()
-        query["filial_ate"] = str(query.get("filial_ate") or "").strip() or "zzzzzzzzz"
+        filial_de  = str(query.get("filial_de")  or "").strip()
+        filial_ate = str(query.get("filial_ate") or "").strip()
+        # Normaliza valores "todo-z" digitados pelo usuário (ex: zzzzz, zzzz) para vazio
+        # → ADVPL aplica o default correto "zzzzzzzzz" internamente
+        if filial_ate and all(c.lower() == 'z' for c in filial_ate):
+            filial_ate = ""
+        query["filial_de"]  = filial_de
+        query["filial_ate"] = filial_ate or "zzzzzzzzz"
         return query
 
 
