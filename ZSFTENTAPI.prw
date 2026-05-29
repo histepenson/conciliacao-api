@@ -97,7 +97,7 @@ ConOut("[ZSFTENTAPI] data=" + cDataIni + "/" + cDataFim + ;
 
 // --- WHERE ---
 cWhere := " D_E_L_E_T_ = ' '" 
-cWhere += " FT_DTCANC = ' ' "
+cWhere += " AND FT_DTCANC = ' ' "
 cWhere += " AND FT_EMISSAO BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
 cWhere += " AND FT_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 
