@@ -135,6 +135,57 @@ def conferir(
             if tes_set is None or any(t in str(s.get("tes") or "").strip() for t in tes_set)
         ]
 
+    # ── Resumo NF: agrega por NF e casa por identidade — resultado separado ─────
+    # Não toca nos ct2_detalhes/sft_detalhes existentes. Apenas produz os campos
+    # ct2_nf_resumo e sft_nf_resumo para exibir a seção separada na UI.
+    def _nf_resumo(ct2_recs: list, sft_recs: list) -> tuple[list, list]:
+
+        def _chave_ct2(rec):
+            k = str(rec.get("ct2_key") or "").strip()
+            if len(k) < 22:
+                return None
+            return (k[0:4].strip(), k[4:13].strip(), k[16:22].strip())
+
+        ct2_nfs: dict = {}
+        for rec in ct2_recs:
+            debito = round(float(rec.get("debito") or 0), 2)
+            if debito == 0:
+                continue
+            chave = _chave_ct2(rec)
+            if chave is None:
+                continue
+            if chave not in ct2_nfs:
+                ct2_nfs[chave] = 0.0
+            ct2_nfs[chave] = round(ct2_nfs[chave] + debito, 2)
+
+        sft_nfs: dict = {}
+        for s in sft_recs:
+            filial  = str(s.get("filial")  or "").strip()
+            nf      = str(s.get("nf")      or "").strip()
+            cliefor = str(s.get("cliefor") or "").strip()
+            if not filial or not nf:
+                continue
+            chave = (filial, nf, cliefor)
+            valcont = round(float(s.get("valcont") or 0), 2)
+            emissao = str(s.get("emissao") or "").strip()
+            if chave not in sft_nfs:
+                sft_nfs[chave] = {"total": 0.0, "emissao": emissao}
+            sft_nfs[chave]["total"] = round(sft_nfs[chave]["total"] + valcont, 2)
+
+        matched_docs = set(ct2_nfs) & set(sft_nfs)
+
+        ct2_resumo = [
+            {"filial": f, "nf": n, "cliefor": c, "total": t,
+             "matched": (f, n, c) in matched_docs}
+            for (f, n, c), t in sorted(ct2_nfs.items(), key=lambda x: (x[0][0], x[0][1]))
+        ]
+        sft_resumo = [
+            {"filial": f, "nf": n, "cliefor": c, "total": info["total"],
+             "emissao": info["emissao"], "matched": (f, n, c) in matched_docs}
+            for (f, n, c), info in sorted(sft_nfs.items(), key=lambda x: (x[0][0], x[0][1]))
+        ]
+        return ct2_resumo, sft_resumo
+
     # ── Matching CT2 ↔ SFT por (filial, nf, fornece) extraído de CT2_KEY ──────
     # CT2_KEY estrutura: filial[0:4] + nf[4:13] + serie[13:16] + fornece[16:22]
     # Primário: match exato por (filial, nf, fornece, valor ±0.01)
@@ -267,6 +318,7 @@ def conferir(
                 "status": "sem_mapeamento", "total_ct2": total_ct2, "total_sft": None,
                 "diferenca": None, "qt_ct2": len(ct2_recs), "qt_sft": 0,
                 "ct2_detalhes": ct2_detalhes, "sft_detalhes": [],
+                "ct2_nf_resumo": [], "sft_nf_resumo": [],
             })
             continue
 
@@ -275,6 +327,7 @@ def conferir(
         diferenca = round(total_ct2 - total_sft, 2)
 
         ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
+        ct2_nf_resumo, sft_nf_resumo = _nf_resumo(ct2_recs, sft_lp)
 
         ct2_detalhes = sorted(
             [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
@@ -298,6 +351,7 @@ def conferir(
             "total_ct2": total_ct2, "total_sft": total_sft, "diferenca": diferenca,
             "qt_ct2": len(ct2_recs), "qt_sft": len(sft_lp),
             "ct2_detalhes": ct2_detalhes, "sft_detalhes": sft_detalhes,
+            "ct2_nf_resumo": ct2_nf_resumo, "sft_nf_resumo": sft_nf_resumo,
         })
 
     # ── Processar INDIVIDUAIS (sem grupo) ────────────────────────────────────
@@ -330,6 +384,7 @@ def conferir(
                 "qt_sft":       0,
                 "ct2_detalhes": ct2_detalhes,
                 "sft_detalhes": [],
+                "ct2_nf_resumo": [], "sft_nf_resumo": [],
             })
             continue
 
@@ -342,6 +397,7 @@ def conferir(
         lp_status = "ok" if abs(diferenca) <= 0.01 else "diferente"
 
         ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
+        ct2_nf_resumo, sft_nf_resumo = _nf_resumo(ct2_recs, sft_lp)
 
         ct2_detalhes = sorted(
             [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
@@ -371,6 +427,7 @@ def conferir(
             "qt_sft":       len(sft_lp),
             "ct2_detalhes": ct2_detalhes,
             "sft_detalhes": sft_detalhes,
+            "ct2_nf_resumo": ct2_nf_resumo, "sft_nf_resumo": sft_nf_resumo,
         })
 
     # ── Resumo ───────────────────────────────────────────────────────────────
