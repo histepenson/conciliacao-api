@@ -135,10 +135,10 @@ def conferir(
             if tes_set is None or any(t in str(s.get("tes") or "").strip() for t in tes_set)
         ]
 
-    # ── Resumo NF: agrega por NF e casa por identidade — resultado separado ─────
-    # Não toca nos ct2_detalhes/sft_detalhes existentes. Apenas produz os campos
-    # ct2_nf_resumo e sft_nf_resumo para exibir a seção separada na UI.
-    def _nf_resumo(ct2_recs: list, sft_recs: list) -> tuple[list, list]:
+    # ── Cruzamento NF: outer join CT2 × SFT agregados por NF ────────────────────
+    # Retorna lista unificada com status "so_sft" | "so_ct2" | "ambos".
+    # Não toca em ct2_detalhes/sft_detalhes — é dado separado para a grid de análise.
+    def _nf_cruzamento(ct2_recs: list, sft_recs: list) -> list:
 
         def _chave_ct2(rec):
             k = str(rec.get("ct2_key") or "").strip()
@@ -154,9 +154,7 @@ def conferir(
             chave = _chave_ct2(rec)
             if chave is None:
                 continue
-            if chave not in ct2_nfs:
-                ct2_nfs[chave] = 0.0
-            ct2_nfs[chave] = round(ct2_nfs[chave] + debito, 2)
+            ct2_nfs[chave] = round(ct2_nfs.get(chave, 0.0) + debito, 2)
 
         sft_nfs: dict = {}
         for s in sft_recs:
@@ -172,19 +170,24 @@ def conferir(
                 sft_nfs[chave] = {"total": 0.0, "emissao": emissao}
             sft_nfs[chave]["total"] = round(sft_nfs[chave]["total"] + valcont, 2)
 
-        matched_docs = set(ct2_nfs) & set(sft_nfs)
-
-        ct2_resumo = [
-            {"filial": f, "nf": n, "cliefor": c, "total": t,
-             "matched": (f, n, c) in matched_docs}
-            for (f, n, c), t in sorted(ct2_nfs.items(), key=lambda x: (x[0][0], x[0][1]))
-        ]
-        sft_resumo = [
-            {"filial": f, "nf": n, "cliefor": c, "total": info["total"],
-             "emissao": info["emissao"], "matched": (f, n, c) in matched_docs}
-            for (f, n, c), info in sorted(sft_nfs.items(), key=lambda x: (x[0][0], x[0][1]))
-        ]
-        return ct2_resumo, sft_resumo
+        result = []
+        for key in sorted(set(ct2_nfs) | set(sft_nfs), key=lambda x: (x[0], x[1])):
+            f, n, c = key
+            ct2_total = ct2_nfs.get(key, 0.0)
+            sft_info  = sft_nfs.get(key)
+            sft_total = sft_info["total"] if sft_info else 0.0
+            emissao   = sft_info["emissao"] if sft_info else ""
+            if ct2_total > 0 and sft_total > 0:
+                status = "ambos"
+            elif ct2_total > 0:
+                status = "so_ct2"
+            else:
+                status = "so_sft"
+            result.append({
+                "filial": f, "nf": n, "cliefor": c, "emissao": emissao,
+                "sft_total": sft_total, "ct2_total": ct2_total, "status": status,
+            })
+        return result
 
     # ── Matching CT2 ↔ SFT por (filial, nf, fornece) extraído de CT2_KEY ──────
     # CT2_KEY estrutura: filial[0:4] + nf[4:13] + serie[13:16] + fornece[16:22]
@@ -318,7 +321,7 @@ def conferir(
                 "status": "sem_mapeamento", "total_ct2": total_ct2, "total_sft": None,
                 "diferenca": None, "qt_ct2": len(ct2_recs), "qt_sft": 0,
                 "ct2_detalhes": ct2_detalhes, "sft_detalhes": [],
-                "ct2_nf_resumo": [], "sft_nf_resumo": [],
+                "nf_cruzamento": [],
             })
             continue
 
@@ -327,7 +330,7 @@ def conferir(
         diferenca = round(total_ct2 - total_sft, 2)
 
         ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
-        ct2_nf_resumo, sft_nf_resumo = _nf_resumo(ct2_recs, sft_lp)
+        nf_cruzamento = _nf_cruzamento(ct2_recs, sft_lp)
 
         ct2_detalhes = sorted(
             [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
@@ -351,7 +354,7 @@ def conferir(
             "total_ct2": total_ct2, "total_sft": total_sft, "diferenca": diferenca,
             "qt_ct2": len(ct2_recs), "qt_sft": len(sft_lp),
             "ct2_detalhes": ct2_detalhes, "sft_detalhes": sft_detalhes,
-            "ct2_nf_resumo": ct2_nf_resumo, "sft_nf_resumo": sft_nf_resumo,
+            "nf_cruzamento": nf_cruzamento,
         })
 
     # ── Processar INDIVIDUAIS (sem grupo) ────────────────────────────────────
@@ -384,7 +387,7 @@ def conferir(
                 "qt_sft":       0,
                 "ct2_detalhes": ct2_detalhes,
                 "sft_detalhes": [],
-                "ct2_nf_resumo": [], "sft_nf_resumo": [],
+                "nf_cruzamento": [],
             })
             continue
 
@@ -397,7 +400,7 @@ def conferir(
         lp_status = "ok" if abs(diferenca) <= 0.01 else "diferente"
 
         ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
-        ct2_nf_resumo, sft_nf_resumo = _nf_resumo(ct2_recs, sft_lp)
+        nf_cruzamento = _nf_cruzamento(ct2_recs, sft_lp)
 
         ct2_detalhes = sorted(
             [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
@@ -427,7 +430,7 @@ def conferir(
             "qt_sft":       len(sft_lp),
             "ct2_detalhes": ct2_detalhes,
             "sft_detalhes": sft_detalhes,
-            "ct2_nf_resumo": ct2_nf_resumo, "sft_nf_resumo": sft_nf_resumo,
+            "nf_cruzamento": nf_cruzamento,
         })
 
     # ── Resumo ───────────────────────────────────────────────────────────────
