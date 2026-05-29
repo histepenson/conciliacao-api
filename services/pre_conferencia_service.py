@@ -135,86 +135,98 @@ def conferir(
             if tes_set is None or any(t in str(s.get("tes") or "").strip() for t in tes_set)
         ]
 
-    # ── Matching CT2 ↔ SFT: agrega por NF e casa por identidade do documento ──
-    # CT2_KEY estrutura: filial[0:4] + nf[4:13] + serie[13:16] + cliefor[16:22]
-    # Retorna linhas agregadas no nível de NF (uma por NF em cada lado).
-    # CT2 sem CT2_KEY válida aparecem como linhas individuais "sem_chave".
+    # ── Matching CT2 ↔ SFT por (filial, nf, fornece) extraído de CT2_KEY ──────
+    # CT2_KEY estrutura: filial[0:4] + nf[4:13] + serie[13:16] + fornece[16:22]
+    # Primário: match exato por (filial, nf, fornece, valor ±0.01)
+    # Fallback 1: match por (filial, nf, fornece) sem valor
+    # Fallback 2: greedy por valor para CT2 sem CT2_KEY / sem NF no SFT
     def _match_ct2_sft(ct2_recs: list, sft_recs: list) -> tuple:
 
-        def _chave_ct2(rec):
-            k = str(rec.get("ct2_key") or "").strip()
-            if len(k) < 22:
+        def _extrair_chave_ct2(rec: dict):
+            key = str(rec.get("ct2_key") or "").strip()
+            if len(key) < 22:
                 return None
-            return (k[0:4].strip(), k[4:13].strip(), k[16:22].strip())
+            return (key[0:4], key[4:13], key[16:22].strip())
 
-        # Agrega CT2 por (filial, nf, cliefor)
-        ct2_nfs: dict = {}
-        sem_chave: list = []
-        for rec in ct2_recs:
-            debito = round(float(rec.get("debito") or 0), 2)
-            if debito == 0:
-                continue
-            chave = _chave_ct2(rec)
-            if chave is None:
-                sem_chave.append(rec)
-                continue
-            if chave not in ct2_nfs:
-                ct2_nfs[chave] = {"total_debito": 0.0, "qt": 0}
-            ct2_nfs[chave]["total_debito"] = round(ct2_nfs[chave]["total_debito"] + debito, 2)
-            ct2_nfs[chave]["qt"] += 1
-
-        # Agrega SFT por (filial, nf, cliefor)
-        sft_nfs: dict = {}
-        for s in sft_recs:
+        # ── Índice SFT por (filial, nf, fornece) → lista de índices
+        sft_por_doc: dict = {}
+        for i, s in enumerate(sft_recs):
             filial  = str(s.get("filial")  or "").strip()
             nf      = str(s.get("nf")      or "").strip()
             cliefor = str(s.get("cliefor") or "").strip()
-            if not filial or not nf:
+            if filial and nf:
+                sft_por_doc.setdefault((filial, nf, cliefor), []).append(i)
+
+        # ── Tenta matching por CT2_KEY + valor (tolerância ±0.10) ───────────
+        sft_matched: set = set()
+        ct2_matched_set: set = set()
+        sem_chave: list = []   # índices de CT2 sem CT2_KEY → entram no fallback
+
+        for i, rec in enumerate(ct2_recs):
+            debito = round(float(rec.get("debito") or 0), 2)
+            if debito == 0:
+                ct2_matched_set.add(i)  # credito/zero é neutro
                 continue
-            chave = (filial, nf, cliefor)
-            valcont = round(float(s.get("valcont") or 0), 2)
-            cfop    = str(s.get("cfop")    or "").strip()
-            emissao = str(s.get("emissao") or "").strip()
-            if chave not in sft_nfs:
-                sft_nfs[chave] = {"total_valcont": 0.0, "qt": 0, "emissao": emissao, "cfops": set()}
-            sft_nfs[chave]["total_valcont"] = round(sft_nfs[chave]["total_valcont"] + valcont, 2)
-            sft_nfs[chave]["qt"] += 1
-            if cfop:
-                sft_nfs[chave]["cfops"].add(cfop)
+            chave = _extrair_chave_ct2(rec)
+            if chave is None:
+                sem_chave.append(i)
+                continue
 
-        matched_docs = set(ct2_nfs) & set(sft_nfs)
+            filial, nf, fornece = chave
+            matched = False
 
-        # Resultado CT2: uma linha por NF + linhas individuais sem_chave
-        ct2_resultado = []
-        for (filial, nf, cliefor), info in sorted(ct2_nfs.items(), key=lambda x: (x[0][0], x[0][1])):
-            ct2_resultado.append({
-                "tipo": "nf",
-                "filial": filial, "nf": nf, "cliefor": cliefor,
-                "total_debito": info["total_debito"],
-                "qt_lancamentos": info["qt"],
-                "matched": (filial, nf, cliefor) in matched_docs,
-            })
-        for rec in sem_chave:
-            ct2_resultado.append({
-                "tipo": "sem_chave",
-                "historico": str(rec.get("historico") or "")[:80],
-                "data": str(rec.get("data") or ""),
-                "debito": round(float(rec.get("debito") or 0), 2),
-                "matched": False,
-            })
+            for idx in sft_por_doc.get((filial, nf, fornece), []):
+                if idx not in sft_matched:
+                    valcont = round(float(sft_recs[idx].get("valcont") or 0), 2)
+                    if abs(valcont - debito) <= 0.10:
+                        sft_matched.add(idx)
+                        ct2_matched_set.add(i)
+                        matched = True
+                        break
 
-        # Resultado SFT: uma linha por NF
-        sft_resultado = []
-        for (filial, nf, cliefor), info in sorted(sft_nfs.items(), key=lambda x: (x[0][0], x[0][1])):
-            sft_resultado.append({
-                "filial": filial, "nf": nf, "cliefor": cliefor,
-                "total_valcont": info["total_valcont"],
-                "qt_itens": info["qt"],
-                "emissao": info["emissao"],
-                "cfops": ",".join(sorted(info["cfops"])),
-                "matched": (filial, nf, cliefor) in matched_docs,
-            })
+            if not matched:
+                sem_chave.append(i)  # CT2_KEY preenchido mas sem correspondência no SFT
 
+        # ── Fallback greedy para CT2 sem chave / sem NF no SFT ──────────────
+        # Calcula o saldo SFT ainda não coberto e aplica cobertura greedy
+        sft_nao_cobertos = [i for i in range(len(sft_recs)) if i not in sft_matched]
+        if sem_chave and sft_nao_cobertos:
+            total_restante_ct2 = round(
+                sum(float(ct2_recs[i].get("debito") or 0) for i in sem_chave), 2
+            )
+            total_restante_sft = round(
+                sum(float(sft_recs[i].get("valcont") or 0) for i in sft_nao_cobertos), 2
+            )
+
+            def _cobrir_greedy(indices, recs, chave_v, budget):
+                ordered = sorted(indices, key=lambda i: -round(float(recs[i].get(chave_v) or 0), 2))
+                cobertos: set = set()
+                restante = budget
+                for i in ordered:
+                    v = round(float(recs[i].get(chave_v) or 0), 2)
+                    if v == 0:
+                        cobertos.add(i)
+                        continue
+                    if restante <= 0:
+                        break
+                    if restante >= v - 0.01:
+                        cobertos.add(i)
+                        restante = round(restante - v, 2)
+                return cobertos
+
+            ct2_cob = _cobrir_greedy(sem_chave,       ct2_recs, "debito",  total_restante_sft)
+            sft_cob = _cobrir_greedy(sft_nao_cobertos, sft_recs, "valcont", total_restante_ct2)
+            ct2_matched_set.update(ct2_cob)
+            sft_matched.update(sft_cob)
+
+        ct2_resultado = [
+            {**rec, "matched": i in ct2_matched_set}
+            for i, rec in enumerate(ct2_recs)
+        ]
+        sft_resultado = [
+            {**s, "matched": i in sft_matched}
+            for i, s in enumerate(sft_recs)
+        ]
         return ct2_resultado, sft_resultado
 
     # ── Processar GRUPOS ─────────────────────────────────────────────────────
@@ -262,7 +274,24 @@ def conferir(
         total_sft = round(sum(float(s.get("valcont") or 0) for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)
 
-        ct2_detalhes, sft_detalhes = _match_ct2_sft(ct2_recs, sft_lp)
+        ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
+
+        ct2_detalhes = sorted(
+            [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
+              "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
+              "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
+              "matched": r["matched"]}
+             for r in ct2_matched],
+            key=lambda x: x["data"],
+        )
+        sft_detalhes = sorted(
+            [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
+              "emissao": str(s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
+              "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
+              "valcont": round(float(s.get("valcont") or 0), 2), "matched": s["matched"]}
+             for s in sft_matched],
+            key=lambda x: (x["filial"], x["nf"]),
+        )
         resultados.append({
             "lp_codigo": lp_codigo_display, "descricao": grupo_nome, "is_grupo": True,
             "status": "ok" if abs(diferenca) <= 0.01 else "diferente",
@@ -312,7 +341,24 @@ def conferir(
         diferenca = round(total_ct2 - total_sft, 2)
         lp_status = "ok" if abs(diferenca) <= 0.01 else "diferente"
 
-        ct2_detalhes, sft_detalhes = _match_ct2_sft(ct2_recs, sft_lp)
+        ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
+
+        ct2_detalhes = sorted(
+            [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
+              "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
+              "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
+              "matched": r["matched"]}
+             for r in ct2_matched],
+            key=lambda x: x["data"],
+        )
+        sft_detalhes = sorted(
+            [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
+              "emissao": str(s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
+              "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
+              "valcont": round(float(s.get("valcont") or 0), 2), "matched": s["matched"]}
+             for s in sft_matched],
+            key=lambda x: (x["filial"], x["nf"]),
+        )
 
         resultados.append({
             "lp_codigo":    lp_codigo,
