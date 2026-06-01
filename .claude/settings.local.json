@@ -143,7 +143,17 @@
       "Bash(Get-ChildItem -Path \"C:\\\\conciliacao-app\\\\src\\\\pages\\\\\" -Name)",
       "Bash(git -C c:\\\\conciliacao-api status --short)",
       "Bash(git -C c:\\\\conciliacao-api log --oneline -3)",
-      "Bash(alembic revision *)"
+      "Bash(alembic revision *)",
+      "Bash(Select-String -Path \"c:\\\\conciliacao-api\\\\services\\\\analise_diferencas_service.py\" -Pattern \"lancamentos_razao_detalhes\")",
+      "Bash(Select-Object -First 30)",
+      "Bash(Format-Table LineNumber, Line -AutoSize)",
+      "PowerShell(& \"c:\\\\conciliacao-api\\\\venv\\\\Scripts\\\\pip.exe\" install rq redis 2>&1)",
+      "PowerShell(& \"c:\\\\conciliacao-api\\\\venv\\\\Scripts\\\\python.exe\" -m pip install rq redis 2>&1)",
+      "PowerShell(& \"c:\\\\conciliacao-api\\\\venv\\\\Scripts\\\\python.exe\" -c \"from rq import Queue; print\\('rq OK', Queue\\)\")",
+      "PowerShell(& \"c:\\\\conciliacao-api\\\\venv\\\\Scripts\\\\python.exe\" -c \"import rq; print\\(rq.__file__\\)\" 2>&1)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/api/empresas/\" -Method GET)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/api/conciliacoes/?empresa_id=1\" -Method GET 2>&1)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/api/pre-conferencias/?empresa_id=1\" -Method GET 2>&1)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

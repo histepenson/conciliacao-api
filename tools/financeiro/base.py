@@ -537,13 +537,20 @@ class ProcessadorFinanceiroBase(ABC):
         # Calcular valor
         df = self._calcular_valor(df)
 
-        # Normalizar codigo
-        codigo_df = normalizar_codigo_cliente(
-            df[col_cliente],
-            prefixo=self.get_prefixo_codigo()
-        )
-        df["codigo"] = codigo_df["codigo"]
-        df["cliente"] = codigo_df["cliente"]
+        # Normalizar codigo:
+        # Se codigo_cli estiver disponivel (formato FINR130/FINR150 do Protheus),
+        # usar diretamente pois ja contem base+loja no formato correto (ex: C00002101).
+        if "codigo_cli" in df.columns and df["codigo_cli"].notna().any():
+            df["codigo"] = df["codigo_cli"].astype(str).str.strip()
+            nome_col = next((c for c in ["nome_cliente", col_cliente] if c in df.columns), None)
+            df["cliente"] = df[nome_col].astype(str).str.strip() if nome_col else df["codigo"]
+        else:
+            codigo_df = normalizar_codigo_cliente(
+                df[col_cliente],
+                prefixo=self.get_prefixo_codigo()
+            )
+            df["codigo"] = codigo_df["codigo"]
+            df["cliente"] = codigo_df["cliente"]
 
         # Processar datas
         df = self._processar_datas(df)
