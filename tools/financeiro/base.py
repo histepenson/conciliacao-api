@@ -538,9 +538,17 @@ class ProcessadorFinanceiroBase(ABC):
         df = self._calcular_valor(df)
 
         # Normalizar codigo:
-        # Se codigo_cli estiver disponivel (formato FINR130/FINR150 do Protheus),
-        # usar diretamente pois ja contem base+loja no formato correto (ex: C00002101).
-        if "codigo_cli" in df.columns and df["codigo_cli"].notna().any():
+        # Se codigo_cli estiver disponivel com formato Protheus (C/F + digitos, ex: C00002101)
+        # e os campos filial/loja tambem existirem (indicativo de dado do Protheus),
+        # usar codigo_cli diretamente pois ja contem base+loja no formato correto.
+        _usa_codigo_cli = (
+            "codigo_cli" in df.columns
+            and "loja" in df.columns
+            and "filial" in df.columns
+            and df["codigo_cli"].notna().any()
+            and df["codigo_cli"].astype(str).str.match(r'^[CFcf]\d+$').any()
+        )
+        if _usa_codigo_cli:
             df["codigo"] = df["codigo_cli"].astype(str).str.strip()
             nome_col = next((c for c in ["nome_cliente", col_cliente] if c in df.columns), None)
             df["cliente"] = df[nome_col].astype(str).str.strip() if nome_col else df["codigo"]

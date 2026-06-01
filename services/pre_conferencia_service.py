@@ -140,11 +140,16 @@ def conferir(
     # Retorna lista unificada com status "so_sft" | "so_ct2" | "ambos".
     # Chave normalizada: (filial:4, nf:9, cliefor) — zero-padded.
     # Origem da chave CT2:
-    #   ct2_key preenchido → CT2_KEY[0:4]/[4:13]/[16:22]
-    #   ct2_key vazio      → historico "NF <nf> <nome> <filial(2-4d)>/<cliefor>"
+    #   ct2_key preenchido  → CT2_KEY[0:4]/[4:13]/[16:22]
+    #   ct2_key vazio c/ filial → historico "NF <nf> <nome> <filial>/<doc_orig>"
+    #     → extrai (filial, nf) e resolve cliefor via SFT por valor
+    #   ct2_key vazio s/ filial → historico "NF <nf> <nome>"
+    #     → extrai nf e resolve (filial, cliefor) via SFT por valor
     def _nf_cruzamento(ct2_recs: list, sft_recs: list) -> list:
-        # Aceita filial com 2–4 dígitos (versões Protheus variam)
-        _HIST_RE = re.compile(r'^NF\s+(\d+)\s+.*\s(\d{2,4})/(\S+)', re.IGNORECASE)
+        # Regex 1: tem filial antes do '/' — "NF <nf> <nome> <filial>/<doc>"
+        _HIST_RE_COM_FILIAL = re.compile(r'^NF\s+(\d+)\s+.*\s(\d{2,4})/', re.IGNORECASE)
+        # Regex 2: só NF — "NF <nf> ..."
+        _HIST_RE_NF = re.compile(r'^NF\s+(\d+)', re.IGNORECASE)
 
         def _norm_filial(v: str) -> str:
             return v.strip().zfill(4)
@@ -153,7 +158,6 @@ def conferir(
             return v.strip().zfill(9)
 
         def _norm_cliefor(v: str) -> str:
-            # Remove espaços e normaliza para 6 chars (código sem loja)
             s = re.sub(r'\s+', '', v)
             return s[:6].zfill(6) if len(s) >= 6 else s.zfill(6)
 
@@ -166,14 +170,6 @@ def conferir(
                 return None
             return _norm(k[0:4], k[4:13], k[16:22])
 
-        def _chave_hist(rec):
-            hist = str(rec.get("historico") or "").strip()
-            m = _HIST_RE.match(hist)
-            if not m:
-                return None
-            # grupo(1)=nf, grupo(2)=filial(2-4d), grupo(3)=cliefor
-            return _norm(m.group(2), m.group(1), m.group(3))
-
         # ── SFT index — chaves normalizadas ──────────────────────────────────
         sft_nfs: dict = {}
         for s in sft_recs:
@@ -184,16 +180,69 @@ def conferir(
                 continue
             chave = _norm(filial, nf, cliefor)
             valcont = round(float(s.get("valcont") or 0), 2)
-            emissao = str(s.get("emissao") or "").strip()
+            emissao = str(s.get("entrada") or s.get("emissao") or "").strip()
             if chave not in sft_nfs:
                 sft_nfs[chave] = {"total": 0.0, "emissao": emissao}
             sft_nfs[chave]["total"] = round(sft_nfs[chave]["total"] + valcont, 2)
 
+        # Índices secundários para resolução por historico
+        # (filial_norm, nf_norm) → lista de (cliefor_norm, total_valcont)
+        sft_por_filial_nf: dict[tuple, list] = {}
+        # nf_norm → lista de (filial_norm, cliefor_norm, total_valcont)
+        sft_por_nf: dict[str, list] = {}
+        for (filial, nf, cliefor), info in sft_nfs.items():
+            total = info["total"]
+            sft_por_filial_nf.setdefault((filial, nf), []).append((cliefor, total))
+            sft_por_nf.setdefault(nf, []).append((filial, cliefor, total))
+
         if sft_nfs:
-            _sft_sample = list(sft_nfs.keys())[:3]
-            logger.info("NF-CRUZAMENTO | sft=%d chaves | ex: %s", len(sft_nfs), _sft_sample)
+            logger.info("NF-CRUZAMENTO | sft=%d chaves | ex: %s", len(sft_nfs), list(sft_nfs.keys())[:3])
         else:
             logger.warning("NF-CRUZAMENTO | sft_nfs VAZIO — nenhum SFT com filial+nf válidos")
+
+        def _resolver_hist(rec: dict, debito: float):
+            """Resolve chave (filial, nf, cliefor) usando ct2_itemc + historico."""
+            hist = str(rec.get("historico") or "").strip()
+            # ct2_itemc sempre traz o fornecedor correto (CT2_ITEMC do Protheus)
+            ct2_itemc = str(rec.get("ct2_itemc") or "").strip()
+            cliefor_itemc = _norm_cliefor(ct2_itemc) if ct2_itemc else None
+
+            # Tenta extrair filial + nf do historico
+            m_filial = _HIST_RE_COM_FILIAL.match(hist)
+            if m_filial:
+                nf_norm = _norm_nf(m_filial.group(1))
+                filial_norm = _norm_filial(m_filial.group(2))
+                if cliefor_itemc:
+                    # Chave completa: filial + nf + fornecedor do ct2_itemc
+                    return (filial_norm, nf_norm, cliefor_itemc)
+                # Fallback: resolver cliefor via SFT por valor
+                candidatos = sft_por_filial_nf.get((filial_norm, nf_norm), [])
+                exatos = [(c, t) for c, t in candidatos if abs(t - debito) <= 0.01]
+                if exatos:
+                    return (filial_norm, nf_norm, exatos[0][0])
+                if len(candidatos) == 1:
+                    return (filial_norm, nf_norm, candidatos[0][0])
+                return None
+
+            # Sem filial no historico: usa nf + ct2_itemc + SFT para filial
+            m_nf = _HIST_RE_NF.match(hist)
+            if m_nf:
+                nf_norm = _norm_nf(m_nf.group(1))
+                if cliefor_itemc:
+                    # Busca filial no SFT pelo par (nf, cliefor)
+                    for f, c, _ in sft_por_nf.get(nf_norm, []):
+                        if c == cliefor_itemc:
+                            return (f, nf_norm, cliefor_itemc)
+                # Fallback por valor
+                candidatos = sft_por_nf.get(nf_norm, [])
+                exatos = [(f, c, t) for f, c, t in candidatos if abs(t - debito) <= 0.01]
+                if exatos:
+                    return (exatos[0][0], nf_norm, exatos[0][1])
+                if len(candidatos) == 1:
+                    return (candidatos[0][0], nf_norm, candidatos[0][1])
+                return None
+
+            return None
 
         # ── CT2 index ─────────────────────────────────────────────────────────
         ct2_nfs: dict = {}
@@ -210,26 +259,13 @@ def conferir(
                 chave = _chave_ct2(rec)
             else:
                 hist_raw = str(rec.get("historico") or "").strip()
-                chave = _chave_hist(rec)
+                chave = _resolver_hist(rec, debito)
                 if chave is None:
                     ct2_hist_sem_parse += 1
-                    logger.warning(
-                        "NF-HIST SEM PARSE | hist=%r",
-                        hist_raw[:120],
-                    )
+                    logger.debug("NF-HIST SEM PARSE | hist=%r deb=%.2f", hist_raw[:120], debito)
                 elif chave not in sft_nfs:
                     ct2_hist_sem_match += 1
-                    # Busca NF igual com cliefor diferente para auxiliar diagnóstico
-                    nf_norm = chave[1]
-                    chaves_mesmo_nf = [ck for ck in sft_nfs if ck[1] == nf_norm]
-                    logger.warning(
-                        "NF-HIST SEM MATCH | chave_ct2=%s | hist=%r | "
-                        "sft_mesmo_nf=%s | sft_sample=%s",
-                        chave,
-                        hist_raw[:120],
-                        chaves_mesmo_nf[:3],
-                        list(sft_nfs)[:3],
-                    )
+                    logger.debug("NF-HIST SEM MATCH | chave=%s hist=%r", chave, hist_raw[:80])
                 else:
                     ct2_hist_ok += 1
 
@@ -428,7 +464,7 @@ def conferir(
         )
         sft_detalhes = sorted(
             [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
-              "emissao": str(s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
+              "emissao": str(s.get("entrada") or s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
               "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
               "valcont": round(float(s.get("valcont") or 0), 2), "matched": s["matched"]}
              for s in sft_matched],
@@ -498,7 +534,7 @@ def conferir(
         )
         sft_detalhes = sorted(
             [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
-              "emissao": str(s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
+              "emissao": str(s.get("entrada") or s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
               "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
               "valcont": round(float(s.get("valcont") or 0), 2), "matched": s["matched"]}
              for s in sft_matched],

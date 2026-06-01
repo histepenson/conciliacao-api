@@ -178,7 +178,8 @@ If lIncCred
     cSql += "     CT2_KEY,"
     cSql += "     CT2.CT2_LP,"
     cSql += "     CT2.CT2_ORIGEM,"
-    cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc"
+    cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc,"
+    cSql += "     CT2_ITEMC  AS ct2_itemc"
     cSql += " FROM " + cTabela + " CT2"
     cSql += " LEFT JOIN " + cTabelaCT5 + " CT5"
     cSql += "     ON CT5.D_E_L_E_T_ = ' '"
@@ -213,7 +214,8 @@ If lIncDeb
     cSql += "     CT2_KEY,"
     cSql += "     CT2.CT2_LP,"
     cSql += "     CT2.CT2_ORIGEM,"
-    cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc"
+    cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc,"
+    cSql += "     CT2_ITEMC  AS ct2_itemc"
     cSql += " FROM " + cTabela + " CT2"
     cSql += " LEFT JOIN " + cTabelaCT5 + " CT5"
     cSql += "     ON CT5.D_E_L_E_T_ = ' '"
@@ -241,6 +243,7 @@ Begin Sequence
     TCSetField(cAlias, "ct5_desc",   "C", 30, 0)
     TCSetField(cAlias, "CT2_LP",     "C",  6, 0)
     TCSetField(cAlias, "CT2_ORIGEM", "C", 60, 0)
+    TCSetField(cAlias, "ct2_itemc",  "C", 30, 0)
 
     (cAlias)->(DbGoTop())
     While !(cAlias)->(Eof())
@@ -263,6 +266,7 @@ Begin Sequence
         oLinha["ct2_key"]            := AllTrim((cAlias)->CT2_KEY)
         oLinha["ct2_lp"]             := AllTrim((cAlias)->CT2_LP)
         oLinha["ct2_origem"]         := AllTrim((cAlias)->CT2_ORIGEM)
+        oLinha["ct2_itemc"]          := AllTrim((cAlias)->ct2_itemc)
         AAdd(aAllLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo
