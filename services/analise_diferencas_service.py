@@ -155,6 +155,18 @@ class AnaliseDiferencasService:
                 df_razao_geral_norm["itemconta_normalizado"] = df_razao_geral_norm[col_itemconta_geral].apply(
                     self._normalizar_item_conta_razao
                 )
+
+                # Segunda opção: se cod_cl_val existe e é coluna diferente da principal,
+                # normaliza também para uso como fallback por linha no matching.
+                col_codclval_geral = None
+                _candidatas_clval = ["cod_cl_val", "COD CL VAL", "COD_CL_VAL", "CODCLVAL"]
+                if col_itemconta_geral not in _candidatas_clval:
+                    col_codclval_geral = self._encontrar_coluna(df_razao_geral_norm, _candidatas_clval)
+                if col_codclval_geral:
+                    df_razao_geral_norm["codclval_normalizado"] = df_razao_geral_norm[col_codclval_geral].apply(
+                        self._normalizar_item_conta_razao
+                    )
+
                 lancamentos_razao_geral = (
                     df_razao_geral_norm.groupby("itemconta_normalizado").size().to_dict()
                 )
@@ -342,9 +354,7 @@ class AnaliseDiferencasService:
             matches_razao_count = 0
             matches_item_all = pd.DataFrame()
             if df_razao_geral_norm is not None and col_itemconta_geral:
-                matches_item_all = df_razao_geral_norm[
-                    df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado
-                ]
+                matches_item_all = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_normalizado)
                 matches_razao_count = int(len(matches_item_all))
                 lancamentos_razao = matches_razao_count
                 if (
@@ -505,9 +515,7 @@ class AnaliseDiferencasService:
 
             if tipo == "DIVERGENTE_VALOR" and df_razao_geral_norm is not None and col_itemconta_geral:
                 codigo_norm_div = self._normalizar_codigo_numerico(codigo)
-                matches_div = df_razao_geral_norm[
-                    df_razao_geral_norm["itemconta_normalizado"] == codigo_norm_div
-                ]
+                matches_div = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_norm_div)
                 logger.warning("[DIV_VALOR] codigo=%s norm=%s matches=%d", codigo, codigo_norm_div, len(matches_div))
                 _div_skipped = 0
                 for _, r in matches_div.iterrows():
@@ -582,9 +590,7 @@ class AnaliseDiferencasService:
                 and col_itemconta_geral
             ):
                 codigo_normalizado = self._normalizar_codigo_numerico(codigo)
-                matches_item = df_razao_geral_norm[
-                    df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado
-                ]
+                matches_item = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_normalizado)
                 for _, r in matches_item.iterrows():
                     valor_debito = 0.0
                     valor_credito = 0.0
@@ -750,9 +756,7 @@ class AnaliseDiferencasService:
                 and col_itemconta_geral
             ):
                 codigo_normalizado = self._normalizar_codigo_numerico(codigo)
-                matches_item = df_razao_geral_norm[
-                    df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado
-                ]
+                matches_item = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_normalizado)
                 lancamentos_razao_tmp: List[Dict[str, Any]] = []
                 for _, r in matches_item.iterrows():
                     valor_debito = 0.0
@@ -844,9 +848,7 @@ class AnaliseDiferencasService:
                     razao_valores_pool: list = []
                     if tipo == "DIVERGENTE_VALOR" and df_razao_geral_norm is not None and col_itemconta_geral:
                         codigo_norm_match = self._normalizar_codigo_numerico(codigo)
-                        matches_razao_match = df_razao_geral_norm[
-                            df_razao_geral_norm["itemconta_normalizado"] == codigo_norm_match
-                        ]
+                        matches_razao_match = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_norm_match)
                         for _, rz in matches_razao_match.iterrows():
                             v_d = 0.0
                             v_c = 0.0
@@ -1242,6 +1244,17 @@ class AnaliseDiferencasService:
 
         return selecionados if abs(soma - alvo) <= 0.01 else []
 
+
+    def _filtrar_razao_por_codigo(
+        self,
+        df_razao_norm: pd.DataFrame,
+        codigo_normalizado: str,
+    ) -> pd.DataFrame:
+        """Filtra linhas do razão cujo itemconta_normalizado OR codclval_normalizado bata o código."""
+        mask = df_razao_norm["itemconta_normalizado"] == codigo_normalizado
+        if "codclval_normalizado" in df_razao_norm.columns:
+            mask = mask | (df_razao_norm["codclval_normalizado"] == codigo_normalizado)
+        return df_razao_norm[mask]
 
     def _encontrar_coluna(
         self, df: pd.DataFrame, candidatas: List[str]
