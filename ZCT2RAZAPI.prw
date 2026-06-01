@@ -228,6 +228,7 @@ EndIf
 cSql += " ORDER BY CT2_DATA, CT2_LOTE, CT2_SBLOTE, CT2_DOC, CT2_LINHA, CT2_KEY"
 
 ConOut("[ZCT2RAZ] SQL montado | tabela=" + cTabela + " incCred=" + IIf(lIncCred,"S","N") + " incDeb=" + IIf(lIncDeb,"S","N"))
+ConOut("[ZCT2RAZ] SQL=" + cSql)
 
 Begin Sequence
     dbUseArea(.T., "TOPCONN", TCGenQry(,, cSql), cAlias, .T., .F.)

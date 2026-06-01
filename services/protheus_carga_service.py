@@ -8,6 +8,7 @@ from rq import Queue
 from rq.command import send_stop_job_command
 from rq.job import Job
 from rq.registry import DeferredJobRegistry, FailedJobRegistry, ScheduledJobRegistry, StartedJobRegistry
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core.rq import PROTHEUS_CARGA_QUEUE, enqueue_protheus_carga, job_esta_ativo
@@ -363,19 +364,37 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
         _tentar_enfileirar(db, falha)
         return falha, False
 
-    # 3. Sem carga util: cria nova.
-    carga = ProtheusCarga(
-        config_id=payload.config_id,
-        empresa_id=empresa_id,
-        tipo_relatorio=tipo,
-        data_base=data_base,
-        parametros_hash=parametros_hash,
-        parametros_json=parametros,
-        status="pendente",
-    )
-    db.add(carga)
-    db.commit()
-    db.refresh(carga)
+    # 3. Sem carga util: cria nova. Guard contra race condition com try/except.
+    try:
+        carga = ProtheusCarga(
+            config_id=payload.config_id,
+            empresa_id=empresa_id,
+            tipo_relatorio=tipo,
+            data_base=data_base,
+            parametros_hash=parametros_hash,
+            parametros_json=parametros,
+            status="pendente",
+        )
+        db.add(carga)
+        db.commit()
+        db.refresh(carga)
+    except IntegrityError:
+        db.rollback()
+        carga = (
+            db.query(ProtheusCarga)
+            .filter(*_filtro_base)
+            .order_by(ProtheusCarga.created_at.desc())
+            .first()
+        )
+        if not carga:
+            raise
+        carga.status = "pendente"
+        carga.erro = None
+        carga.iniciado_em = None
+        carga.finalizado_em = None
+        carga.total_registros = 0
+        db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
+        db.commit()
 
     _tentar_enfileirar(db, carga)
     return carga, False
