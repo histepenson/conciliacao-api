@@ -138,16 +138,27 @@ def conferir(
 
     # ── Cruzamento NF: outer join CT2 × SFT agregados por NF ────────────────────
     # Retorna lista unificada com status "so_sft" | "so_ct2" | "ambos".
-    # Chave normalizada: (filial:4, nf:9, cliefor:6) — zero-padded.
+    # Chave normalizada: (filial:4, nf:9, cliefor) — zero-padded.
     # Origem da chave CT2:
     #   ct2_key preenchido → CT2_KEY[0:4]/[4:13]/[16:22]
-    #   ct2_key vazio      → historico "NF <nf> <nome> <filial(4d)>/<cliefor> R"
+    #   ct2_key vazio      → historico "NF <nf> <nome> <filial(2-4d)>/<cliefor>"
     def _nf_cruzamento(ct2_recs: list, sft_recs: list) -> list:
-        # "NF 606 PRESTO LOG OP LOG C 0115/001710 R"
-        _HIST_RE = re.compile(r'^NF\s+(\d+)\s+.*\s(\d{4})/(\d+)', re.IGNORECASE)
+        # Aceita filial com 2–4 dígitos (versões Protheus variam)
+        _HIST_RE = re.compile(r'^NF\s+(\d+)\s+.*\s(\d{2,4})/(\S+)', re.IGNORECASE)
+
+        def _norm_filial(v: str) -> str:
+            return v.strip().zfill(4)
+
+        def _norm_nf(v: str) -> str:
+            return v.strip().zfill(9)
+
+        def _norm_cliefor(v: str) -> str:
+            # Remove espaços e normaliza para 6 chars (código sem loja)
+            s = re.sub(r'\s+', '', v)
+            return s[:6].zfill(6) if len(s) >= 6 else s.zfill(6)
 
         def _norm(filial: str, nf: str, cliefor: str) -> tuple:
-            return (filial.strip().zfill(4), nf.strip().zfill(9), cliefor.strip().zfill(6))
+            return (_norm_filial(filial), _norm_nf(nf), _norm_cliefor(cliefor))
 
         def _chave_ct2(rec):
             k = str(rec.get("ct2_key") or "").strip()
@@ -160,10 +171,10 @@ def conferir(
             m = _HIST_RE.match(hist)
             if not m:
                 return None
-            # grupo(1)=nf, grupo(2)=filial(4d), grupo(3)=cliefor
+            # grupo(1)=nf, grupo(2)=filial(2-4d), grupo(3)=cliefor
             return _norm(m.group(2), m.group(1), m.group(3))
 
-        # ── SFT index — chaves normalizadas (filial:4, nf:9, cliefor:6) ──────
+        # ── SFT index — chaves normalizadas ──────────────────────────────────
         sft_nfs: dict = {}
         for s in sft_recs:
             filial  = str(s.get("filial")  or "").strip()
@@ -178,10 +189,18 @@ def conferir(
                 sft_nfs[chave] = {"total": 0.0, "emissao": emissao}
             sft_nfs[chave]["total"] = round(sft_nfs[chave]["total"] + valcont, 2)
 
+        if sft_nfs:
+            _sft_sample = list(sft_nfs.keys())[:3]
+            logger.info("NF-CRUZAMENTO | sft=%d chaves | ex: %s", len(sft_nfs), _sft_sample)
+        else:
+            logger.warning("NF-CRUZAMENTO | sft_nfs VAZIO — nenhum SFT com filial+nf válidos")
+
         # ── CT2 index ─────────────────────────────────────────────────────────
-        # ct2_key preenchido → _chave_ct2
-        # ct2_key vazio      → _chave_hist (historico sempre presente nesses casos)
         ct2_nfs: dict = {}
+        ct2_hist_ok = 0
+        ct2_hist_sem_parse = 0
+        ct2_hist_sem_match = 0
+
         for rec in ct2_recs:
             debito = round(float(rec.get("debito") or 0), 2)
             if debito == 0:
@@ -190,15 +209,39 @@ def conferir(
             if k:
                 chave = _chave_ct2(rec)
             else:
+                hist_raw = str(rec.get("historico") or "").strip()
                 chave = _chave_hist(rec)
                 if chave is None:
-                    logger.debug(
-                        "hist-sem-parse | hist_raw=%s",
-                        str(rec.get("historico") or "")[:80],
+                    ct2_hist_sem_parse += 1
+                    logger.warning(
+                        "NF-HIST SEM PARSE | hist=%r",
+                        hist_raw[:120],
                     )
+                elif chave not in sft_nfs:
+                    ct2_hist_sem_match += 1
+                    # Busca NF igual com cliefor diferente para auxiliar diagnóstico
+                    nf_norm = chave[1]
+                    chaves_mesmo_nf = [ck for ck in sft_nfs if ck[1] == nf_norm]
+                    logger.warning(
+                        "NF-HIST SEM MATCH | chave_ct2=%s | hist=%r | "
+                        "sft_mesmo_nf=%s | sft_sample=%s",
+                        chave,
+                        hist_raw[:120],
+                        chaves_mesmo_nf[:3],
+                        list(sft_nfs)[:3],
+                    )
+                else:
+                    ct2_hist_ok += 1
+
             if chave is None:
                 continue
             ct2_nfs[chave] = round(ct2_nfs.get(chave, 0.0) + debito, 2)
+
+        if ct2_hist_ok or ct2_hist_sem_parse or ct2_hist_sem_match:
+            logger.info(
+                "NF-CRUZAMENTO hist | ok=%d sem_parse=%d sem_match=%d",
+                ct2_hist_ok, ct2_hist_sem_parse, ct2_hist_sem_match,
+            )
 
         # ── Outer join ────────────────────────────────────────────────────────
         result = []

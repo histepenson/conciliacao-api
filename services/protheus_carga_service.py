@@ -316,6 +316,16 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
     )
     if concluida and (concluida.total_registros or 0) > 0:
         return concluida, True
+    elif concluida:
+        # concluida mas sem registros: reprocessa em vez de tentar criar nova (violaria unique constraint)
+        concluida.status = "pendente"
+        concluida.erro = None
+        concluida.iniciado_em = None
+        concluida.finalizado_em = None
+        concluida.total_registros = 0
+        db.commit()
+        _tentar_enfileirar(db, concluida)
+        return concluida, False
 
     # 2. Existe uma carga ativa (pendente ou processando)? Reconecta.
     ativa = (
