@@ -8,8 +8,8 @@ API REST do Livro Fiscal via consulta SQL direta na tabela SFT.
 Endpoint: GET /rest/zsftentapi/api/v1/sftent
 
 Parametros:
-  data_ini      = data inicial YYYYMMDD  (obrigatorio)
-  data_fim      = data final   YYYYMMDD  (obrigatorio)
+  data_ini      = data inicial YYYYMMDD  (obrigatorio) - filtra por FT_ENTRADA
+  data_fim      = data final   YYYYMMDD  (obrigatorio) - filtra por FT_ENTRADA
   filial_de     = filial inicial (default "")
   filial_ate    = filial final   (default "zzzzzzzzz")
   page          = pagina (default 1)
@@ -24,7 +24,7 @@ Retorno JSON:
   linhas          = registros da pagina
 
 Campos por linha:
-  filial, nf, tes, emissao, cliefor, estado, cfop, especie, quant,
+  filial, nf, tes, emissao, entrada, cliefor, estado, cfop, especie, quant,
   valcont, aliqicm, baseicm, valicm, isenicm, outricm,
   icmscom, icmsdif, difal, icmsret,
   produto, cstpis, codbcc, valpis, valcof, valipi
@@ -98,7 +98,7 @@ ConOut("[ZSFTENTAPI] data=" + cDataIni + "/" + cDataFim + ;
 // --- WHERE ---
 cWhere := " D_E_L_E_T_ = ' '" 
 cWhere += " AND FT_DTCANC = ' ' "
-cWhere += " AND FT_EMISSAO BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
+cWhere += " AND FT_ENTRADA BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
 cWhere += " AND FT_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 
 // --- SQL ---
@@ -107,6 +107,7 @@ cSql += "     FT_FILIAL,"
 cSql += "     FT_NFISCAL,"
 cSql += "     FT_TES,"
 cSql += "     FT_EMISSAO,"
+cSql += "     FT_ENTRADA,"
 cSql += "     FT_CLIEFOR,"
 cSql += "     FT_ESTADO,"
 cSql += "     FT_CFOP,"
@@ -130,13 +131,14 @@ cSql += "     FT_VALCOF,"
 cSql += "     FT_VALIPI"
 cSql += " FROM " + cTabela
 cSql += " WHERE " + cWhere
-cSql += " ORDER BY FT_EMISSAO, FT_FILIAL, FT_NFISCAL"
+cSql += " ORDER BY FT_ENTRADA, FT_FILIAL, FT_NFISCAL"
 
 ConOut("[ZSFTENTAPI] SQL montado | tabela=" + cTabela)
 
 Begin Sequence
     dbUseArea(.T., "TOPCONN", TCGenQry(,, cSql), cAlias, .T., .F.)
     TCSetField(cAlias, "FT_EMISSAO", "D",  8, 0)
+    TCSetField(cAlias, "FT_ENTRADA", "D",  8, 0)
     TCSetField(cAlias, "FT_QUANT",   "N", 16, 3)
     TCSetField(cAlias, "FT_VALCONT", "N", 16, 2)
     TCSetField(cAlias, "FT_ALIQICM", "N",  8, 4)
@@ -159,6 +161,7 @@ Begin Sequence
         oLinha["nf"]       := AllTrim((cAlias)->FT_NFISCAL)
         oLinha["tes"]      := AllTrim((cAlias)->FT_TES)
         oLinha["emissao"]  := DtoC((cAlias)->FT_EMISSAO)
+        oLinha["entrada"]  := DtoC((cAlias)->FT_ENTRADA)
         oLinha["cliefor"]  := AllTrim((cAlias)->FT_CLIEFOR)
         oLinha["estado"]   := AllTrim((cAlias)->FT_ESTADO)
         oLinha["cfop"]     := AllTrim((cAlias)->FT_CFOP)

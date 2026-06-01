@@ -11,6 +11,7 @@ Fluxo:
 """
 
 import logging
+import re
 from typing import Any
 
 from fastapi import HTTPException
@@ -137,25 +138,32 @@ def conferir(
 
     # ── Cruzamento NF: outer join CT2 × SFT agregados por NF ────────────────────
     # Retorna lista unificada com status "so_sft" | "so_ct2" | "ambos".
-    # Não toca em ct2_detalhes/sft_detalhes — é dado separado para a grid de análise.
+    # Chave normalizada: (filial:4, nf:9, cliefor:6) — zero-padded.
+    # Origem da chave CT2:
+    #   ct2_key preenchido → CT2_KEY[0:4]/[4:13]/[16:22]
+    #   ct2_key vazio      → historico "NF <nf> <nome> <filial(4d)>/<cliefor> R"
     def _nf_cruzamento(ct2_recs: list, sft_recs: list) -> list:
+        # "NF 606 PRESTO LOG OP LOG C 0115/001710 R"
+        _HIST_RE = re.compile(r'^NF\s+(\d+)\s+.*\s(\d{4})/(\d+)', re.IGNORECASE)
+
+        def _norm(filial: str, nf: str, cliefor: str) -> tuple:
+            return (filial.strip().zfill(4), nf.strip().zfill(9), cliefor.strip().zfill(6))
 
         def _chave_ct2(rec):
             k = str(rec.get("ct2_key") or "").strip()
             if len(k) < 22:
                 return None
-            return (k[0:4].strip(), k[4:13].strip(), k[16:22].strip())
+            return _norm(k[0:4], k[4:13], k[16:22])
 
-        ct2_nfs: dict = {}
-        for rec in ct2_recs:
-            debito = round(float(rec.get("debito") or 0), 2)
-            if debito == 0:
-                continue
-            chave = _chave_ct2(rec)
-            if chave is None:
-                continue
-            ct2_nfs[chave] = round(ct2_nfs.get(chave, 0.0) + debito, 2)
+        def _chave_hist(rec):
+            hist = str(rec.get("historico") or "").strip()
+            m = _HIST_RE.match(hist)
+            if not m:
+                return None
+            # grupo(1)=nf, grupo(2)=filial(4d), grupo(3)=cliefor
+            return _norm(m.group(2), m.group(1), m.group(3))
 
+        # ── SFT index — chaves normalizadas (filial:4, nf:9, cliefor:6) ──────
         sft_nfs: dict = {}
         for s in sft_recs:
             filial  = str(s.get("filial")  or "").strip()
@@ -163,13 +171,36 @@ def conferir(
             cliefor = str(s.get("cliefor") or "").strip()
             if not filial or not nf:
                 continue
-            chave = (filial, nf, cliefor)
+            chave = _norm(filial, nf, cliefor)
             valcont = round(float(s.get("valcont") or 0), 2)
             emissao = str(s.get("emissao") or "").strip()
             if chave not in sft_nfs:
                 sft_nfs[chave] = {"total": 0.0, "emissao": emissao}
             sft_nfs[chave]["total"] = round(sft_nfs[chave]["total"] + valcont, 2)
 
+        # ── CT2 index ─────────────────────────────────────────────────────────
+        # ct2_key preenchido → _chave_ct2
+        # ct2_key vazio      → _chave_hist (historico sempre presente nesses casos)
+        ct2_nfs: dict = {}
+        for rec in ct2_recs:
+            debito = round(float(rec.get("debito") or 0), 2)
+            if debito == 0:
+                continue
+            k = str(rec.get("ct2_key") or "").strip()
+            if k:
+                chave = _chave_ct2(rec)
+            else:
+                chave = _chave_hist(rec)
+                if chave is None:
+                    logger.debug(
+                        "hist-sem-parse | hist_raw=%s",
+                        str(rec.get("historico") or "")[:80],
+                    )
+            if chave is None:
+                continue
+            ct2_nfs[chave] = round(ct2_nfs.get(chave, 0.0) + debito, 2)
+
+        # ── Outer join ────────────────────────────────────────────────────────
         result = []
         for key in sorted(set(ct2_nfs) | set(sft_nfs), key=lambda x: (x[0], x[1])):
             f, n, c = key
@@ -189,7 +220,6 @@ def conferir(
             })
 
         # Validação: cada (filial, nf, cliefor) deve aparecer exatamente 1 vez.
-        # Se disparar, indica bug na lógica de agregação acima.
         seen: set = set()
         for item in result:
             chave = (item["filial"], item["nf"], item["cliefor"])

@@ -4,6 +4,7 @@ import secrets
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -71,6 +72,17 @@ class Settings(BaseSettings):
 
     # Certificado Digital
     CERT_ENCRYPTION_KEY: str = ""
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "production", "prod"}:
+                return False
+            if normalized in {"development", "dev"}:
+                return True
+        return value
 
     class Config:
         env_file = ".env"
