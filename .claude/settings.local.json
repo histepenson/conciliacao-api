@@ -161,7 +161,9 @@
       "Bash(.venv/Scripts/python.exe -c \"import boto3\")",
       "Bash(.venv/Scripts/python.exe -m pip install boto3)",
       "Bash(.venv/Scripts/python.exe -c ' *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(.venv/Scripts/python.exe -m alembic current)",
+      "Bash(.venv/Scripts/python.exe -m alembic heads)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
