@@ -57,16 +57,20 @@ Local aAllMovs       := {}
 Local oItem          := Nil
 Local oError         := Nil
 Local cAlias         := GetNextAlias()
+Local cAliasSA6      := GetNextAlias()
 Local cSql           := ""
+Local cSqlSA6        := ""
 Local cSqlWhere      := ""
 Local cCampos        := ""
 Local cExpMda        := ""
 Local cTabela14      := ""
 Local aRecon         := { { 0, 0, 0, 0 } }
+Local nMoedaSA6      := 1
+Local nLimCredSA6    := 0
 
 Local cBanco         := AllTrim(Self:banco)
 Local cAgencia       := AllTrim(Self:agencia)
-Local cConta         := AllTrim(Self:conta)
+Local cConta         := Self:conta
 Local cDataIni       := AllTrim(Self:data_ini)
 Local cDataFim       := AllTrim(Self:data_fim)
 Local cMoeda         := AllTrim(Self:moeda)
@@ -117,7 +121,7 @@ Local lTitulo        := .T.
 Local dDataMovi      := CtoD("")
 Local dDtConvSld     := CtoD("")
 
-Local cFilSA6        := ""  // SA6 e compartilhado: A6_FILIAL e sempre vazio
+Local cFilSA6        := IIf(lGestao, FWFilial("SA6"), xFilial("SA6"))
 Local cFilSE5        := IIf(lGestao, FWFilial("SE5"), xFilial("SE5"))
 Local cFilSE8        := IIf(lGestao, FWFilial("SE8"), xFilial("SE8"))
 Local cMoedaDesc     := ""
@@ -191,11 +195,23 @@ lAllFil        := (nTodasFiliais == 1)
 nDecMoeda      := GetMv("MV_CENT" + IIf(nMoedaRel > 1, AllTrim(Str(nMoedaRel)), ""))
 ConOut("ZFIN470API - [3] params: moeda=" + cValToChar(nMoedaRel) + " lAllFil=" + cValToChar(lAllFil) + " pageSize=" + cValToChar(nPageSize))
 
-dbSelectArea("SA6")
-SA6->(DbSetOrder(1))
-ConOut("ZFIN470API - [4] SA6 seek key=[" + PadR(cFilSA6, TamSX3("A6_FILIAL")[1]) + PadR(AllTrim(cBanco), nTamBanco) + PadR(AllTrim(cAgencia), nTamAgencia) + PadR(AllTrim(cConta), nTamConta) + "]")
-If !SA6->(DbSeek(PadR(cFilSA6, TamSX3("A6_FILIAL")[1]) + PadR(AllTrim(cBanco), nTamBanco) + PadR(AllTrim(cAgencia), nTamAgencia) + PadR(AllTrim(cConta), nTamConta)))
+// Busca SA6 via SQL sem filtro de filial: cada empresa pode ter filial diferente ou compartilhada
+cSqlSA6 := " SELECT A6_FILIAL, A6_MOEDA, A6_LIMCRED FROM " + RetSqlName("SA6")
+cSqlSA6 += " WHERE D_E_L_E_T_ = ' '"
+cSqlSA6 += " AND A6_COD     = '" + PadR(AllTrim(cBanco),   nTamBanco)   + "'"
+cSqlSA6 += " AND A6_AGENCIA = '" + PadR(AllTrim(cAgencia), nTamAgencia) + "'"
+cSqlSA6 += " AND A6_NUMCON  = '" + PadR(AllTrim(cConta),   nTamConta)   + "'"
+
+ConOut("ZFIN470API - [4] SA6 SQL banco=[" + PadR(AllTrim(cBanco),nTamBanco) + "] ag=[" + PadR(AllTrim(cAgencia),nTamAgencia) + "] cta=[" + PadR(AllTrim(cConta),nTamConta) + "]")
+
+dbUseArea(.T., "TOPCONN", TCGenQry(,, cSqlSA6), cAliasSA6, .T., .F.)
+TCSetField(cAliasSA6, "A6_MOEDA",   "N",  2, 0)
+TCSetField(cAliasSA6, "A6_LIMCRED", "N", 16, 2)
+(cAliasSA6)->(DbGoTop())
+
+If (cAliasSA6)->(Eof())
 	ConOut("ZFIN470API - [4] SA6 nao encontrado")
+	(cAliasSA6)->(DbCloseArea())
 	oError := JsonObject():New()
 	oError["erro"]      := .T.
 	oError["status"]    := 404
@@ -206,8 +222,13 @@ If !SA6->(DbSeek(PadR(cFilSA6, TamSX3("A6_FILIAL")[1]) + PadR(AllTrim(cBanco), n
 Return .T.
 EndIf
 
-ConOut("ZFIN470API - [5] SA6 encontrado moeda=" + cValToChar(SA6->A6_MOEDA))
-nMoedaBco := Max(SA6->A6_MOEDA, 1)
+cFilSA6   := AllTrim((cAliasSA6)->A6_FILIAL)
+nMoedaSA6 := (cAliasSA6)->A6_MOEDA
+nLimCredSA6 := (cAliasSA6)->A6_LIMCRED
+(cAliasSA6)->(DbCloseArea())
+
+nMoedaBco := Max(nMoedaSA6, 1)
+ConOut("ZFIN470API - [5] SA6 encontrado filial=[" + cFilSA6 + "] moeda=" + cValToChar(nMoedaBco))
 ConOut("ZFIN470API - [6] chamando FR470Tab14")
 cTabela14 := FR470Tab14()
 ConOut("ZFIN470API - [7] Tab14=" + cTabela14)
@@ -227,12 +248,12 @@ nSaldoRod   := nSaldoIni
 nSaldoFinal := nSaldoIni
 
 If cPaisLoc == "BRA"
-	nLimCred := SA6->A6_LIMCRED
+	nLimCred := nLimCredSA6
 Else
-	If SA6->A6_MOEDA <> 1 .And. SA6->A6_MOEDA == nMoedaRel
-		nLimCred := SA6->A6_LIMCRED
+	If nMoedaSA6 <> 1 .And. nMoedaSA6 == nMoedaRel
+		nLimCred := nLimCredSA6
 	Else
-		nLimCred := xMoeda(SA6->A6_LIMCRED, SA6->A6_MOEDA, 1, dDataBase)
+		nLimCred := xMoeda(nLimCredSA6, nMoedaSA6, 1, dDataBase)
 	EndIf
 EndIf
 
@@ -323,6 +344,10 @@ cSql += " NOT (SE5.E5_NUMCHEQ BETWEEN '*              ' AND '*ZZZZZZZZZZZZZZ') A
 cSql += " SE5.D_E_L_E_T_ = ' ' "
 cSql += " ORDER BY SE5.E5_DTDISPO, SE5.E5_BANCO, SE5.E5_AGENCIA, SE5.E5_CONTA, "
 cSql += "          SE5.E5_NUMCHEQ, SE5.E5_DOCUMEN, SE5.R_E_C_N_O_, SE5.E5_PREFIXO, SE5.E5_NUMERO "
+
+ConOut("ZFIN470API - [10] nFiliais=" + cValToChar(nFiliais) + " aSelFil=" + cValToChar(Len(aSelFil)))
+ConOut("ZFIN470API - [10] cSqlWhere=" + cSqlWhere)
+ConOut("ZFIN470API - [10] cSql=" + cSql)
 
 Begin Sequence
 	dbUseArea(.T., "TOPCONN", TCGenQry(,, cSql), cAlias, .T., .F.)

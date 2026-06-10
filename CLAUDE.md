@@ -50,6 +50,8 @@ alembic current                                  # Status atual
 ```
 Requisição HTTP
     ↓
+Middleware (middleware/)    → Auth (JWT), tenant (empresa), permissões
+    ↓
 Router (routers/)           → Endpoints da API
     ↓
 Schema Pydantic (schemas/)  → Validação de entrada/saída
@@ -63,53 +65,132 @@ Model SQLAlchemy (models/)  → Acesso ao banco
 PostgreSQL (schema: concilia)
 ```
 
-### Estrutura de Pastas
+Jobs assíncronos (cargas Protheus) rodam fora do ciclo request/response via fila Redis (RQ) processada por `workers/`.
+
+### Estrutura de Pastas (visão geral)
 
 ```
 conciliacao-api/
-├── main.py                              # Ponto de entrada FastAPI, CORS, routers
-├── db.py                                # Configuração SQLAlchemy, pool de conexões
-├── requirements.txt                     # Dependências Python
-├── alembic.ini                          # Configuração de migrações
-├── alembic/
-│   ├── env.py                           # Config do ambiente de migração
-│   └── versions/                        # Scripts de migração
+├── main.py            # Entry point FastAPI: lifespan (APScheduler), CORS, exception handler, registro dos routers
+├── db.py              # Configuração SQLAlchemy, pool de conexões
+├── requirements.txt
+├── alembic/           # Migrações (schema concilia)
 │
-├── routers/                             # Endpoints da API
-│   ├── empresa_router.py                # CRUD de empresas
-│   ├── planodecontas_router.py          # CRUD + importação de plano de contas
-│   ├── conciliacao_router.py            # Processamento de conciliação
-│   └── arquivo_router.py                # Upload e gestão de arquivos
+├── core/              # Infraestrutura compartilhada
+│   ├── config.py        # Settings (pydantic-settings): DB, JWT, SMTP, CORS, Protheus, Redis
+│   ├── security.py       # Hash de senha, geração/validação de JWT
+│   ├── protheus.py        # Criptografia de credenciais Protheus, helpers de integração
+│   ├── protheus_http.py   # Cliente HTTP para REST do Protheus
+│   ├── redis.py          # Conexão Redis (get_redis_connection)
+│   └── rq.py             # Fila RQ "protheus-cargas", enqueue/job status, callback de falha
 │
-├── schemas/                             # Validação Pydantic
-│   ├── empresa_schema.py                # Create, Update, Out para empresa
-│   ├── planodecontas_schema.py          # Create, Update, Out + ImportacaoResultado
-│   ├── conciliacao_schema.py            # RequestConciliacao, RelatorioConsolidacao
-│   └── arquivo_conciliacao_schema.py    # Create, Update, Out para arquivos
+├── middleware/        # Multitenant e autorização (ver docs/ARCHITECTURE_AUTH_MULTITENANT.md)
+│   ├── auth.py           # get_current_user: valida JWT, retorna CurrentUser
+│   ├── tenant.py          # get_empresa_context: resolve EmpresaContext (empresa, perfil, permissões)
+│   └── permission.py      # require_permission/require_admin/require_empresa_admin + Permissions
 │
-├── services/                            # Lógica de negócio
-│   ├── empresa_services.py              # CRUD empresas
-│   ├── planodecontas_services.py        # CRUD + importação hierárquica
-│   ├── conciliacao_service.py           # Orquestração da conciliação
-│   └── analise_diferencas_service.py    # Análise detalhada por código
+├── routers/           # ~28 routers, registrados em main.py com prefix="/api"
+│   ├── auth_router.py                 # Login, refresh token, reset de senha
+│   ├── admin_usuarios_router.py       # CRUD usuários (admin master)
+│   ├── admin_empresas_router.py       # CRUD empresas (admin master)
+│   ├── admin_perfis_router.py         # CRUD perfis/permissões (admin master)
+│   ├── empresa_router.py              # CRUD de empresas (escopo do tenant)
+│   ├── planodecontas_router.py        # CRUD + importação de plano de contas
+│   ├── arquivo_router.py              # Upload e gestão de arquivos
+│   ├── dashboard_router.py            # Indicadores consolidados
+│   ├── conciliacao_router.py          # Conciliação financeira (FINR130/150 × CTBR140/480)
+│   ├── conciliacao_bancaria_router.py # Conciliação bancária (FINR470 × CTBR400)
+│   ├── conciliacao_estoque_router.py  # Conciliação de estoque (MATR900 × CTBR400)
+│   ├── finr130_router.py / finr150_router.py / finr470_router.py  # Importação relatórios financeiros Protheus
+│   ├── ctbr140_router.py / ctbr400_router.py / ctbr480_router.py  # Importação relatórios contábeis Protheus
+│   ├── matr900_router.py              # Importação Kardex de estoque (Protheus)
+│   ├── efetivacao_router.py           # Efetivação/baixa de itens conciliados
+│   ├── protheus_carga_router.py       # Dispara/consulta cargas assíncronas do Protheus (RQ)
+│   ├── produto_router.py              # CRUD de produtos
+│   ├── produto_fornecedor_router.py   # De-Para produto x fornecedor
+│   ├── certificado_router.py          # Certificado digital A1 (NF-e/SEFAZ)
+│   ├── nfe_router.py                  # Importação de NF-e via SEFAZ
+│   ├── estoque_router.py              # Saldos, movimentações, ajustes de estoque
+│   ├── pre_conferencia_router.py      # Pré-conferência (CT2 × SFT)
+│   └── lancamento_padrao_router.py    # Lançamentos padrão / templates contábeis
 │
-├── models/                              # Modelos SQLAlchemy
-│   ├── __init__.py                      # Imports na ordem correta
-│   ├── empresa.py                       # Entidade raiz
-│   ├── planodecontas.py                 # Plano de contas
-│   ├── conciliacao.py                   # Registros de conciliação
-│   ├── arquivoconciliacao.py            # Metadados de arquivos
-│   ├── request_models.py                # Schemas de request (legacy)
-│   └── response_models.py               # Schemas de response (legacy)
+├── schemas/           # Validação Pydantic (1 arquivo por domínio, espelha routers/)
 │
-├── tools/                               # Utilitários de processamento
-│   ├── financeiro.py                    # Normalização de planilha financeira
-│   ├── contabilidade.py                 # Normalização de planilha contábil
-│   ├── calc_diferencas.py               # Cálculo de diferenças + export Excel
-│   └── mappers.py                       # Conversão de dados para schemas
+├── services/          # Lógica de negócio (1+ arquivo por domínio, espelha routers/)
+│   ├── conciliacao_service.py / analise_diferencas_service.py     # Orquestração + análise detalhada (financeira)
+│   ├── conciliacao_bancaria_service.py / *_efetivacao_service.py  # Conciliação bancária + efetivação
+│   ├── conciliacao_estoque_service.py / *_efetivacao_service.py   # Conciliação de estoque + efetivação
+│   ├── pre_conferencia_service.py / ct2raz_service.py / ct2raz_ct5_service.py / sft_ent_service.py
+│   ├── estoque_service.py / fechamento_service.py                  # Saldos e fechamento de período
+│   ├── nfe_service.py / sefaz_service.py / certificado_service.py  # NF-e e SEFAZ
+│   ├── produto_service.py / produto_fornecedor_service.py
+│   ├── protheus_carga_service.py / task_service.py                 # Cargas assíncronas Protheus
+│   ├── auth_service.py / admin_*_service.py                        # Auth e administração
+│   ├── dashboard_service.py / relatorio_service.py / file_storage_service.py
+│   └── finr130/finr150/finr470/ctbr140/ctbr400/ctbr480/matr900_service.py  # Importação de relatórios Protheus
 │
-└── uploads/                             # Arquivos enviados pelo usuário
+├── tools/             # Processamento de dados (normalização, cálculos)
+│   ├── financeiro/    # base.py (parsing, normalização de código), contas_pagar.py, contas_receber.py, factory.py
+│   ├── contabilidade.py / calc_diferencas.py / mappers.py          # Conciliação financeira
+│   ├── banco/         # extrato_bancario.py, razao_banco.py, calc_diferencas_banco.py
+│   └── estoque/       # kardex.py, razao_estoque.py, calc_diferencas_estoque.py
+│
+├── models/            # Modelos SQLAlchemy (schema concilia)
+│   ├── empresa.py / planodecontas.py / conciliacao.py / arquivoconciliacao.py
+│   ├── usuario.py / usuario_empresa.py / perfil.py / user_session.py / password_reset.py / audit_log.py
+│   ├── produto.py / produto_fornecedor.py / nfe.py / certificado_digital.py
+│   ├── estoque.py / estoque_alerta.py / protheus_carga.py
+│   └── request_models.py / response_models.py  # Schemas legados
+│
+├── workers/           # Processamento assíncrono via RQ
+│   ├── protheus_carga_worker.py     # Executa carga de dados do Protheus (job RQ)
+│   └── protheus_carga_scheduler.py  # Agenda/dispara cargas
+│
+├── protheus/          # Fontes ADVPL/TLPP (.prw) expostos via REST custom no Protheus
+│   ├── ZFINR130API.prw / ZFINR150API.prw / ZFIN470API.prw      # APIs financeiras (FINR130/150/470)
+│   ├── ZCTBR140API.prw / ZCTBR400API.prw / ZCTBR480API.prw     # APIs contábeis (CTBR140/400/480)
+│   ├── ZMATR900API.prw                                          # API Kardex de estoque (MATR900)
+│   ├── ZCT2RAZAPI.prw / ZCT2RAZAPI_BKP.prw / ZCT2RAZCT5.prw     # APIs de razão (CT2RAZ)
+│   └── ZSFTENTAPI.prw                                           # API de entradas (SFT)
+│
+└── uploads/           # Arquivos enviados pelo usuário
 ```
+
+### Multitenant e Autenticação
+
+- JWT (`core/security.py`) carrega `sub` (user id), `empresa_id` e `is_admin`.
+- `middleware/auth.py::get_current_user` valida o token e retorna `CurrentUser`.
+- `middleware/tenant.py::get_empresa_context` resolve `EmpresaContext` (empresa ativa, perfil e lista de permissões); admins master sem empresa selecionada recebem permissão `"*"`.
+- `middleware/permission.py` expõe `require_permission(...)`, `require_admin`, `require_empresa_admin()` e a classe `Permissions` com as constantes de permissão (ex.: `conciliacao:write`, `estoque:read`).
+- Praticamente todo router de domínio depende de `get_empresa_context` (ou `require_permission`) para isolar dados por `empresa_id`.
+- Detalhes completos: [docs/ARCHITECTURE_AUTH_MULTITENANT.md](docs/ARCHITECTURE_AUTH_MULTITENANT.md)
+
+### Integração com Protheus (cargas assíncronas)
+
+- `core/protheus_http.py` faz as chamadas REST ao Protheus; `core/protheus.py` cuida de criptografia de credenciais (Fernet, `CERT_ENCRYPTION_KEY`).
+- `routers/protheus_carga_router.py` dispara uma carga, que é enfileirada via `core/rq.py::enqueue_protheus_carga` na fila Redis `"protheus-cargas"`.
+- `workers/protheus_carga_worker.py` consome a fila e executa `executar_carga_protheus`; falhas/abandonos atualizam o status da carga (`models/protheus_carga.py`) via callback `on_failure`.
+- `workers/protheus_carga_scheduler.py` agenda cargas recorrentes.
+- Resultado das cargas alimenta os relatórios FINR130/150/470, CTBR140/400/480 e MATR900.
+
+### Jobs Agendados (APScheduler)
+
+- Configurado no `lifespan` de `main.py`.
+- `job_fechar_mes_anterior`: roda no dia 1 de cada mês às 02:00, fechando automaticamente o período de estoque do mês anterior (`services/fechamento_service.py`).
+
+### Módulos de Negócio
+
+| Módulo | Routers/Services principais | Documentação |
+|--------|------------------------------|---------------|
+| Conciliação Financeira (Contas a Receber/Pagar) | `conciliacao_router`, `conciliacao_service`, `analise_diferencas_service` | [docs/DOCUMENTACAO_CONCILIACAO.md](docs/DOCUMENTACAO_CONCILIACAO.md), [docs/REGRAS_NEGOCIO.md](docs/REGRAS_NEGOCIO.md) |
+| Conciliação Bancária | `conciliacao_bancaria_router`, `conciliacao_bancaria_service`, `tools/banco/` | docs/REGRAS_NEGOCIO.md §6 |
+| Conciliação de Estoque (Kardex × Razão) | `conciliacao_estoque_router`, `conciliacao_estoque_service`, `tools/estoque/` | docs/REGRAS_NEGOCIO.md §7 |
+| Pré-Conferência (CT2 × SFT) | `pre_conferencia_router`, `pre_conferencia_service`, `ct2raz_*`, `sft_ent_service` | docs/REGRAS_NEGOCIO.md §9 |
+| Estoque (saldos, fechamento, NF-e, SEFAZ) | `estoque_router`, `nfe_router`, `produto_router`, `produto_fornecedor_router`, `certificado_router` | [docs/DOCUMENTACAO_ESTOQUE.md](docs/DOCUMENTACAO_ESTOQUE.md), docs/REGRAS_NEGOCIO.md §8 |
+| Importação de Relatórios Protheus | `finr130/150/470_router`, `ctbr140/400/480_router`, `matr900_router`, `protheus_carga_router` | - |
+| Lançamento Padrão | `lancamento_padrao_router` | - |
+| Administração (usuários/empresas/perfis) | `admin_usuarios_router`, `admin_empresas_router`, `admin_perfis_router`, `auth_router` | docs/ARCHITECTURE_AUTH_MULTITENANT.md |
+| Dashboard | `dashboard_router`, `dashboard_service` | - |
 
 ## Banco de Dados
 
