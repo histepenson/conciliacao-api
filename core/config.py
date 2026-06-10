@@ -2,7 +2,7 @@
 import secrets
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import Field, AliasChoices, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -66,11 +66,12 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # Storage (S3-compatible - Railway Bucket Storage)
-    STORAGE_ENDPOINT: str = ""
-    STORAGE_ACCESS_KEY_ID: str = ""
-    STORAGE_SECRET_ACCESS_KEY: str = ""
-    STORAGE_REGION: str = "auto"
-    STORAGE_BUCKET: str = ""
+    # Aceita tanto STORAGE_* quanto os nomes gerados pelo plugin de bucket do Railway
+    STORAGE_ENDPOINT: str = Field(default="", validation_alias=AliasChoices("STORAGE_ENDPOINT", "ENDPOINT"))
+    STORAGE_ACCESS_KEY_ID: str = Field(default="", validation_alias=AliasChoices("STORAGE_ACCESS_KEY_ID", "ACCESS_KEY_ID"))
+    STORAGE_SECRET_ACCESS_KEY: str = Field(default="", validation_alias=AliasChoices("STORAGE_SECRET_ACCESS_KEY", "SECRET_ACCESS_KEY"))
+    STORAGE_REGION: str = Field(default="auto", validation_alias=AliasChoices("STORAGE_REGION", "REGION"))
+    STORAGE_BUCKET: str = Field(default="", validation_alias=AliasChoices("STORAGE_BUCKET", "BUCKET"))
 
     # Certificado Digital
     CERT_ENCRYPTION_KEY: str = ""
