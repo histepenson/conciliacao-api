@@ -160,7 +160,8 @@
       "Bash(echo \"exit=$?\")",
       "Bash(.venv/Scripts/python.exe -c \"import boto3\")",
       "Bash(.venv/Scripts/python.exe -m pip install boto3)",
-      "Bash(.venv/Scripts/python.exe -c ' *)"
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(git rm *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
