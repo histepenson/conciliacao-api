@@ -283,7 +283,16 @@ def importar_nfes_background(
         total_pendentes = 0
         processadas = 0
 
-        for doc in buscar_nfes_sefaz(cnpj, pfx_bytes, senha_bytes, data_inicio, data_fim):
+        def _persistir_nsu(novo_nsu: str) -> None:
+            cert.ultimo_nsu = novo_nsu
+            db.commit()
+
+        ult_nsu_inicial = cert.ultimo_nsu or "000000000000000"
+
+        for doc in buscar_nfes_sefaz(
+            cnpj, pfx_bytes, senha_bytes, data_inicio, data_fim,
+            ult_nsu=ult_nsu_inicial, on_nsu_update=_persistir_nsu,
+        ):
             xml_str = doc["xml_str"]
             chave = doc["chave_acesso"]
 

@@ -170,7 +170,11 @@
       "Bash(DATABASE_URL=postgresql://postgres:mMXKWaoRkRRpHxlVszpEPdenEWqJhKSL@postgres.railway.internal:5432/railway .venv/Scripts/python.exe -c ' *)",
       "Bash(DBURL=postgresql://postgres:mMXKWaoRkRRpHxlVszpEPdenEWqJhKSL@turntable.proxy.rlwy.net:48244/railway .venv/Scripts/python.exe -c ' *)",
       "Bash(DATABASE_URL=\"postgresql://postgres:mMXKWaoRkRRpHxlVszpEPdenEWqJhKSL@turntable.proxy.rlwy.net:48244/railway?sslmode=require\" .venv/Scripts/python.exe -m alembic -x sqlalchemy.url=\"postgresql+psycopg2://postgres:mMXKWaoRkRRpHxlVszpEPdenEWqJhKSL@turntable.proxy.rlwy.net:48244/railway?sslmode=require\" upgrade head)",
-      "Bash(docker --version)"
+      "Bash(docker --version)",
+      "WebSearch",
+      "Bash(.venv/Scripts/python.exe -m alembic revision -m \"add ultimo_nsu to certificado_digital\")",
+      "Bash(.venv/Scripts/python.exe -m alembic upgrade head)",
+      "Bash(venv/Scripts/python.exe -m pip install boto3)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

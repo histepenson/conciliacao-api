@@ -33,7 +33,7 @@ _SOAP_TEMPLATE = textwrap.dedent("""
                  xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
     <nfeDistDFeInteresse xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe">
-      <nfeDist>
+      <nfeDadosMsg>
         <distDFeInt versao="1.01" xmlns="http://www.portalfiscal.inf.br/nfe">
           <tpAmb>1</tpAmb>
           <cUFAutor>{cuf}</cUFAutor>
@@ -42,7 +42,7 @@ _SOAP_TEMPLATE = textwrap.dedent("""
             <ultNSU>{ult_nsu}</ultNSU>
           </distNSU>
         </distDFeInt>
-      </nfeDist>
+      </nfeDadosMsg>
     </nfeDistDFeInteresse>
   </soap12:Body>
 </soap12:Envelope>
@@ -59,12 +59,14 @@ def _build_ssl_context(pfx_bytes: bytes, senha: bytes) -> ssl.SSLContext:
         serialization.NoEncryption(),
     )
     cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+    for chain_cert in chain or []:
+        cert_pem += chain_cert.public_bytes(serialization.Encoding.PEM)
 
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
-    # Escreve cert e key em arquivos temporários para carregar no SSLContext
+    # Escreve cert (com cadeia completa) e key em arquivos temporários para carregar no SSLContext
     with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as cf:
         cf.write(cert_pem)
         cert_path = cf.name
@@ -107,19 +109,26 @@ def buscar_nfes_sefaz(
     senha: bytes,
     data_inicio: date,
     data_fim: date,
+    ult_nsu: str = "000000000000000",
+    on_nsu_update=None,
 ) -> Generator[dict, None, None]:
     """
     Consulta o DistDFe da SEFAZ e gera dicts com dados de cada NF-e do período.
 
-    Faz paginação por NSU automaticamente até esgotar os documentos.
+    Faz paginação por NSU automaticamente até esgotar os documentos, retomando
+    a partir de `ult_nsu` (último NSU processado em consultas anteriores).
     Filtra por data_autorizacao entre data_inicio e data_fim.
+
+    Args:
+        ult_nsu: último NSU já processado (usado como ponto de partida).
+        on_nsu_update: callback chamado com o novo NSU a cada resposta da SEFAZ,
+            para que o chamador persista o progresso mesmo se a busca for interrompida.
 
     Yields:
         dict com keys: xml_str, chave_acesso, tipo ("entrada"|"saida")
     """
     ssl_ctx = _build_ssl_context(pfx_bytes, senha)
     cuf = _extrair_cnpj_da_uf(cnpj)
-    ult_nsu = "000000000000000"
 
     with httpx.Client(verify=ssl_ctx, timeout=60.0) as client:
         while True:
@@ -148,8 +157,19 @@ def buscar_nfes_sefaz(
                 break
 
             c_stat = ret.findtext(f"{{{ns}}}cStat", "")
+            x_motivo = ret.findtext(f"{{{ns}}}xMotivo", "")
+
+            # Persiste o ultNSU retornado, mesmo em caso de rejeicao,
+            # para que a proxima consulta retome do ponto correto.
+            ult_nsu_resp = ret.findtext(f"{{{ns}}}ultNSU", ult_nsu)
+            if ult_nsu_resp != ult_nsu and on_nsu_update:
+                on_nsu_update(ult_nsu_resp)
+            ult_nsu = ult_nsu_resp
+
             if c_stat not in ("137", "138"):
                 # 137=OK com docs, 138=OK sem mais docs
+                if c_stat not in ("656",):
+                    raise RuntimeError(f"SEFAZ retornou cStat={c_stat}: {x_motivo}")
                 break
 
             max_nsu = ret.findtext(f"{{{ns}}}maxNSU", ult_nsu)
@@ -172,6 +192,8 @@ def buscar_nfes_sefaz(
             if max_nsu == ult_nsu:
                 break
             ult_nsu = max_nsu
+            if on_nsu_update:
+                on_nsu_update(ult_nsu)
 
             if c_stat == "138":
                 break
