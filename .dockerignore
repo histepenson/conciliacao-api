@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+.git/
+.claude/
+data/
+uploads/
+*.log
+docs/
+node_modules/

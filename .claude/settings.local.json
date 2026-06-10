@@ -163,7 +163,14 @@
       "Bash(.venv/Scripts/python.exe -c ' *)",
       "Bash(git rm *)",
       "Bash(.venv/Scripts/python.exe -m alembic current)",
-      "Bash(.venv/Scripts/python.exe -m alembic heads)"
+      "Bash(.venv/Scripts/python.exe -m alembic heads)",
+      "Bash(railway --version)",
+      "Bash(railway whoami *)",
+      "Bash(railway status *)",
+      "Bash(DATABASE_URL=postgresql://postgres:mMXKWaoRkRRpHxlVszpEPdenEWqJhKSL@postgres.railway.internal:5432/railway .venv/Scripts/python.exe -c ' *)",
+      "Bash(DBURL=postgresql://postgres:mMXKWaoRkRRpHxlVszpEPdenEWqJhKSL@turntable.proxy.rlwy.net:48244/railway .venv/Scripts/python.exe -c ' *)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:mMXKWaoRkRRpHxlVszpEPdenEWqJhKSL@turntable.proxy.rlwy.net:48244/railway?sslmode=require\" .venv/Scripts/python.exe -m alembic -x sqlalchemy.url=\"postgresql+psycopg2://postgres:mMXKWaoRkRRpHxlVszpEPdenEWqJhKSL@turntable.proxy.rlwy.net:48244/railway?sslmode=require\" upgrade head)",
+      "Bash(docker --version)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
