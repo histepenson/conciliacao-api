@@ -1,8 +1,8 @@
 """
 Service para gerenciamento de armazenamento de arquivos de conciliacao.
 
-Estrutura de diretorios:
-{STORAGE_DIR}/empresa_{id}/{ano}/{mes}/{tipo}/{conta_contabil}/
+Estrutura de chaves no bucket S3:
+empresa_{id}/{ano}/{mes}/{tipo}/{conta_contabil}/
   |-- originais/
   |   |-- origem.xlsx
   |   |-- contabil_filtrado.xlsx
@@ -16,41 +16,24 @@ Estrutura de diretorios:
 
 Tipos: banco, receber, pagar
 """
-import os
+import io
 import json
-import shutil
 import logging
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, Optional, Any, BinaryIO
+from typing import Dict, Optional, Any
 
 import pandas as pd
-from core.config import resolve_storage_dir
+
+from core import storage
 
 logger = logging.getLogger(__name__)
 
-# Diretorio base com fallback automatico para /data na Railway.
-UPLOAD_BASE_DIR = resolve_storage_dir()
-UPLOAD_BASE_DIR.mkdir(parents=True, exist_ok=True)
-logger.info(f"FileStorageService: UPLOAD_BASE_DIR={UPLOAD_BASE_DIR}")
-
 
 class FileStorageService:
-    """Service para armazenamento hierarquico de arquivos de conciliacao."""
-
-    @staticmethod
-    def _ensure_directory(path: Path) -> None:
-        """Cria diretorio se nao existir."""
-        path.mkdir(parents=True, exist_ok=True)
-
-    @staticmethod
-    def _generate_timestamp() -> str:
-        """Gera string de timestamp para nomes de arquivo."""
-        return datetime.now().strftime("%Y%m%d_%H%M%S")
+    """Service para armazenamento hierarquico de arquivos de conciliacao no bucket S3."""
 
     @staticmethod
     def _sanitize_conta(conta_contabil: str) -> str:
-        """Sanitiza codigo da conta para uso em path de arquivo."""
+        """Sanitiza codigo da conta para uso em chave de arquivo."""
         return conta_contabil.replace(".", "_").replace("/", "_").replace("\\", "_").replace(" ", "_")
 
     def get_base_path(
@@ -60,22 +43,15 @@ class FileStorageService:
         mes: int,
         conta_contabil: str,
         tipo_conciliacao: str = "receber"
-    ) -> Path:
+    ) -> str:
         """
-        Retorna o path base para arquivos de uma conciliacao.
-
-        Args:
-            empresa_id: ID da empresa
-            ano: Ano do periodo
-            mes: Mes do periodo (1-12)
-            conta_contabil: Codigo da conta contabil
-            tipo_conciliacao: banco, receber ou pagar
+        Retorna o prefixo de chave base para arquivos de uma conciliacao.
 
         Returns:
-            Path base: {STORAGE_DIR}/empresa_{id}/{ano}/{mes:02d}/{tipo}/{conta}/
+            Prefixo: empresa_{id}/{ano}/{mes:02d}/{tipo}/{conta}
         """
         sanitized_conta = self._sanitize_conta(conta_contabil)
-        return UPLOAD_BASE_DIR / f"empresa_{empresa_id}" / str(ano) / f"{mes:02d}" / tipo_conciliacao / sanitized_conta
+        return f"empresa_{empresa_id}/{ano}/{mes:02d}/{tipo_conciliacao}/{sanitized_conta}"
 
     def save_original_file(
         self,
@@ -92,21 +68,17 @@ class FileStorageService:
         Salva arquivo original exatamente como foi enviado.
 
         Returns:
-            Caminho completo do arquivo salvo
+            Chave do arquivo salvo no bucket
         """
         base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
-        originais_path = base_path / "originais"
-        self._ensure_directory(originais_path)
 
-        extensao = Path(nome_original).suffix or ".xlsx"
-        filename = f"{tipo_arquivo}{extensao}"
-        file_path = originais_path / filename
+        extensao = "." + nome_original.rsplit(".", 1)[-1] if "." in nome_original else ".xlsx"
+        key = f"{base_path}/originais/{tipo_arquivo}{extensao}"
 
-        with open(file_path, 'wb') as f:
-            f.write(file_content)
+        storage.upload_bytes(key, file_content)
 
-        logger.info(f"Arquivo original salvo: {file_path}")
-        return str(file_path)
+        logger.info(f"Arquivo original salvo: {key}")
+        return key
 
     def save_dataframe_as_excel(
         self,
@@ -122,19 +94,17 @@ class FileStorageService:
         Salva DataFrame normalizado como arquivo Excel.
 
         Returns:
-            Caminho completo do arquivo salvo
+            Chave do arquivo salvo no bucket
         """
         base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
-        normalizados_path = base_path / "normalizados"
-        self._ensure_directory(normalizados_path)
+        key = f"{base_path}/normalizados/{tipo_arquivo}.xlsx"
 
-        filename = f"{tipo_arquivo}.xlsx"
-        file_path = normalizados_path / filename
+        buffer = io.BytesIO()
+        df.to_excel(buffer, index=False)
+        storage.upload_bytes(key, buffer.getvalue())
 
-        df.to_excel(str(file_path), index=False)
-        logger.info(f"DataFrame normalizado salvo: {file_path}")
-
-        return str(file_path)
+        logger.info(f"DataFrame normalizado salvo: {key}")
+        return key
 
     def save_json_result(
         self,
@@ -149,20 +119,16 @@ class FileStorageService:
         Salva resultado da conciliacao como JSON.
 
         Returns:
-            Caminho completo do arquivo salvo
+            Chave do arquivo salvo no bucket
         """
         base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
-        relatorio_path = base_path / "relatorio"
-        self._ensure_directory(relatorio_path)
+        key = f"{base_path}/relatorio/resultado.json"
 
-        filename = "resultado.json"
-        file_path = relatorio_path / filename
+        content = json.dumps(data, ensure_ascii=False, indent=2, default=str).encode("utf-8")
+        storage.upload_bytes(key, content)
 
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-
-        logger.info(f"Resultado JSON salvo: {file_path}")
-        return str(file_path)
+        logger.info(f"Resultado JSON salvo: {key}")
+        return key
 
     def save_all_reconciliation_files(
         self,
@@ -192,10 +158,10 @@ class FileStorageService:
         Returns:
             Dicionario com estrutura:
             {
-                "origem": {"original": "path", "normalizado": "path"},
-                "contabil_filtrado": {"original": "path", "normalizado": "path"},
-                "contabil_geral": {"original": "path", "normalizado": "path"},
-                "relatorio": {"json": "path"}
+                "origem": {"original": "chave", "normalizado": "chave"},
+                "contabil_filtrado": {"original": "chave", "normalizado": "chave"},
+                "contabil_geral": {"original": "chave", "normalizado": "chave"},
+                "relatorio": {"json": "chave"}
             }
         """
         caminhos = {
@@ -253,9 +219,9 @@ class FileStorageService:
         Returns:
             Dicionario com estrutura:
             {
-                "extrato": {"original": "path"},
-                "razao": {"original": "path"},
-                "relatorio": {"json": "path"}
+                "extrato": {"original": "chave"},
+                "razao": {"original": "chave"},
+                "relatorio": {"json": "chave"}
             }
         """
         caminhos = {"relatorio": {}}
@@ -299,9 +265,9 @@ class FileStorageService:
         Returns:
             Dicionario com estrutura:
             {
-                "kardex": {"original": "path"},
-                "razao": {"original": "path"},
-                "relatorio": {"json": "path"}
+                "kardex": {"original": "chave"},
+                "razao": {"original": "chave"},
+                "relatorio": {"json": "chave"}
             }
         """
         caminhos = {"relatorio": {}}
@@ -328,15 +294,12 @@ class FileStorageService:
         return caminhos
 
     def file_exists(self, file_path: str) -> bool:
-        """Verifica se um arquivo existe."""
-        return Path(file_path).exists()
+        """Verifica se um arquivo existe no bucket."""
+        return storage.file_exists(file_path)
 
     def get_file_size(self, file_path: str) -> Optional[int]:
         """Retorna o tamanho do arquivo em bytes."""
-        path = Path(file_path)
-        if path.exists():
-            return path.stat().st_size
-        return None
+        return storage.get_file_size(file_path)
 
     def delete_reconciliation_files(
         self,
@@ -354,15 +317,13 @@ class FileStorageService:
         """
         base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
 
-        if base_path.exists():
-            try:
-                shutil.rmtree(base_path)
-                logger.info(f"Arquivos removidos: {base_path}")
-                return True
-            except Exception as e:
-                logger.error(f"Erro ao remover arquivos: {e}")
-                return False
-        return True
+        try:
+            storage.delete_prefix(f"{base_path}/")
+            logger.info(f"Arquivos removidos: {base_path}/")
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao remover arquivos: {e}")
+            return False
 
     def get_file_path(
         self,
@@ -375,7 +336,7 @@ class FileStorageService:
         tipo_conciliacao: str = "receber"
     ) -> Optional[str]:
         """
-        Obtem o caminho de um arquivo especifico.
+        Obtem a chave de um arquivo especifico.
 
         Args:
             tipo_arquivo: origem, contabil_filtrado, contabil_geral, relatorio
@@ -383,23 +344,19 @@ class FileStorageService:
             tipo_conciliacao: banco, receber, pagar
 
         Returns:
-            Caminho do arquivo ou None se nao existir
+            Chave do arquivo ou None se nao existir
         """
         base_path = self.get_base_path(empresa_id, ano, mes, conta_contabil, tipo_conciliacao)
 
         if tipo_arquivo == "relatorio":
-            relatorio_path = base_path / "relatorio"
-            if relatorio_path.exists():
-                json_files = list(relatorio_path.glob("*.json"))
-                if json_files:
-                    return str(max(json_files, key=os.path.getmtime))
-            return None
+            key = f"{base_path}/relatorio/resultado.json"
+            return key if storage.file_exists(key) else None
 
         if formato == "original":
-            file_path = base_path / "originais" / f"{tipo_arquivo}.xlsx"
+            key = f"{base_path}/originais/{tipo_arquivo}.xlsx"
         elif formato == "normalizado":
-            file_path = base_path / "normalizados" / f"{tipo_arquivo}.xlsx"
+            key = f"{base_path}/normalizados/{tipo_arquivo}.xlsx"
         else:
             return None
 
-        return str(file_path) if file_path.exists() else None
+        return key if storage.file_exists(key) else None

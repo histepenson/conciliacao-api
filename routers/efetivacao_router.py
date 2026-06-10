@@ -3,13 +3,12 @@ Router para endpoints de efetivacao de conciliacoes.
 """
 import logging
 import json
-import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session
 
+from core import storage
 from db import get_db
 from middleware.auth import get_current_user, CurrentUser
 from schemas.efetivacao_schema import (
@@ -219,9 +218,9 @@ async def listar_arquivos_conciliacao(
     for tipo, formatos in caminhos.items():
         if isinstance(formatos, dict):
             for formato, caminho in formatos.items():
-                existe = os.path.exists(caminho) if caminho else False
-                tamanho = os.path.getsize(caminho) if existe else None
-                nome = os.path.basename(caminho) if caminho else ""
+                existe = storage.file_exists(caminho) if caminho else False
+                tamanho = storage.get_file_size(caminho) if existe else None
+                nome = caminho.rsplit("/", 1)[-1] if caminho else ""
 
                 arquivos.append(ArquivoDownloadInfo(
                     tipo_arquivo=tipo,
@@ -280,22 +279,23 @@ async def download_arquivo(
         )
 
     service = EfetivacaoService()
-    file_path = service.obter_arquivo(db, conciliacao_id, tipo_arquivo, formato, empresa_id)
+    file_key = service.obter_arquivo(db, conciliacao_id, tipo_arquivo, formato, empresa_id)
 
     # Determinar media type
-    if file_path.endswith(".xlsx"):
+    if file_key.endswith(".xlsx"):
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    elif file_path.endswith(".json"):
+    elif file_key.endswith(".json"):
         media_type = "application/json"
     else:
         media_type = "application/octet-stream"
 
-    filename = os.path.basename(file_path)
+    filename = file_key.rsplit("/", 1)[-1]
+    content = storage.download_bytes(file_key)
 
-    return FileResponse(
-        path=file_path,
-        filename=filename,
-        media_type=media_type
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 

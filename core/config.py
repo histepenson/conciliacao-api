@@ -1,8 +1,6 @@
 # core/config.py
-import os
 import secrets
 from functools import lru_cache
-from pathlib import Path
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -67,8 +65,12 @@ class Settings(BaseSettings):
     # Redis / RQ
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Storage
-    STORAGE_DIR: str = "data"
+    # Storage (S3-compatible - Railway Bucket Storage)
+    STORAGE_ENDPOINT: str = ""
+    STORAGE_ACCESS_KEY_ID: str = ""
+    STORAGE_SECRET_ACCESS_KEY: str = ""
+    STORAGE_REGION: str = "auto"
+    STORAGE_BUCKET: str = ""
 
     # Certificado Digital
     CERT_ENCRYPTION_KEY: str = ""
@@ -97,21 +99,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-
-
-def resolve_storage_dir() -> Path:
-    """
-    Resolve diretorio de storage com fallback seguro para Railway.
-
-    Regras:
-    - Se STORAGE_DIR estiver definido e diferente de "data", usa valor informado.
-    - Se estiver em Railway e STORAGE_DIR estiver ausente ou "data", usa "/data".
-    - Caso contrario, usa "data" (desenvolvimento local).
-    """
-    configured = os.environ.get("STORAGE_DIR", settings.STORAGE_DIR).strip()
-    is_railway = os.environ.get("RAILWAY_ENVIRONMENT") is not None
-
-    if is_railway and (not configured or configured == "data"):
-        return Path("/data").resolve()
-
-    return Path(configured or "data").resolve()

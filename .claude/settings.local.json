@@ -155,7 +155,12 @@
       "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/api/conciliacoes/?empresa_id=1\" -Method GET 2>&1)",
       "PowerShell(Invoke-RestMethod -Uri \"http://localhost:8000/api/pre-conferencias/?empresa_id=1\" -Method GET 2>&1)",
       "Bash(git mv *)",
-      "Bash(git status *)"
+      "Bash(git status *)",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(.venv/Scripts/python.exe -c \"import boto3\")",
+      "Bash(.venv/Scripts/python.exe -m pip install boto3)",
+      "Bash(.venv/Scripts/python.exe -c ' *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
