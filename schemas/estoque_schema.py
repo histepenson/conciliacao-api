@@ -44,6 +44,35 @@ class MovimentacaoOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class KardexLinhaOut(BaseModel):
+    data: date
+    tipo: str
+    documento: Optional[str] = None
+    descricao: Optional[str] = None
+    quantidade: Decimal
+    valor_unitario: Decimal
+    valor_total: Decimal
+    saldo_quantidade: Decimal
+    custo_medio: Decimal
+    saldo_valor: Decimal
+
+
+class KardexOut(BaseModel):
+    produto_id: int
+    produto_codigo: Optional[str] = None
+    produto_descricao: Optional[str] = None
+    produto_unidade: Optional[str] = None
+    data_inicio: date
+    data_fim: date
+    saldo_inicial_quantidade: Decimal
+    saldo_inicial_valor: Decimal
+    saldo_inicial_custo_medio: Decimal
+    saldo_final_quantidade: Decimal
+    saldo_final_valor: Decimal
+    saldo_final_custo_medio: Decimal
+    linhas: list[KardexLinhaOut] = []
+
+
 class AjusteRequest(BaseModel):
     empresa_id: Optional[int] = None
     produto_id: int

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, BackgroundTasks, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
@@ -16,6 +16,7 @@ from models.estoque_alerta import EstoqueAlerta
 from services import task_service
 from services.nfe_service import (
     importar_nfes_background,
+    importar_nfe_saida_xml,
     cancelar_nfe_entrada, cancelar_nfe_saida,
     vincular_item_entrada, vincular_item_saida,
     reprocessar_nfe_entrada,
@@ -61,6 +62,40 @@ def status_importacao(
     if not dados:
         raise HTTPException(404, "Task nao encontrada")
     return TaskStatusOut(task_id=task_id, **dados)
+
+
+# ─────────────────────────────────────────
+# IMPORTAÇÃO MANUAL DE XML (NF DE SAÍDA)
+# ─────────────────────────────────────────
+
+@router.post("/saida/importar-xml")
+async def importar_saida_xml(
+    files: list[UploadFile] = File(...),
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(require_permission("estoque:write")),
+):
+    """
+    Importa NF(s) de saída a partir do XML completo (nfeProc), gerado pela
+    própria empresa na emissão. A SEFAZ não disponibiliza o XML completo de
+    notas emitidas pela empresa via DistDFe, apenas resumo.
+    """
+    empresa_id = resolve_empresa_id(context, empresa_id)
+
+    resultados = []
+    for f in files:
+        conteudo = await f.read()
+        resultado = importar_nfe_saida_xml(db, empresa_id, conteudo)
+        resultado["arquivo"] = f.filename
+        resultados.append(resultado)
+
+    return {
+        "importadas": sum(1 for r in resultados if r["status"] == "importada"),
+        "duplicadas": sum(1 for r in resultados if r["status"] == "duplicada"),
+        "erros": sum(1 for r in resultados if r["status"] == "erro"),
+        "pendentes_vinculo": sum(r.get("pendentes_vinculo", 0) for r in resultados),
+        "detalhes": resultados,
+    }
 
 
 # ─────────────────────────────────────────

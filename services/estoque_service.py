@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -219,3 +219,160 @@ def listar_movimentacoes(
             m.produto_descricao = produto.descricao
 
     return movs
+
+
+def gerar_kardex(db: Session, empresa_id: int, produto_id: int, data_inicio: date, data_fim: date) -> dict:
+    """
+    Monta o kardex (ficha de estoque) do produto: entradas e saídas em ordem
+    cronológica (entradas antes de saídas no mesmo dia), com saldo corrente
+    de quantidade e valor, calculando o custo médio móvel.
+
+    `data_inicio`/`data_fim` definem o intervalo exibido (inclusive); o saldo
+    anterior é calculado a partir de todo o histórico anterior a `data_inicio`.
+    """
+    fim_exclusivo = data_fim + timedelta(days=1)
+
+    produto = db.query(Produto).filter(Produto.id == produto_id).first()
+    if not produto:
+        raise HTTPException(404, "Produto nao encontrado")
+
+    entradas = db.query(NfeEntradaItem, NfeEntrada).join(
+        NfeEntrada, NfeEntradaItem.nfe_entrada_id == NfeEntrada.id
+    ).filter(
+        NfeEntrada.empresa_id == empresa_id,
+        NfeEntradaItem.produto_id == produto_id,
+        NfeEntradaItem.vinculo_pendente == False,  # noqa
+        NfeEntrada.status == "autorizada",
+        NfeEntrada.data_emissao < fim_exclusivo,
+    ).all()
+
+    saidas = db.query(NfeSaidaItem, NfeSaida).join(
+        NfeSaida, NfeSaidaItem.nfe_saida_id == NfeSaida.id
+    ).filter(
+        NfeSaida.empresa_id == empresa_id,
+        NfeSaidaItem.produto_id == produto_id,
+        NfeSaidaItem.vinculo_pendente == False,  # noqa
+        NfeSaida.status == "autorizada",
+        NfeSaida.data_emissao < fim_exclusivo,
+    ).all()
+
+    ajustes = db.query(EstoqueMovimentacao).filter(
+        EstoqueMovimentacao.empresa_id == empresa_id,
+        EstoqueMovimentacao.produto_id == produto_id,
+        EstoqueMovimentacao.tipo.in_([TipoMovimentacao.ajuste, TipoMovimentacao.estorno]),
+        EstoqueMovimentacao.data_movimentacao < fim_exclusivo,
+    ).all()
+
+    eventos = []
+    for item, nfe in entradas:
+        data_evento = nfe.data_emissao or nfe.data_autorizacao
+        if not data_evento:
+            continue
+        eventos.append({
+            "data": data_evento,
+            "ordem": 0,  # entradas primeiro
+            "tipo": "entrada",
+            "documento": nfe.numero_nf,
+            "descricao": item.descricao_produto,
+            "quantidade": Decimal(str(item.quantidade_convertida or 0)),
+            "valor_total": Decimal(str(item.valor_total_item)) if item.valor_total_item is not None else None,
+        })
+    for item, nfe in saidas:
+        data_evento = nfe.data_emissao or nfe.data_autorizacao
+        if not data_evento:
+            continue
+        eventos.append({
+            "data": data_evento,
+            "ordem": 1,  # saídas depois das entradas
+            "tipo": "saida",
+            "documento": nfe.numero_nf,
+            "descricao": item.descricao_produto,
+            "quantidade": Decimal(str(item.quantidade_convertida or 0)),
+            "valor_total": None,
+        })
+    for mov in ajustes:
+        qtd = Decimal(str(mov.quantidade))
+        eventos.append({
+            "data": mov.data_movimentacao,
+            "ordem": 0 if qtd >= 0 else 1,
+            "tipo": mov.tipo.value,
+            "documento": mov.documento_origem,
+            "descricao": mov.justificativa,
+            "quantidade_assinada": qtd,
+            "valor_total": None,
+        })
+
+    eventos.sort(key=lambda e: (e["data"], e["ordem"]))
+
+    saldo_qtd = Decimal("0")
+    saldo_valor = Decimal("0")
+    custo_medio = Decimal("0")
+    saldo_inicial_qtd = Decimal("0")
+    saldo_inicial_valor = Decimal("0")
+    saldo_inicial_custo_medio = Decimal("0")
+    saldo_inicial_definido = False
+    linhas = []
+
+    for ev in eventos:
+        if not saldo_inicial_definido and ev["data"] >= data_inicio:
+            saldo_inicial_qtd = saldo_qtd
+            saldo_inicial_valor = saldo_valor
+            saldo_inicial_custo_medio = custo_medio
+            saldo_inicial_definido = True
+
+        qtd_assinada = ev.get("quantidade_assinada")
+        if qtd_assinada is None:
+            qtd_assinada = ev["quantidade"] if ev["ordem"] == 0 else -ev["quantidade"]
+
+        if ev["ordem"] == 0:
+            # Entrada (NF ou ajuste positivo)
+            valor_evento = ev["valor_total"]
+            if valor_evento is None:
+                valor_evento = qtd_assinada * custo_medio
+        else:
+            # Saída (NF, ajuste negativo ou estorno) — valorizada ao custo médio atual
+            valor_evento = qtd_assinada * custo_medio
+
+        saldo_qtd += qtd_assinada
+        saldo_valor += valor_evento
+
+        if saldo_qtd == 0:
+            saldo_valor = Decimal("0")
+            custo_medio = Decimal("0")
+        else:
+            custo_medio = saldo_valor / saldo_qtd
+
+        if ev["data"] >= data_inicio:
+            linhas.append({
+                "data": ev["data"],
+                "tipo": ev["tipo"],
+                "documento": ev["documento"],
+                "descricao": ev["descricao"],
+                "quantidade": qtd_assinada,
+                "valor_total": valor_evento,
+                "valor_unitario": (valor_evento / qtd_assinada) if qtd_assinada else Decimal("0"),
+                "saldo_quantidade": saldo_qtd,
+                "custo_medio": custo_medio,
+                "saldo_valor": saldo_valor,
+            })
+
+    if not saldo_inicial_definido:
+        saldo_inicial_qtd = saldo_qtd
+        saldo_inicial_valor = saldo_valor
+        saldo_inicial_custo_medio = custo_medio
+
+    return {
+        "produto_id": produto_id,
+        "produto_codigo": produto.codigo_interno,
+        "produto_descricao": produto.descricao,
+        "produto_unidade": produto.unidade_estoque,
+        "data_inicio": data_inicio,
+        "data_fim": data_fim,
+        "saldo_inicial_quantidade": saldo_inicial_qtd,
+        "saldo_inicial_valor": saldo_inicial_valor,
+        "saldo_inicial_custo_medio": saldo_inicial_custo_medio,
+        "saldo_final_quantidade": saldo_qtd,
+        "saldo_final_valor": saldo_valor,
+        "saldo_final_custo_medio": custo_medio,
+        "linhas": linhas,
+    }

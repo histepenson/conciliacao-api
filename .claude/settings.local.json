@@ -176,7 +176,8 @@
       "Bash(.venv/Scripts/python.exe -m alembic upgrade head)",
       "Bash(venv/Scripts/python.exe -m pip install boto3)",
       "Bash(.venv/Scripts/python.exe -c \"import services.sefaz_service\")",
-      "Bash(.venv/Scripts/python.exe /tmp/test_sefaz_call5.py)"
+      "Bash(.venv/Scripts/python.exe /tmp/test_sefaz_call5.py)",
+      "Bash(.venv\\\\Scripts\\\\python.exe -c \"import services.nfe_service\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
