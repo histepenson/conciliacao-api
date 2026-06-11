@@ -9,7 +9,6 @@ import gzip
 import ssl
 import tempfile
 import textwrap
-from datetime import date
 from pathlib import Path
 from typing import Generator
 
@@ -107,17 +106,14 @@ def buscar_nfes_sefaz(
     cnpj: str,
     pfx_bytes: bytes,
     senha: bytes,
-    data_inicio: date,
-    data_fim: date,
     ult_nsu: str = "000000000000000",
     on_nsu_update=None,
 ) -> Generator[dict, None, None]:
     """
-    Consulta o DistDFe da SEFAZ e gera dicts com dados de cada NF-e do período.
+    Consulta o DistDFe da SEFAZ e gera dicts com dados de cada NF-e disponível.
 
     Faz paginação por NSU automaticamente até esgotar os documentos, retomando
     a partir de `ult_nsu` (último NSU processado em consultas anteriores).
-    Filtra por data_autorizacao entre data_inicio e data_fim.
 
     Args:
         ult_nsu: último NSU já processado (usado como ponto de partida).
@@ -168,9 +164,7 @@ def buscar_nfes_sefaz(
 
             if c_stat not in ("137", "138"):
                 # 137=OK com docs, 138=OK sem mais docs
-                if c_stat not in ("656",):
-                    raise RuntimeError(f"SEFAZ retornou cStat={c_stat}: {x_motivo}")
-                break
+                raise RuntimeError(f"SEFAZ retornou cStat={c_stat}: {x_motivo}")
 
             max_nsu = ret.findtext(f"{{{ns}}}maxNSU", ult_nsu)
             lote = ret.find(f"{{{ns}}}loteDistDFeInt")

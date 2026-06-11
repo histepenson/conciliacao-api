@@ -4,6 +4,7 @@ NF-e Service — parse, persistência, De-Para automático e alertas.
 import xml.etree.ElementTree as ET
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -259,8 +260,8 @@ def importar_nfes_background(
     db: Session,
     empresa_id: int,
     cnpj_certificado: str,
-    data_inicio: date,
-    data_fim: date,
+    data_inicio: Optional[date],
+    data_fim: Optional[date],
     task_id: str,
 ) -> None:
     """
@@ -290,7 +291,7 @@ def importar_nfes_background(
         ult_nsu_inicial = cert.ultimo_nsu or "000000000000000"
 
         for doc in buscar_nfes_sefaz(
-            cnpj, pfx_bytes, senha_bytes, data_inicio, data_fim,
+            cnpj, pfx_bytes, senha_bytes,
             ult_nsu=ult_nsu_inicial, on_nsu_update=_persistir_nsu,
         ):
             xml_str = doc["xml_str"]
@@ -300,9 +301,9 @@ def importar_nfes_background(
             if not dados:
                 continue
 
-            # Filtra pelo período
+            # Filtra pelo período (se informado)
             data_ref = dados["data_autorizacao"] or dados["data_emissao"]
-            if data_ref and not (data_inicio <= data_ref <= data_fim):
+            if data_inicio and data_fim and data_ref and not (data_inicio <= data_ref <= data_fim):
                 continue
 
             # Determina se é entrada ou saída pelo destinatário
