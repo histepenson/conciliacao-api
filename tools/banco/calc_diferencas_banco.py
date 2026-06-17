@@ -493,6 +493,40 @@ def calcular_diferencas_bancarias(
             dias_conciliados.append(dia_info)
 
     # ==========================
+    # 6.5 SALDO FINAL BATE -> CONSIDERAR TUDO CONCILIADO
+    # ==========================
+    # Mesmo que dias individuais nao batam (timing de lancamentos entre dias),
+    # se o saldo final do periodo (ultima linha de cada base) bate, a conciliacao
+    # e considerada OK e todos os dias sao marcados como CONCILIADO (verde).
+    saldo_final_extrato = (
+        float(df_ext.iloc[-1]["saldo_atual"])
+        if len(df_ext) > 0 and "saldo_atual" in df_ext.columns
+        else None
+    )
+    saldo_final_razao = (
+        float(df_raz.iloc[-1]["saldo_atual"])
+        if len(df_raz) > 0 and "saldo_atual" in df_raz.columns
+        else None
+    )
+    saldo_final_bate = (
+        saldo_final_extrato is not None
+        and saldo_final_razao is not None
+        and abs(saldo_final_extrato - saldo_final_razao) <= THRESHOLD_CONCILIACAO
+    )
+
+    if saldo_final_bate:
+        logger.info(
+            f"[CALC DIFERENCAS BANCO] Saldo final bate (extrato={saldo_final_extrato}, "
+            f"razao={saldo_final_razao}) -> marcando todos os dias como CONCILIADO"
+        )
+        for dia_info in movimentos_por_dia:
+            dia_info["status"] = "CONCILIADO"
+        dias_conciliados = movimentos_por_dia
+        dias_divergentes = []
+        registros_so_extrato = []
+        registros_so_razao = []
+
+    # ==========================
     # 7. CALCULAR RESUMO
     # ==========================
     total_entradas_extrato = df_merge["entradas_extrato"].sum()
@@ -522,6 +556,9 @@ def calcular_diferencas_bancarias(
         "qtd_conciliados": qtd_conciliados,
         "qtd_divergentes": qtd_divergentes,
         "percentual_conciliacao": round(percentual_conciliacao, 2),
+        "saldo_final_extrato": round(saldo_final_extrato, 2) if saldo_final_extrato is not None else None,
+        "saldo_final_razao": round(saldo_final_razao, 2) if saldo_final_razao is not None else None,
+        "saldo_final_bate": saldo_final_bate,
         "data_processamento": datetime.now().isoformat(),
     }
 

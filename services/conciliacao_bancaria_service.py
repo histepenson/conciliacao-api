@@ -133,6 +133,13 @@ class ConciliacaoBancariaService:
         """Gera alertas baseados no resumo da conciliacao."""
         alertas = []
 
+        if resumo.get("saldo_final_bate"):
+            alertas.append(
+                "Saldo final do periodo bate entre extrato e razao - "
+                "conciliacao considerada OK mesmo com diferencas pontuais por dia"
+            )
+            return alertas
+
         if resumo["qtd_divergentes"] > 0:
             alertas.append(
                 f"ATENCAO: {resumo['qtd_divergentes']} dia(s) com divergencia"
