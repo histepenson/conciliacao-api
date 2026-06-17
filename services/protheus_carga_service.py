@@ -133,6 +133,7 @@ def listar_cargas(
     data_base: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 100,
+    parametros_filtro: Optional[dict[str, Any]] = None,
 ) -> list[ProtheusCarga]:
     query = db.query(ProtheusCarga).filter(ProtheusCarga.empresa_id == empresa_id)
     if tipo_relatorio:
@@ -141,6 +142,11 @@ def listar_cargas(
         query = query.filter(ProtheusCarga.data_base == validar_data_base(data_base))
     if status:
         query = query.filter(ProtheusCarga.status == status)
+    if parametros_filtro:
+        # Containment JSONB: so retorna cargas cujo parametros_json contem (>=) o subconjunto informado
+        # (ex: {"banco": "341", "agencia": "0001", "conta": "440008"}), evitando reaproveitar
+        # o cache de outra conta/banco quando existe mais de uma carga concluida do mesmo tipo.
+        query = query.filter(ProtheusCarga.parametros_json.contains(parametros_filtro))
     return query.order_by(ProtheusCarga.created_at.desc()).limit(limit).all()
 
 

@@ -1,6 +1,8 @@
+import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import status as http_status
 from sqlalchemy.orm import Session
 
 from db import get_db
@@ -112,12 +114,27 @@ def get_cargas(
     data_base: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=500),
+    parametros_filtro: Optional[str] = Query(
+        None,
+        description="JSON com subconjunto de parametros_json a exigir (ex: "
+        '{"banco":"341","agencia":"0001","conta":"440008"}) -- so retorna '
+        "cargas cujo parametros_json contem esses valores.",
+    ),
     db: Session = Depends(get_db),
     context: EmpresaContext = Depends(get_empresa_context),
 ):
     _no_store(response)
     resolved_id = resolve_empresa_id(context, empresa_id)
-    return service.listar_cargas(db, resolved_id, tipo_relatorio, data_base, status, limit)
+    filtro_dict = None
+    if parametros_filtro:
+        try:
+            filtro_dict = json.loads(parametros_filtro)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="parametros_filtro deve ser um JSON valido",
+            )
+    return service.listar_cargas(db, resolved_id, tipo_relatorio, data_base, status, limit, filtro_dict)
 
 
 @router.post("", response_model=ProtheusCargaEnfileirada)
