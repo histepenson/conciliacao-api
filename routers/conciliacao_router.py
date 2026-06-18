@@ -106,8 +106,14 @@ async def processar_conciliacao(
     try:
         logger.info(" Recebendo requisicao de conciliacao")
 
-        # Resolve credenciais Protheus da empresa atual (lidas do banco, senha descriptografada)
-        protheus_config = resolve_protheus_config(ctx.empresa_id, db)
+        # So resolve credenciais Protheus quando a requisicao realmente precisa buscar
+        # algo de la (ctbr140_params/ctbr480_params) -- no fluxo manual (registros ja
+        # enviados pelo frontend) empresas sem URL Protheus configurada (ex: GENIX)
+        # nao devem ser bloqueadas por essa resolucao.
+        precisa_protheus = bool(request.base_contabil_filtrada.ctbr140_params) or bool(
+            request.base_contabil_geral and request.base_contabil_geral.ctbr480_params
+        )
+        protheus_config = resolve_protheus_config(ctx.empresa_id, db) if precisa_protheus else None
 
         # Resolve base contabil filtrada: busca do Protheus se ctbr140_params presente
         request = await _resolver_base_contabil(request, protheus_config)
