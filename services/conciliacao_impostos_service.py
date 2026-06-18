@@ -123,7 +123,11 @@ class ConciliacaoImpostosService:
             [r for r in razao_resultado if not r["matched"]]
         )
         diferencas_so_sft = self._agrupar_sft(
-            [s for s in sft_resultado if not s["matched"]], campo_imposto
+            [
+                s for s in sft_resultado
+                if not s["matched"] and round(float(s.get(campo_imposto) or 0), 2) != 0
+            ],
+            campo_imposto,
         )
         qtd_matched = sum(1 for r in razao_resultado if r["matched"])
 
