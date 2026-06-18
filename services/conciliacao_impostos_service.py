@@ -28,6 +28,28 @@ COLUNAS_IMPOSTO_SFT = {
 }
 
 
+def _classificar_tipo_mov(registro: Dict[str, Any]) -> str:
+    """
+    Classifica um registro do SFT como "ENTRADA" ou "SAIDA".
+
+    Usa o campo "tipo_mov" do registro se ja vier preenchido (alguns layouts
+    manuais ja trazem essa coluna); caso contrario, deriva pelo primeiro
+    digito do CFOP (1/2/3 = Entrada, 5/6/7 = Saida - convencao fiscal padrao).
+    """
+    valor = str(registro.get("tipo_mov") or "").strip().upper()
+    if valor in ("ENTRADA", "E", "1"):
+        return "ENTRADA"
+    if valor in ("SAIDA", "SAÍDA", "S", "2"):
+        return "SAIDA"
+
+    cfop = str(registro.get("cfop") or "").strip()
+    if cfop[:1] in ("1", "2", "3"):
+        return "ENTRADA"
+    if cfop[:1] in ("5", "6", "7"):
+        return "SAIDA"
+    return ""
+
+
 class ConciliacaoImpostosService:
     """Servico para processar conciliacao de impostos."""
 
@@ -79,6 +101,11 @@ class ConciliacaoImpostosService:
         sft_raw = request.base_sft.registros
         logger.info(f"      SFT: {len(sft_raw)} registros recebidos")
 
+        tipo_mov_filtro = (request.parametros.tipo_mov or "").strip().upper()
+        if tipo_mov_filtro in ("ENTRADA", "SAIDA"):
+            sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r) == tipo_mov_filtro]
+            logger.info(f"      SFT filtrado por Tipo Mov={tipo_mov_filtro}: {len(sft_raw)} registros")
+
         # ==========================
         # 2. MATCHING via CT2_KEY
         # ==========================
@@ -122,6 +149,7 @@ class ConciliacaoImpostosService:
                 f"Conciliacao de impostos da conta {conta_contabil}",
                 f"Coluna SFT considerada: {COLUNAS_IMPOSTO_SFT.get(campo_imposto, campo_imposto)}",
                 f"Data-base: {request.parametros.data_base}",
+                *([f"SFT filtrado por Tipo Mov: {'Entrada' if tipo_mov_filtro == 'ENTRADA' else 'Saida'}"] if tipo_mov_filtro in ("ENTRADA", "SAIDA") else []),
             ],
             "alertas": self._gerar_alertas(resumo),
         }
