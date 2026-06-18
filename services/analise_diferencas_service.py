@@ -896,9 +896,17 @@ class AnaliseDiferencasService:
 
                         valor_fin_rec = round(float(r.get("valor", 0) or 0), 2)
 
+                        # Titulo fora do periodo analisado: nao tem como ter correspondencia
+                        # esperada no razao do periodo -- deixa neutro (sem cor) em vez de
+                        # avaliar/marcar como divergente.
+                        _data_emissao_rec_fmt = self._formatar_data(r.get("data_emissao", ""))
+                        _fora_do_periodo_rec = periodo is not None and not self._data_no_periodo(
+                            _data_emissao_rec_fmt, periodo
+                        )
+
                         # Matching individual por valor (apenas para DIVERGENTE_VALOR)
                         tem_correspondencia: Optional[bool] = None
-                        if tipo == "DIVERGENTE_VALOR" and razao_valores_pool is not None:
+                        if not _fora_do_periodo_rec and tipo == "DIVERGENTE_VALOR" and razao_valores_pool is not None:
                             for i, rv in enumerate(razao_valores_pool):
                                 if abs(rv - valor_fin_rec) <= 0.01:
                                     razao_valores_pool.pop(i)
