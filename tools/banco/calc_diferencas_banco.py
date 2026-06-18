@@ -24,125 +24,191 @@ logger = logging.getLogger(__name__)
 THRESHOLD_CONCILIACAO = 0.01
 
 
-def _fazer_matching_registros(
+def _normalizar_numero_documento(valor: Any) -> str:
+    """Extrai e concatena todos os digitos do documento, removendo zeros a esquerda."""
+    if pd.isna(valor):
+        return ""
+    s = str(valor)
+    # Concatenar TODOS os grupos de digitos (ex: "63616-055" -> "63616055")
+    numeros = re.findall(r"\d+", s)
+    if not numeros:
+        return ""
+    concatenado = "".join(numeros)
+    # Remover zeros a esquerda para normalizar
+    return concatenado.lstrip("0") or "0"
+
+
+def _key_documento(df: pd.DataFrame) -> pd.Series:
+    if "numero" in df.columns:
+        return df["numero"].fillna("").astype(str).apply(_normalizar_numero_documento)
+    if "documento_extraido" in df.columns:
+        return df["documento_extraido"].fillna("").astype(str).apply(_normalizar_numero_documento)
+    if "chave_documento" in df.columns:
+        return df["chave_documento"].fillna("").astype(str).apply(_normalizar_numero_documento)
+    return pd.Series([""] * len(df), index=df.index)
+
+
+def _match_exato_doc_valor(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
+    for idx_ext in df_ext.index:
+        if df_ext.loc[idx_ext, "matched"]:
+            continue
+        chave = df_ext.loc[idx_ext, "_doc_key"]
+        if not chave:
+            continue
+        valor_ext = df_ext.loc[idx_ext, col_ext]
+        candidatos = df_raz[~df_raz["matched"] & (df_raz["_doc_key"] == chave)]
+        for idx_raz in candidatos.index:
+            valor_raz = df_raz.loc[idx_raz, col_raz]
+            if abs(valor_ext - valor_raz) <= THRESHOLD_CONCILIACAO:
+                df_ext.loc[idx_ext, "matched"] = True
+                df_raz.loc[idx_raz, "matched"] = True
+                df_ext.loc[idx_ext, "data_correspondencia"] = df_raz.loc[idx_raz, "data"]
+                df_raz.loc[idx_raz, "data_correspondencia"] = df_ext.loc[idx_ext, "data"]
+                break
+
+
+def _match_soma_por_documento(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
+    pend_ext = df_ext[~df_ext["matched"] & (df_ext["_doc_key"].str.len() > 0)]
+    pend_raz = df_raz[~df_raz["matched"] & (df_raz["_doc_key"].str.len() > 0)]
+    if pend_ext.empty or pend_raz.empty:
+        return
+    soma_ext = pend_ext.groupby("_doc_key")[col_ext].sum()
+    soma_raz = pend_raz.groupby("_doc_key")[col_raz].sum()
+    for chave in set(soma_ext.index).intersection(set(soma_raz.index)):
+        if abs(soma_ext[chave] - soma_raz[chave]) <= THRESHOLD_CONCILIACAO:
+            idx_ext_grupo = pend_ext[pend_ext["_doc_key"] == chave].index
+            idx_raz_grupo = pend_raz[pend_raz["_doc_key"] == chave].index
+            datas_raz = ", ".join(sorted(set(df_raz.loc[idx_raz_grupo, "data"])))
+            datas_ext = ", ".join(sorted(set(df_ext.loc[idx_ext_grupo, "data"])))
+            df_ext.loc[idx_ext_grupo, "matched"] = True
+            df_ext.loc[idx_ext_grupo, "data_correspondencia"] = datas_raz
+            df_raz.loc[idx_raz_grupo, "matched"] = True
+            df_raz.loc[idx_raz_grupo, "data_correspondencia"] = datas_ext
+
+
+def _match_soma_documentos_relacionados(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
+    """
+    FASE 2.5: Match por soma de documentos relacionados.
+    Ex: Extrato 63616055 (10931.97) vs Razao 63616055 (10665.89) + 63616 (266.08)
+    Busca no razao documentos cujo numero base esta contido no numero do extrato.
+    """
+    pend_ext = df_ext[~df_ext["matched"] & (df_ext["_doc_key"].str.len() > 0)].copy()
+    pend_raz = df_raz[~df_raz["matched"] & (df_raz["_doc_key"].str.len() > 0)].copy()
+    if pend_ext.empty or pend_raz.empty:
+        return
+
+    for idx_ext in pend_ext.index:
+        if df_ext.loc[idx_ext, "matched"]:
+            continue
+        chave_ext = df_ext.loc[idx_ext, "_doc_key"]
+        valor_ext = df_ext.loc[idx_ext, col_ext]
+        if not chave_ext or len(chave_ext) < 4:
+            continue
+
+        # Buscar documentos relacionados no razao:
+        # 1. Chave exata (63616055)
+        # 2. Chave base contida na chave do extrato (63616 em 63616055, 555 em 555032)
+        mask_relacionados = pend_raz["_doc_key"].apply(
+            lambda x: x == chave_ext or (len(x) >= 3 and chave_ext.startswith(x))
+        )
+        relacionados = pend_raz[mask_relacionados & ~df_raz.loc[pend_raz.index, "matched"]]
+
+        if relacionados.empty:
+            continue
+
+        soma_raz = relacionados[col_raz].sum()
+        if abs(valor_ext - soma_raz) <= THRESHOLD_CONCILIACAO:
+            datas_raz = ", ".join(sorted(set(relacionados["data"])))
+            df_ext.loc[idx_ext, "matched"] = True
+            df_ext.loc[idx_ext, "data_correspondencia"] = datas_raz
+            df_raz.loc[relacionados.index, "matched"] = True
+            df_raz.loc[relacionados.index, "data_correspondencia"] = df_ext.loc[idx_ext, "data"]
+            logger.info(f"[FASE 2.5] Match doc relacionados: {chave_ext} = {valor_ext} vs soma({list(relacionados['_doc_key'].values)}) = {soma_raz}")
+
+
+def _match_fallback_valor(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
+    """
+    FASE 3: fallback por valor, sem exigir documento nem mesma data.
+    Usado como ultimo recurso quando nao ha chave de documento que permita
+    casar com seguranca - busca em todo o periodo (nao so no mesmo dia).
+    """
+    for idx_ext in df_ext.index:
+        if df_ext.loc[idx_ext, "matched"]:
+            continue
+        valor_ext = df_ext.loc[idx_ext, col_ext]
+
+        candidatos = df_raz[~df_raz["matched"]]
+        for idx_raz in candidatos.index:
+            valor_raz = df_raz.loc[idx_raz, col_raz]
+            if abs(valor_ext - valor_raz) <= THRESHOLD_CONCILIACAO:
+                df_ext.loc[idx_ext, "matched"] = True
+                df_raz.loc[idx_raz, "matched"] = True
+                df_ext.loc[idx_ext, "data_correspondencia"] = df_raz.loc[idx_raz, "data"]
+                df_raz.loc[idx_raz, "data_correspondencia"] = df_ext.loc[idx_ext, "data"]
+                break
+
+
+def _sf(v, default=0.0) -> float:
+    """Converte para float, retornando default se NaN."""
+    return float(v) if pd.notna(v) else default
+
+
+def _ss(v, default="") -> str:
+    """Converte para str, retornando default se NaN."""
+    return str(v) if pd.notna(v) else default
+
+
+def _formatar_extrato(row, tipo: str) -> Dict:
+    valor = row.get("entrada", 0) if tipo == "entrada" else row.get("saida", 0)
+    return {
+        "data": _ss(row.get("data")),
+        "documento": _ss(row.get("documento")),
+        "prefixo": _ss(row.get("prefixo")),
+        "numero": _ss(row.get("numero")),
+        "descricao": _ss(row.get("descricao")),
+        "valor": round(_sf(valor), 2),
+        "tipo": tipo.upper(),
+        "data_correspondencia": _ss(row.get("data_correspondencia")),
+    }
+
+
+def _formatar_razao(row, tipo: str) -> Dict:
+    valor = row.get("debito", 0) if tipo == "debito" else row.get("credito", 0)
+    return {
+        "data": _ss(row.get("data")),
+        "lote_doc": _ss(row.get("lote_doc")),
+        "historico": _ss(row.get("historico")),
+        "documento_extraido": _ss(row.get("documento_extraido")),
+        "prefixo": _ss(row.get("prefixo")),
+        "numero": _ss(row.get("numero")),
+        "valor": round(_sf(valor), 2),
+        "tipo": tipo.upper(),
+        "data_correspondencia": _ss(row.get("data_correspondencia")),
+    }
+
+
+def _fazer_matching_global(
     df_extrato: pd.DataFrame,
     df_razao: pd.DataFrame,
-    data: str,
-    dif_entradas: float = 0.0,
-    dif_saidas: float = 0.0
-) -> Tuple[List[Dict], List[Dict], List[Dict], List[Dict], bool, bool]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Faz o matching de registros entre extrato e razao para uma data especifica.
+    Faz o matching de TODOS os registros do periodo de uma vez, sem restringir
+    por dia. Quando a correspondencia e encontrada em uma data diferente da
+    data do proprio registro, isso fica registrado em "data_correspondencia"
+    para ser exibido ao usuario (o registro continua aparecendo no seu dia
+    real, mas marcado como conciliado e com a referencia da data do "par").
 
-    Retorna:
-        - so_extrato_entradas: Entradas no extrato sem correspondencia no razao (debito)
-        - so_extrato_saidas: Saidas no extrato sem correspondencia no razao (credito)
-        - so_razao_debitos: Debitos no razao sem correspondencia no extrato
-        - so_razao_creditos: Creditos no razao sem correspondencia no extrato
+    Retorna os 4 DataFrames (entradas_ext, saidas_ext, debitos_raz, creditos_raz)
+    com as colunas "matched" e "data_correspondencia" preenchidas.
     """
-    # Filtrar por data
-    ext_dia = df_extrato[df_extrato["data"] == data].copy()
-    raz_dia = df_razao[df_razao["data"] == data].copy()
+    entradas_ext = df_extrato[df_extrato["entrada"] > 0].copy()
+    saidas_ext = df_extrato[df_extrato["saida"] > 0].copy()
+    debitos_raz = df_razao[df_razao["debito"] > 0].copy()
+    creditos_raz = df_razao[df_razao["credito"] > 0].copy()
 
-    # Separar entradas/saidas do extrato
-    entradas_ext = ext_dia[ext_dia["entrada"] > 0].copy()
-    saidas_ext = ext_dia[ext_dia["saida"] > 0].copy()
-
-    # Separar debitos/creditos do razao
-    debitos_raz = raz_dia[raz_dia["debito"] > 0].copy()
-    creditos_raz = raz_dia[raz_dia["credito"] > 0].copy()
-
-    # Marcar registros como matched
-    entradas_ext["matched"] = False
-    saidas_ext["matched"] = False
-    debitos_raz["matched"] = False
-    creditos_raz["matched"] = False
-
-    def _normalizar_numero_documento(valor: Any) -> str:
-        """Extrai e concatena todos os digitos do documento, removendo zeros a esquerda."""
-        if pd.isna(valor):
-            return ""
-        s = str(valor)
-        # Concatenar TODOS os grupos de digitos (ex: "63616-055" -> "63616055")
-        numeros = re.findall(r"\d+", s)
-        if not numeros:
-            return ""
-        concatenado = "".join(numeros)
-        # Remover zeros a esquerda para normalizar
-        return concatenado.lstrip("0") or "0"
-
-    def _key_documento(df: pd.DataFrame) -> pd.Series:
-        if "numero" in df.columns:
-            return df["numero"].fillna("").astype(str).apply(_normalizar_numero_documento)
-        if "documento_extraido" in df.columns:
-            return df["documento_extraido"].fillna("").astype(str).apply(_normalizar_numero_documento)
-        if "chave_documento" in df.columns:
-            return df["chave_documento"].fillna("").astype(str).apply(_normalizar_numero_documento)
-        return pd.Series([""] * len(df), index=df.index)
-
-    def _match_exato_doc_valor(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
-        for idx_ext in df_ext.index:
-            if df_ext.loc[idx_ext, "matched"]:
-                continue
-            chave = df_ext.loc[idx_ext, "_doc_key"]
-            if not chave:
-                continue
-            valor_ext = df_ext.loc[idx_ext, col_ext]
-            candidatos = df_raz[~df_raz["matched"] & (df_raz["_doc_key"] == chave)]
-            for idx_raz in candidatos.index:
-                valor_raz = df_raz.loc[idx_raz, col_raz]
-                if abs(valor_ext - valor_raz) <= THRESHOLD_CONCILIACAO:
-                    df_ext.loc[idx_ext, "matched"] = True
-                    df_raz.loc[idx_raz, "matched"] = True
-                    break
-
-    def _match_soma_por_documento(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
-        pend_ext = df_ext[~df_ext["matched"] & (df_ext["_doc_key"].str.len() > 0)]
-        pend_raz = df_raz[~df_raz["matched"] & (df_raz["_doc_key"].str.len() > 0)]
-        if pend_ext.empty or pend_raz.empty:
-            return
-        soma_ext = pend_ext.groupby("_doc_key")[col_ext].sum()
-        soma_raz = pend_raz.groupby("_doc_key")[col_raz].sum()
-        for chave in set(soma_ext.index).intersection(set(soma_raz.index)):
-            if abs(soma_ext[chave] - soma_raz[chave]) <= THRESHOLD_CONCILIACAO:
-                df_ext.loc[pend_ext[pend_ext["_doc_key"] == chave].index, "matched"] = True
-                df_raz.loc[pend_raz[pend_raz["_doc_key"] == chave].index, "matched"] = True
-
-    def _match_soma_documentos_relacionados(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
-        """
-        FASE 2.5: Match por soma de documentos relacionados.
-        Ex: Extrato 63616055 (10931.97) vs Razao 63616055 (10665.89) + 63616 (266.08)
-        Busca no razao documentos cujo numero base esta contido no numero do extrato.
-        """
-        pend_ext = df_ext[~df_ext["matched"] & (df_ext["_doc_key"].str.len() > 0)].copy()
-        pend_raz = df_raz[~df_raz["matched"] & (df_raz["_doc_key"].str.len() > 0)].copy()
-        if pend_ext.empty or pend_raz.empty:
-            return
-
-        for idx_ext in pend_ext.index:
-            if df_ext.loc[idx_ext, "matched"]:
-                continue
-            chave_ext = df_ext.loc[idx_ext, "_doc_key"]
-            valor_ext = df_ext.loc[idx_ext, col_ext]
-            if not chave_ext or len(chave_ext) < 4:
-                continue
-
-            # Buscar documentos relacionados no razao:
-            # 1. Chave exata (63616055)
-            # 2. Chave base contida na chave do extrato (63616 em 63616055, 555 em 555032)
-            mask_relacionados = pend_raz["_doc_key"].apply(
-                lambda x: x == chave_ext or (len(x) >= 3 and chave_ext.startswith(x))
-            )
-            relacionados = pend_raz[mask_relacionados & ~df_raz.loc[pend_raz.index, "matched"]]
-
-            if relacionados.empty:
-                continue
-
-            soma_raz = relacionados[col_raz].sum()
-            if abs(valor_ext - soma_raz) <= THRESHOLD_CONCILIACAO:
-                df_ext.loc[idx_ext, "matched"] = True
-                df_raz.loc[relacionados.index, "matched"] = True
-                logger.info(f"[FASE 2.5] Match doc relacionados: {chave_ext} = {valor_ext} vs soma({list(relacionados['_doc_key'].values)}) = {soma_raz}")
+    for df in (entradas_ext, saidas_ext, debitos_raz, creditos_raz):
+        df["matched"] = False
+        df["data_correspondencia"] = ""
 
     # Preencher chaves de documento (apenas numeros)
     entradas_ext["_doc_key"] = _key_documento(entradas_ext)
@@ -150,138 +216,31 @@ def _fazer_matching_registros(
     debitos_raz["_doc_key"] = _key_documento(debitos_raz)
     creditos_raz["_doc_key"] = _key_documento(creditos_raz)
 
-    # FASE 1: DATA + DOCUMENTO + VALOR
+    # FASE 1: DOCUMENTO + VALOR (qualquer data do periodo)
     _match_exato_doc_valor(entradas_ext, debitos_raz, "entrada", "debito")
     _match_exato_doc_valor(saidas_ext, creditos_raz, "saida", "credito")
 
-    # FASE 2: DATA + DOCUMENTO (soma)
+    # FASE 2: DOCUMENTO (soma)
     _match_soma_por_documento(entradas_ext, debitos_raz, "entrada", "debito")
     _match_soma_por_documento(saidas_ext, creditos_raz, "saida", "credito")
 
-    # FASE 2.5: DATA + DOCUMENTOS RELACIONADOS (soma de docs com numero base comum)
+    # FASE 2.5: DOCUMENTOS RELACIONADOS (soma de docs com numero base comum)
     _match_soma_documentos_relacionados(saidas_ext, creditos_raz, "saida", "credito")
     _match_soma_documentos_relacionados(entradas_ext, debitos_raz, "entrada", "debito")
 
-    # FASE 3: DATA + VALOR (fallback)
-    for idx_ext in entradas_ext.index:
-        if entradas_ext.loc[idx_ext, "matched"]:
-            continue
-        valor_ext = entradas_ext.loc[idx_ext, "entrada"]
+    # FASE 3: VALOR (fallback, busca em todo o periodo - nao so no mesmo dia)
+    _match_fallback_valor(entradas_ext, debitos_raz, "entrada", "debito")
+    _match_fallback_valor(saidas_ext, creditos_raz, "saida", "credito")
 
-        for idx_raz in debitos_raz.index:
-            if debitos_raz.loc[idx_raz, "matched"]:
-                continue
-            valor_raz = debitos_raz.loc[idx_raz, "debito"]
+    return entradas_ext, saidas_ext, debitos_raz, creditos_raz
 
-            if abs(valor_ext - valor_raz) <= THRESHOLD_CONCILIACAO:
-                entradas_ext.loc[idx_ext, "matched"] = True
-                debitos_raz.loc[idx_raz, "matched"] = True
-                break
 
-    for idx_ext in saidas_ext.index:
-        if saidas_ext.loc[idx_ext, "matched"]:
-            continue
-        valor_ext = saidas_ext.loc[idx_ext, "saida"]
-
-        for idx_raz in creditos_raz.index:
-            if creditos_raz.loc[idx_raz, "matched"]:
-                continue
-            valor_raz = creditos_raz.loc[idx_raz, "credito"]
-
-            if abs(valor_ext - valor_raz) <= THRESHOLD_CONCILIACAO:
-                saidas_ext.loc[idx_ext, "matched"] = True
-                creditos_raz.loc[idx_raz, "matched"] = True
-                break
-
-    # ==========================
-    # NOTA: Validacao final removida - registros sem match devem permanecer visiveis
-    # ==========================
-    validacao_final_entradas = False
-    validacao_final_saidas = False
-
-    # Coletar registros nao matched
-    def _sf(v, default=0.0) -> float:
-        """Converte para float, retornando default se NaN."""
-        return float(v) if pd.notna(v) else default
-
-    def _ss(v, default="") -> str:
-        """Converte para str, retornando default se NaN."""
-        return str(v) if pd.notna(v) else default
-
-    def _formatar_extrato(row, tipo: str) -> Dict:
-        valor = row.get("entrada", 0) if tipo == "entrada" else row.get("saida", 0)
-        return {
-            "data": _ss(row.get("data")),
-            "documento": _ss(row.get("documento")),
-            "prefixo": _ss(row.get("prefixo")),
-            "numero": _ss(row.get("numero")),
-            "descricao": _ss(row.get("descricao")),
-            "valor": round(_sf(valor), 2),
-            "tipo": tipo.upper(),
-        }
-
-    def _formatar_razao(row, tipo: str) -> Dict:
-        valor = row.get("debito", 0) if tipo == "debito" else row.get("credito", 0)
-        return {
-            "data": _ss(row.get("data")),
-            "lote_doc": _ss(row.get("lote_doc")),
-            "historico": _ss(row.get("historico")),
-            "documento_extraido": _ss(row.get("documento_extraido")),
-            "prefixo": _ss(row.get("prefixo")),
-            "numero": _ss(row.get("numero")),
-            "valor": round(_sf(valor), 2),
-            "tipo": tipo.upper(),
-        }
-
-    # Registros NAO conciliados (pendentes)
-    so_extrato_entradas = [
-        _formatar_extrato(row, "entrada")
-        for _, row in entradas_ext[~entradas_ext["matched"]].iterrows()
-    ]
-    so_extrato_saidas = [
-        _formatar_extrato(row, "saida")
-        for _, row in saidas_ext[~saidas_ext["matched"]].iterrows()
-    ]
-    so_razao_debitos = [
-        _formatar_razao(row, "debito")
-        for _, row in debitos_raz[~debitos_raz["matched"]].iterrows()
-    ]
-    so_razao_creditos = [
-        _formatar_razao(row, "credito")
-        for _, row in creditos_raz[~creditos_raz["matched"]].iterrows()
-    ]
-
-    # Registros CONCILIADOS (matched) - para mostrar em verde
-    conciliados_extrato_entradas = [
-        _formatar_extrato(row, "entrada")
-        for _, row in entradas_ext[entradas_ext["matched"]].iterrows()
-    ]
-    conciliados_extrato_saidas = [
-        _formatar_extrato(row, "saida")
-        for _, row in saidas_ext[saidas_ext["matched"]].iterrows()
-    ]
-    conciliados_razao_debitos = [
-        _formatar_razao(row, "debito")
-        for _, row in debitos_raz[debitos_raz["matched"]].iterrows()
-    ]
-    conciliados_razao_creditos = [
-        _formatar_razao(row, "credito")
-        for _, row in creditos_raz[creditos_raz["matched"]].iterrows()
-    ]
-
-    return (
-        so_extrato_entradas,
-        so_extrato_saidas,
-        so_razao_debitos,
-        so_razao_creditos,
-        validacao_final_entradas,
-        validacao_final_saidas,
-        # Novos retornos: registros conciliados
-        conciliados_extrato_entradas,
-        conciliados_extrato_saidas,
-        conciliados_razao_debitos,
-        conciliados_razao_creditos,
-    )
+def _filtrar_formatar_dia(
+    df: pd.DataFrame, data: str, matched: bool, tipo: str, formatador
+) -> List[Dict]:
+    """Filtra os registros (ja com matching global feito) que pertencem a um dia especifico."""
+    subset = df[(df["data"] == data) & (df["matched"] == matched)]
+    return [formatador(row, tipo) for _, row in subset.iterrows()]
 
 
 def calcular_diferencas_bancarias(
@@ -432,31 +391,26 @@ def calcular_diferencas_bancarias(
     registros_so_extrato = []
     registros_so_razao = []
 
+    # Matching GLOBAL: roda uma unica vez para todo o periodo (nao mais por dia).
+    # Quando o documento/valor casa em uma data diferente, o registro continua
+    # aparecendo no seu dia real, marcado como conciliado, com "data_correspondencia"
+    # indicando em qual data esta o lancamento que fechou com ele.
+    entradas_ext, saidas_ext, debitos_raz, creditos_raz = _fazer_matching_global(df_ext, df_raz)
+
     for _, row in df_merge.iterrows():
         data_dia = row["data"]
         dif_entradas = row["dif_entradas"]
         dif_saidas = row["dif_saidas"]
-
-        # Fazer matching detalhado para TODOS os dias (divergentes e conciliados)
         status_dia = row["status"]
 
-        (
-            so_ext_ent,
-            so_ext_sai,
-            so_raz_deb,
-            so_raz_cred,
-            _validacao_final_ent,
-            _validacao_final_sai,
-            # Registros conciliados (matched)
-            conc_ext_ent,
-            conc_ext_sai,
-            conc_raz_deb,
-            conc_raz_cred,
-        ) = _fazer_matching_registros(
-            df_ext, df_raz, data_dia,
-            dif_entradas=dif_entradas,
-            dif_saidas=dif_saidas
-        )
+        so_ext_ent = _filtrar_formatar_dia(entradas_ext, data_dia, False, "entrada", _formatar_extrato)
+        conc_ext_ent = _filtrar_formatar_dia(entradas_ext, data_dia, True, "entrada", _formatar_extrato)
+        so_ext_sai = _filtrar_formatar_dia(saidas_ext, data_dia, False, "saida", _formatar_extrato)
+        conc_ext_sai = _filtrar_formatar_dia(saidas_ext, data_dia, True, "saida", _formatar_extrato)
+        so_raz_deb = _filtrar_formatar_dia(debitos_raz, data_dia, False, "debito", _formatar_razao)
+        conc_raz_deb = _filtrar_formatar_dia(debitos_raz, data_dia, True, "debito", _formatar_razao)
+        so_raz_cred = _filtrar_formatar_dia(creditos_raz, data_dia, False, "credito", _formatar_razao)
+        conc_raz_cred = _filtrar_formatar_dia(creditos_raz, data_dia, True, "credito", _formatar_razao)
 
         # Adicionar aos registros globais (apenas pendentes/divergentes)
         if status_dia == "DIVERGENTE":

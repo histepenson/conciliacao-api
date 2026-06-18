@@ -200,7 +200,9 @@
       "Bash(APP_ENV=genix_import python -m alembic upgrade head)",
       "Bash(node -e ' *)",
       "Bash(APP_ENV=genix_import python -c ' *)",
-      "Bash(rm -f tmp_finr470_itau.json)"
+      "Bash(rm -f tmp_finr470_itau.json)",
+      "Bash(npx esbuild *)",
+      "Bash(rm -f /tmp/out.js)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -213,7 +215,8 @@
       "C:\\conciliacao-app\\src\\services",
       "C:\\conciliacao-app\\src\\components\\ProtheusParamsDialog",
       "c:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog",
-      "C:\\conciliacao-app"
+      "C:\\conciliacao-app",
+      "\\tmp"
     ]
   }
 }
