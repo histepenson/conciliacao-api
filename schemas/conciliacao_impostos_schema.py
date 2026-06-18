@@ -58,7 +58,8 @@ class EfetivarConciliacaoImpostosRequest(BaseModel):
 class ResumoConciliacaoImpostos(BaseModel):
     """Resumo da conciliacao de impostos."""
     campo_imposto: str
-    total_debito_razao: float = 0.0
+    coluna_razao: str = "debito"  # "debito" (Entrada) ou "credito" (Saida)
+    total_lancamento_razao: float = 0.0
     total_sft: float = 0.0
     diferenca: float = 0.0
     situacao: str  # CONCILIADO ou DIVERGENTE

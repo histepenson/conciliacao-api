@@ -12,11 +12,15 @@ def match_ct2_sft(
     ct2_recs: list[dict],
     sft_recs: list[dict],
     campo_valor_sft: str = "valcont",
+    campo_valor_ct2: str = "debito",
     tolerancia: float = 0.10,
 ) -> tuple[list[dict], list[dict]]:
     """
-    Casa lancamentos de debito do CT2 (via CT2_KEY) com notas do SFT por
+    Casa lancamentos do CT2 (via CT2_KEY) com notas do SFT por
     (filial, nf, fornece) + valor (campo_valor_sft) dentro da tolerancia.
+
+    campo_valor_ct2 indica qual coluna do CT2 usar como valor do lancamento
+    ("debito" para notas de Entrada, "credito" para notas de Saida).
 
     Fallback: para CT2 sem CT2_KEY ou sem correspondencia exata, aplica
     cobertura greedy por valor entre os registros restantes de cada lado.
@@ -47,8 +51,8 @@ def match_ct2_sft(
     sem_chave: list = []
 
     for i, rec in enumerate(ct2_recs):
-        debito = round(float(rec.get("debito") or 0), 2)
-        if debito == 0:
+        valor_ct2 = round(float(rec.get(campo_valor_ct2) or 0), 2)
+        if valor_ct2 == 0:
             ct2_matched_set.add(i)
             continue
         chave = _extrair_chave_ct2(rec)
@@ -62,7 +66,7 @@ def match_ct2_sft(
         for idx in sft_por_doc.get((filial, nf, fornece), []):
             if idx not in sft_matched:
                 valor_sft = round(float(sft_recs[idx].get(campo_valor_sft) or 0), 2)
-                if abs(valor_sft - debito) <= tolerancia:
+                if abs(valor_sft - valor_ct2) <= tolerancia:
                     sft_matched.add(idx)
                     ct2_matched_set.add(i)
                     matched = True
@@ -75,7 +79,7 @@ def match_ct2_sft(
     sft_nao_cobertos = [i for i in range(len(sft_recs)) if i not in sft_matched]
     if sem_chave and sft_nao_cobertos:
         total_restante_ct2 = round(
-            sum(float(ct2_recs[i].get("debito") or 0) for i in sem_chave), 2
+            sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in sem_chave), 2
         )
         total_restante_sft = round(
             sum(float(sft_recs[i].get(campo_valor_sft) or 0) for i in sft_nao_cobertos), 2
@@ -97,7 +101,7 @@ def match_ct2_sft(
                     restante = round(restante - v, 2)
             return cobertos
 
-        ct2_cob = _cobrir_greedy(sem_chave, ct2_recs, "debito", total_restante_sft)
+        ct2_cob = _cobrir_greedy(sem_chave, ct2_recs, campo_valor_ct2, total_restante_sft)
         sft_cob = _cobrir_greedy(sft_nao_cobertos, sft_recs, campo_valor_sft, total_restante_ct2)
         ct2_matched_set.update(ct2_cob)
         sft_matched.update(sft_cob)
