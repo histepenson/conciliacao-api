@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-from models import Conciliacao, PlanoDeContas, Empresa
+from models import Conciliacao, PlanoDeContas
 from schemas.efetivacao_schema import StatusConciliacao
 from middleware.auth import CurrentUser
 from services.file_storage_service import FileStorageService
@@ -51,15 +51,6 @@ class ConciliacaoImpostosEfetivacaoService:
             )
         ).first()
 
-    def _validate_no_divergencias(self, resultado: Dict[str, Any], permite_divergente: bool = False) -> None:
-        resumo = resultado.get("resumo", {})
-        situacao = resumo.get("situacao", "DIVERGENTE")
-        if situacao != "CONCILIADO" and not permite_divergente:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nao e possivel efetivar: conciliacao divergente"
-            )
-
     def efetivar(
         self,
         db: Session,
@@ -83,11 +74,6 @@ class ConciliacaoImpostosEfetivacaoService:
                 detail=f"Conciliacao ja efetivada em {existing.data_efetivacao}"
             )
 
-        empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
-        permite_divergente = empresa.permite_efetivar_divergente if empresa else False
-
-        self._validate_no_divergencias(resultado, permite_divergente)
-
         conta = db.query(PlanoDeContas).filter(PlanoDeContas.id == conta_contabil_id).first()
         if not conta:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conta contabil nao encontrada")
@@ -95,9 +81,9 @@ class ConciliacaoImpostosEfetivacaoService:
         resumo = resultado.get("resumo", {})
         saldo = float(resumo.get("diferenca", 0) or 0)
 
-        # Ao efetivar, situacao e sempre CONCILIADO
-        resultado_para_salvar = {**resultado}
-        resultado_para_salvar["resumo"] = {**resumo, "situacao": "CONCILIADO"}
+        # Divergencias (NFs sem correspondencia) sao esperadas na conciliacao de
+        # impostos e nao bloqueiam a efetivacao; mantem a situacao real calculada.
+        resultado_para_salvar = resultado
 
         now = datetime.now(timezone.utc)
 
