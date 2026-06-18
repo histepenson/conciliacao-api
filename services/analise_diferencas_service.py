@@ -313,7 +313,16 @@ class AnaliseDiferencasService:
             return False
 
         def _correspondencia_financeiro(codigo: str, data_str: str, valor: float):
-            """Retorna (tem_correspondencia, valor_financeiro_match) usando o snapshot original."""
+            """
+            Retorna (tem_correspondencia, valor_financeiro_match) usando o snapshot original.
+
+            Lancamentos do razao fora do periodo analisado nao tem como ter correspondencia
+            no financeiro do periodo (financeiro_match_map so cobre o periodo analisado) --
+            nesses casos retorna (None, None) para o frontend mostrar neutro (sem cor),
+            em vez de vermelho (mesma regra ja aplicada para os titulos do financeiro).
+            """
+            if periodo is not None and not self._data_no_periodo(data_str, periodo):
+                return None, None
             valores_snap = financeiro_match_map_snap.get((codigo, data_str), [])
             if not valores_snap:
                 return False, None
