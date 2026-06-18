@@ -52,17 +52,35 @@ class FinR130Service:
             return await _do(c)
 
     async def buscar_como_registros_pagina(self, params: dict[str, Any], *, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+        """Retorna uma pagina do FINR130 ja no formato de base financeira."""
         resultado = await self.buscar_pagina(params, client=client)
-        titulos = resultado.get("titulos", [])
+        registros = _titulos_para_registros(resultado.get("titulos", []))
         total_pages = int(resultado.get("totalPages") or resultado.get("total_pages") or 1)
         page = int(params.get("page") or 1)
         return {
-            "registros": titulos,
-            "total": len(titulos),
+            "parametros": resultado.get("parametros", {}),
+            "registros": registros,
+            "total": len(registros),
+            "totalPages": total_pages,
             "total_pages": total_pages,
             "page": page,
             "hasMore": bool(resultado.get("hasMore", page < total_pages)),
         }
+
+    async def buscar_como_registros(self, params: dict[str, Any]) -> list[dict]:
+        """
+        Retorna os titulos no formato esperado por ProcessadorContasReceber.
+
+        Colunas geradas:
+          - codigo_lj_nome_do_cliente: "CLIENTE-LOJA-NOME" -> normalizado para C{base}{loja}
+          - tit_vencidos_valor_corrigido: saldo_na_data quando dias_vencidos > 0
+          - titulos_a_vencer_valor_atual: saldo_na_data quando dias_vencidos <= 0
+          - vencto_real: data de vencimento real
+          - dias_atraso: dias vencidos (negativo = a vencer)
+          - tp: tipo do titulo (para filtro opcional)
+        """
+        resultado = await self.buscar_todos_titulos(params)
+        return _titulos_para_registros(resultado["titulos"])
 
     async def buscar_todos_titulos(self, params: dict[str, Any]) -> dict[str, Any]:
         """Chama o ZFINR130API paginando automaticamente e retorna todos os titulos."""
@@ -112,3 +130,49 @@ def _decode_json_response(raw: bytes) -> dict[str, Any]:
         return _json.loads(raw.decode("utf-8"))
     except UnicodeDecodeError:
         return _json.loads(raw.decode("windows-1252"))
+
+
+def _titulos_para_registros(titulos: list[dict]) -> list[dict]:
+    registros = []
+    for t in titulos:
+        cliente = (t.get("cliente") or "").strip()
+        loja = (t.get("loja") or "").strip()
+        nome = (t.get("nome_cliente") or "").strip()
+        saldo = t.get("saldo_na_data", 0) or 0
+        dias = t.get("dias_vencidos", 0) or 0
+
+        if dias > 0:
+            vencido = saldo
+            a_vencer = 0
+        else:
+            vencido = 0
+            a_vencer = saldo
+
+        prefixo = (t.get("prefixo") or "").strip()
+        numero = (t.get("numero") or "").strip()
+        parcela = (t.get("parcela") or "").strip()
+
+        registro = {
+            "codigo_lj_nome_do_cliente": f"{cliente}-{loja}-{nome}",
+            "tit_vencidos_valor_corrigido": vencido,
+            "titulos_a_vencer_valor_atual": a_vencer,
+            "vencto_real": t.get("vencto_real", ""),
+            "data_de_emissao": t.get("emissao", ""),
+            "prf_numero": f"{prefixo}{numero}{parcela}",
+            "dias_atraso": dias,
+            "tp": t.get("tipo", ""),
+            "natureza": t.get("natureza", ""),
+            "historico": t.get("historico", ""),
+        }
+
+        # Quando a carga ja traz o codigo Protheus completo (cargas manuais via
+        # planilha de empresas sem API, ex: GENIX), repassa para o normalizador
+        # usar direto em vez de re-parsear o composto "codigo_lj_nome_do_cliente"
+        if t.get("codigo_cli") and t.get("filial"):
+            registro["codigo_cli"] = t["codigo_cli"]
+            registro["filial"] = t["filial"]
+            registro["loja"] = loja
+            registro["nome_cliente"] = nome
+
+        registros.append(registro)
+    return registros
