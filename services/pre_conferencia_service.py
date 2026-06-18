@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from models.protheus_carga import ProtheusCarga, ProtheusCargaRegistro
 from models.lancamento_padrao import LancamentoPadrao
+from tools.fiscal.match_ct2_sft import match_ct2_sft as _match_ct2_sft_impl
 
 logger = logging.getLogger(__name__)
 
@@ -312,98 +313,9 @@ def conferir(
         return result
 
     # ── Matching CT2 ↔ SFT por (filial, nf, fornece) extraído de CT2_KEY ──────
-    # CT2_KEY estrutura: filial[0:4] + nf[4:13] + serie[13:16] + fornece[16:22]
-    # Primário: match exato por (filial, nf, fornece, valor ±0.01)
-    # Fallback 1: match por (filial, nf, fornece) sem valor
-    # Fallback 2: greedy por valor para CT2 sem CT2_KEY / sem NF no SFT
+    # Logica compartilhada com a conciliacao de impostos (tools/fiscal/match_ct2_sft.py)
     def _match_ct2_sft(ct2_recs: list, sft_recs: list) -> tuple:
-
-        def _extrair_chave_ct2(rec: dict):
-            key = str(rec.get("ct2_key") or "").strip()
-            if len(key) < 22:
-                return None
-            return (key[0:4], key[4:13], key[16:22].strip())
-
-        # ── Índice SFT por (filial, nf, fornece) → lista de índices
-        sft_por_doc: dict = {}
-        for i, s in enumerate(sft_recs):
-            filial  = str(s.get("filial")  or "").strip()
-            nf      = str(s.get("nf")      or "").strip()
-            cliefor = str(s.get("cliefor") or "").strip()
-            if filial and nf:
-                sft_por_doc.setdefault((filial, nf, cliefor), []).append(i)
-
-        # ── Tenta matching por CT2_KEY + valor (tolerância ±0.10) ───────────
-        sft_matched: set = set()
-        ct2_matched_set: set = set()
-        sem_chave: list = []   # índices de CT2 sem CT2_KEY → entram no fallback
-
-        for i, rec in enumerate(ct2_recs):
-            debito = round(float(rec.get("debito") or 0), 2)
-            if debito == 0:
-                ct2_matched_set.add(i)  # credito/zero é neutro
-                continue
-            chave = _extrair_chave_ct2(rec)
-            if chave is None:
-                sem_chave.append(i)
-                continue
-
-            filial, nf, fornece = chave
-            matched = False
-
-            for idx in sft_por_doc.get((filial, nf, fornece), []):
-                if idx not in sft_matched:
-                    valcont = round(float(sft_recs[idx].get("valcont") or 0), 2)
-                    if abs(valcont - debito) <= 0.10:
-                        sft_matched.add(idx)
-                        ct2_matched_set.add(i)
-                        matched = True
-                        break
-
-            if not matched:
-                sem_chave.append(i)  # CT2_KEY preenchido mas sem correspondência no SFT
-
-        # ── Fallback greedy para CT2 sem chave / sem NF no SFT ──────────────
-        # Calcula o saldo SFT ainda não coberto e aplica cobertura greedy
-        sft_nao_cobertos = [i for i in range(len(sft_recs)) if i not in sft_matched]
-        if sem_chave and sft_nao_cobertos:
-            total_restante_ct2 = round(
-                sum(float(ct2_recs[i].get("debito") or 0) for i in sem_chave), 2
-            )
-            total_restante_sft = round(
-                sum(float(sft_recs[i].get("valcont") or 0) for i in sft_nao_cobertos), 2
-            )
-
-            def _cobrir_greedy(indices, recs, chave_v, budget):
-                ordered = sorted(indices, key=lambda i: -round(float(recs[i].get(chave_v) or 0), 2))
-                cobertos: set = set()
-                restante = budget
-                for i in ordered:
-                    v = round(float(recs[i].get(chave_v) or 0), 2)
-                    if v == 0:
-                        cobertos.add(i)
-                        continue
-                    if restante <= 0:
-                        break
-                    if restante >= v - 0.01:
-                        cobertos.add(i)
-                        restante = round(restante - v, 2)
-                return cobertos
-
-            ct2_cob = _cobrir_greedy(sem_chave,       ct2_recs, "debito",  total_restante_sft)
-            sft_cob = _cobrir_greedy(sft_nao_cobertos, sft_recs, "valcont", total_restante_ct2)
-            ct2_matched_set.update(ct2_cob)
-            sft_matched.update(sft_cob)
-
-        ct2_resultado = [
-            {**rec, "matched": i in ct2_matched_set}
-            for i, rec in enumerate(ct2_recs)
-        ]
-        sft_resultado = [
-            {**s, "matched": i in sft_matched}
-            for i, s in enumerate(sft_recs)
-        ]
-        return ct2_resultado, sft_resultado
+        return _match_ct2_sft_impl(ct2_recs, sft_recs, campo_valor_sft="valcont", tolerancia=0.10)
 
     # ── Processar GRUPOS ─────────────────────────────────────────────────────
     grupos_configs: dict[str, list[LancamentoPadrao]] = {}

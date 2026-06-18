@@ -207,7 +207,11 @@
       "Bash(APP_ENV=genix_import python scripts/importar_carga_manual.py --empresa-id 13 --tipo FINR470 --data-base 20251231 --registros-json /tmp/finr470_bnp_registros.json --parametros-json '{\"banco\":\"752\",\"agencia\":\"0001\",\"conta\":\"99999\"}')",
       "Bash(rm -f finr470_bnp_registros.tmp.json .env.genix_import)",
       "Bash(APP_ENV=genix_import python scripts/importar_carga_manual.py --empresa-id 13 --tipo CTBR400 --data-base 20251231 --registros-json ctbr400_bnp_registros.tmp.json --parametros-json '{\"conta_de\":\"111020011\",\"conta_ate\":\"111020011\"}')",
-      "Bash(rm -f ctbr400_bnp_registros.tmp.json finr470_bnp_registros.tmp.json)"
+      "Bash(rm -f ctbr400_bnp_registros.tmp.json finr470_bnp_registros.tmp.json)",
+      "Bash(APP_ENV=genix_import python scripts/importar_carga_manual.py --empresa-id 13 --tipo CTBR140 --data-base 20251231 --registros-json ctbr140_clientes_bnp.tmp.json --parametros-json '{\"conta_de\":\"112010001\",\"conta_ate\":\"112010001\"}')",
+      "Bash(rm -f ctbr140_clientes_bnp.tmp.json)",
+      "Bash(APP_ENV=genix_import python scripts/importar_carga_manual.py --empresa-id 13 --tipo CTBR480 --data-base 20251231 --registros-json ctbr480_clientes.tmp.json --parametros-json '{\"conta_de\":\"112010001\",\"conta_ate\":\"112010001\"}')",
+      "Bash(rm -f ctbr480_clientes.tmp.json)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

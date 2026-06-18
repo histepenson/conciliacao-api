@@ -247,6 +247,52 @@ class FileStorageService:
         logger.info(f"Arquivos bancarios salvos para empresa {empresa_id}, periodo {ano}-{mes:02d}, conta {conta_contabil}")
         return caminhos
 
+    def save_imposto_files(
+        self,
+        empresa_id: int,
+        ano: int,
+        mes: int,
+        conta_contabil: str,
+        resultado: Dict[str, Any],
+        arquivo_sft: bytes = None,
+        arquivo_razao: bytes = None,
+        nome_sft: str = "sft.xlsx",
+        nome_razao: str = "razao.xlsx"
+    ) -> Dict[str, Dict[str, str]]:
+        """
+        Salva arquivos de conciliacao de impostos (originais + resultado JSON).
+
+        Returns:
+            Dicionario com estrutura:
+            {
+                "sft": {"original": "chave"},
+                "razao": {"original": "chave"},
+                "relatorio": {"json": "chave"}
+            }
+        """
+        caminhos = {"relatorio": {}}
+
+        if arquivo_sft:
+            caminhos["sft"] = {}
+            caminhos["sft"]["original"] = self.save_original_file(
+                arquivo_sft, empresa_id, ano, mes, conta_contabil,
+                "sft", nome_sft, "impostos"
+            )
+
+        if arquivo_razao:
+            caminhos["razao"] = {}
+            caminhos["razao"]["original"] = self.save_original_file(
+                arquivo_razao, empresa_id, ano, mes, conta_contabil,
+                "razao", nome_razao, "impostos"
+            )
+
+        caminhos["relatorio"]["json"] = self.save_json_result(
+            resultado, empresa_id, ano, mes, conta_contabil, "impostos"
+        )
+
+        logger.info(f"Arquivos de impostos salvos para empresa {empresa_id}, periodo {ano}-{mes:02d}, conta {conta_contabil}")
+        return caminhos
+
     def save_stock_files(
         self,
         empresa_id: int,
