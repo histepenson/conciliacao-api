@@ -13,6 +13,7 @@ import json
 from schemas.conciliacao_impostos_schema import RequestConciliacaoImpostos
 from services.conciliacao_impostos_service import ConciliacaoImpostosService, COLUNAS_IMPOSTO_SFT
 from services.conciliacao_impostos_efetivacao_service import ConciliacaoImpostosEfetivacaoService
+from services import balancete_service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
 from db import get_db
@@ -61,6 +62,23 @@ def processar_conciliacao_impostos(request: RequestConciliacaoImpostos, db: Sess
 
     try:
         resultado = service.executar(request)
+
+        # Validar saldo calculado contra balancete importado (se houver)
+        # Movimentos do periodo vem do proprio razao da conta: debito - credito
+        resumo = resultado.get("resumo", {})
+        movimentos_periodo = float(resumo.get("total_debito_razao", 0) or 0) - float(
+            resumo.get("total_credito_razao", 0) or 0
+        )
+        validacao_balancete = balancete_service.validar_saldo_calculado(
+            db,
+            request.parametros.empresa_id,
+            request.base_razao.conta_contabil_id,
+            request.parametros.data_base,
+            movimentos_periodo,
+        )
+        if validacao_balancete:
+            resumo.update(validacao_balancete)
+
         logger.info("Conciliacao de impostos executada com sucesso")
         return resultado
 

@@ -98,12 +98,20 @@ class ConciliacaoImpostosService:
         coluna_razao_label = "Credito" if coluna_razao == "credito" else "Debito"
 
         razao_raw = request.base_razao.registros
-        razao_filtrado = [
+        razao_da_conta = [
             r for r in razao_raw
             if str(r.get("conta") or "").strip() == conta_contabil.strip()
-            and round(float(r.get(coluna_razao) or 0), 2) > 0
+        ]
+        razao_filtrado = [
+            r for r in razao_da_conta
+            if round(float(r.get(coluna_razao) or 0), 2) > 0
         ]
         logger.info(f"[1/2] Razao: {len(razao_raw)} lancamentos recebidos, {len(razao_filtrado)} a {coluna_razao} da conta {conta_contabil}")
+
+        # Totais de debito/credito da conta, independente da coluna usada no matching
+        # -- exibidos sempre no resumo para o usuario ver os dois lados.
+        total_debito_conta = round(sum(float(r.get("debito") or 0) for r in razao_da_conta), 2)
+        total_credito_conta = round(sum(float(r.get("credito") or 0) for r in razao_da_conta), 2)
 
         sft_raw = request.base_sft.registros
         logger.info(f"      SFT: {len(sft_raw)} registros recebidos")
@@ -125,9 +133,9 @@ class ConciliacaoImpostosService:
         diferenca = round(total_lancamento_razao - total_sft, 2)
         situacao = "CONCILIADO" if abs(diferenca) <= 0.01 else "DIVERGENTE"
 
-        diferencas_so_razao = self._agrupar_razao(
-            [r for r in razao_resultado if not r["matched"]], coluna_razao
-        )
+        # Lancamentos individuais (mesmo padrao da grid de razao da conciliacao
+        # financeira/contas a pagar: um lancamento por linha, sem agrupar).
+        diferencas_so_razao = [r for r in razao_resultado if not r["matched"]]
         diferencas_so_sft = self._agrupar_sft(
             [
                 s for s in sft_resultado
@@ -143,6 +151,8 @@ class ConciliacaoImpostosService:
             "coluna_razao": coluna_razao,
             "coluna_razao_label": coluna_razao_label,
             "total_lancamento_razao": total_lancamento_razao,
+            "total_debito_razao": total_debito_conta,
+            "total_credito_razao": total_credito_conta,
             "total_sft": total_sft,
             "diferenca": diferenca,
             "situacao": situacao,
@@ -172,38 +182,6 @@ class ConciliacaoImpostosService:
         logger.info("=" * 50)
 
         return resposta
-
-    @staticmethod
-    def _extrair_chave_ct2(rec: Dict[str, Any]):
-        key = str(rec.get("ct2_key") or "").strip()
-        if len(key) < 22:
-            return None
-        return (key[0:4], key[4:13].strip(), key[16:22].strip())
-
-    def _agrupar_razao(self, registros: list, coluna_razao: str = "debito") -> list:
-        """Aglutina lancamentos do razao sem correspondencia por (filial, nf, fornecedor)."""
-        grupos: Dict[tuple, list] = {}
-        sem_chave = []
-        for r in registros:
-            chave = self._extrair_chave_ct2(r)
-            if chave is None:
-                sem_chave.append(r)
-                continue
-            grupos.setdefault(chave, []).append(r)
-
-        agrupados = []
-        for (filial, nf, fornece), itens in grupos.items():
-            agrupados.append({
-                "filial": filial,
-                "nf": nf,
-                "cliefor": fornece,
-                "historico": itens[0].get("historico"),
-                "valor_lancamento": round(sum(float(i.get(coluna_razao) or 0) for i in itens), 2),
-                "qtd_lancamentos": len(itens),
-                "ct2_key": itens[0].get("ct2_key"),
-            })
-
-        return agrupados + sem_chave
 
     def _agrupar_sft(self, registros: list, campo_imposto: str) -> list:
         """Aglutina notas do SFT sem correspondencia por (filial, nf, fornecedor)."""
