@@ -33,6 +33,7 @@ from routers.nfe_router import router as nfe_router
 from routers.estoque_router import router as estoque_router
 from routers.pre_conferencia_router import router as pre_conferencia_router
 from routers.lancamento_padrao_router import router as lancamento_padrao_router
+from routers.balancete_router import router as balancete_router
 
 
 @asynccontextmanager
@@ -84,6 +85,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -131,3 +133,4 @@ app.include_router(nfe_router, prefix="/api")
 app.include_router(estoque_router)
 app.include_router(pre_conferencia_router, prefix="/api")
 app.include_router(lancamento_padrao_router, prefix="/api")
+app.include_router(balancete_router, prefix="/api")

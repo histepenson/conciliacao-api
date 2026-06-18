@@ -513,6 +513,17 @@ def calcular_diferencas_estoque(
             grupos_conciliados.append(grupo_info)
 
     # ===========================
+    # 7.5 SALDO FINAL DO RAZAO (ultima linha, igual ao banco)
+    # ===========================
+    total_debito_razao = df_r["debito"].sum() if "debito" in df_r.columns else 0.0
+    total_credito_razao = df_r["credito"].sum() if "credito" in df_r.columns else 0.0
+    saldo_final_razao = (
+        float(df_r.iloc[-1]["saldo_atual"])
+        if len(df_r) > 0 and "saldo_atual" in df_r.columns
+        else None
+    )
+
+    # ===========================
     # 8. RESUMO
     # ===========================
     total_kardex = df_merge["valor_kardex"].sum()
@@ -539,6 +550,9 @@ def calcular_diferencas_estoque(
         "qtd_so_kardex": qtd_so_kardex,
         "qtd_so_razao": qtd_so_razao,
         "percentual_conciliacao": round(percentual_conciliacao, 2),
+        "total_debito_razao": round(float(total_debito_razao), 2),
+        "total_credito_razao": round(float(total_credito_razao), 2),
+        "saldo_final_razao": round(saldo_final_razao, 2) if saldo_final_razao is not None else None,
         "data_processamento": datetime.now().isoformat(),
     }
 

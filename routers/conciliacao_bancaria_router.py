@@ -15,6 +15,7 @@ from schemas.conciliacao_bancaria_schema import (
 )
 from services.conciliacao_bancaria_service import ConciliacaoBancariaService
 from services.conciliacao_bancaria_efetivacao_service import ConciliacaoBancariaEfetivacaoService
+from services import balancete_service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
 from db import get_db
@@ -29,7 +30,7 @@ router = APIRouter(
 
 
 @router.post("/bancaria", response_model=None)
-def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria):
+def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria, db: Session = Depends(get_db)):
     """
     Processa conciliacao bancaria.
 
@@ -56,6 +57,22 @@ def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria):
     try:
         # Executar conciliacao
         resultado = service.executar(request)
+
+        # Validar saldo calculado contra balancete importado (se houver)
+        resumo = resultado.get("resumo", {})
+        movimentos_periodo = float(resumo.get("total_debitos_razao", 0) or 0) - float(
+            resumo.get("total_creditos_razao", 0) or 0
+        )
+        validacao_balancete = balancete_service.validar_saldo_calculado(
+            db,
+            request.parametros.empresa_id,
+            request.base_razao.conta_contabil_id,
+            request.parametros.data_base,
+            movimentos_periodo,
+        )
+        if validacao_balancete:
+            resumo.update(validacao_balancete)
+
         logger.info("Conciliacao bancaria executada com sucesso")
         return resultado
 

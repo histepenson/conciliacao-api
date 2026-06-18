@@ -1,10 +1,12 @@
 """
 Router para endpoints de efetivacao de conciliacoes.
 """
+import io
 import logging
 import json
 from typing import Optional
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session
 
@@ -281,16 +283,32 @@ async def download_arquivo(
     service = EfetivacaoService()
     file_key = service.obter_arquivo(db, conciliacao_id, tipo_arquivo, formato, empresa_id)
 
-    # Determinar media type
-    if file_key.endswith(".xlsx"):
+    filename = file_key.rsplit("/", 1)[-1]
+    content = storage.download_bytes(file_key)
+
+    # Arquivos "originais" de conciliacoes vindas direto do Protheus (sem upload manual)
+    # sao salvos como JSON puro (ex: finr130_protheus.json) - nao ha planilha real por
+    # tras. Para o usuario conseguir abrir no Excel, convertemos para .xlsx aqui.
+    if formato == "original" and file_key.endswith(".json") and tipo_arquivo != "relatorio":
+        registros = json.loads(content)
+        if isinstance(registros, dict):
+            registros = registros.get("registros", [])
+        df = pd.DataFrame(registros)
+        buffer = io.BytesIO()
+        df.to_excel(buffer, index=False)
+        content = buffer.getvalue()
+        filename = filename.rsplit(".", 1)[0] + ".xlsx"
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif file_key.endswith(".xlsx"):
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif file_key.endswith(".xls"):
+        media_type = "application/vnd.ms-excel"
+    elif file_key.endswith(".csv"):
+        media_type = "text/csv"
     elif file_key.endswith(".json"):
         media_type = "application/json"
     else:
         media_type = "application/octet-stream"
-
-    filename = file_key.rsplit("/", 1)[-1]
-    content = storage.download_bytes(file_key)
 
     return Response(
         content=content,

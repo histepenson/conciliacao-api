@@ -195,7 +195,12 @@
       "Bash(APP_ENV=genix_import python scripts/importar_carga_manual.py --empresa-id 13 --tipo CTBR400 --data-base 20251231 --registros-json tmp_ctbr400_genix_bradesco.json --parametros-json '{\"conta_de\":\"111020010\",\"conta_ate\":\"111020010\"}')",
       "Bash(APP_ENV=genix_import python scripts/importar_carga_manual.py --empresa-id 13 --tipo CTBR400 --data-base 20251231 --registros-json tmp_ctbr400_genix_santander.json --parametros-json '{\"conta_de\":\"111020007\",\"conta_ate\":\"111020007\"}')",
       "Read(//temp/readonly/**)",
-      "Read(//c/temp/readonly/**)"
+      "Read(//c/temp/readonly/**)",
+      "Bash(python -c ' *)",
+      "Bash(APP_ENV=genix_import python -m alembic upgrade head)",
+      "Bash(node -e ' *)",
+      "Bash(APP_ENV=genix_import python -c ' *)",
+      "Bash(rm -f tmp_finr470_itau.json)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
