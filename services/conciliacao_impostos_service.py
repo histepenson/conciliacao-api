@@ -92,8 +92,12 @@ class ConciliacaoImpostosService:
         diferenca = round(total_debito_razao - total_sft, 2)
         situacao = "CONCILIADO" if abs(diferenca) <= 0.01 else "DIVERGENTE"
 
-        diferencas_so_razao = [r for r in razao_resultado if not r["matched"]]
-        diferencas_so_sft = [s for s in sft_resultado if not s["matched"]]
+        diferencas_so_razao = self._agrupar_razao(
+            [r for r in razao_resultado if not r["matched"]]
+        )
+        diferencas_so_sft = self._agrupar_sft(
+            [s for s in sft_resultado if not s["matched"]], campo_imposto
+        )
         qtd_matched = sum(1 for r in razao_resultado if r["matched"])
 
         resumo = {
@@ -127,6 +131,59 @@ class ConciliacaoImpostosService:
         logger.info("=" * 50)
 
         return resposta
+
+    @staticmethod
+    def _extrair_chave_ct2(rec: Dict[str, Any]):
+        key = str(rec.get("ct2_key") or "").strip()
+        if len(key) < 22:
+            return None
+        return (key[0:4], key[4:13].strip(), key[16:22].strip())
+
+    def _agrupar_razao(self, registros: list) -> list:
+        """Aglutina lancamentos do razao sem correspondencia por (filial, nf, fornecedor)."""
+        grupos: Dict[tuple, list] = {}
+        sem_chave = []
+        for r in registros:
+            chave = self._extrair_chave_ct2(r)
+            if chave is None:
+                sem_chave.append(r)
+                continue
+            grupos.setdefault(chave, []).append(r)
+
+        agrupados = []
+        for (filial, nf, fornece), itens in grupos.items():
+            agrupados.append({
+                "filial": filial,
+                "nf": nf,
+                "cliefor": fornece,
+                "historico": itens[0].get("historico"),
+                "debito": round(sum(float(i.get("debito") or 0) for i in itens), 2),
+                "qtd_lancamentos": len(itens),
+                "ct2_key": itens[0].get("ct2_key"),
+            })
+
+        return agrupados + sem_chave
+
+    def _agrupar_sft(self, registros: list, campo_imposto: str) -> list:
+        """Aglutina notas do SFT sem correspondencia por (filial, nf, fornecedor)."""
+        grupos: Dict[tuple, list] = {}
+        for s in registros:
+            filial = str(s.get("filial") or "").strip()
+            nf = str(s.get("nf") or "").strip()
+            cliefor = str(s.get("cliefor") or "").strip()
+            grupos.setdefault((filial, nf, cliefor), []).append(s)
+
+        agrupados = []
+        for (filial, nf, cliefor), itens in grupos.items():
+            agrupados.append({
+                "filial": filial,
+                "nf": nf,
+                "cliefor": cliefor,
+                campo_imposto: round(sum(float(i.get(campo_imposto) or 0) for i in itens), 2),
+                "qtd_itens": len(itens),
+            })
+
+        return agrupados
 
     def _gerar_alertas(self, resumo: Dict[str, Any]) -> list:
         alertas = []
