@@ -59,9 +59,10 @@ def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria, db: Sess
         resultado = service.executar(request)
 
         # Validar saldo calculado contra balancete importado (se houver)
+        # Movimentos do periodo vem da ORIGEM (extrato bancario): entradas = debito, saidas = credito
         resumo = resultado.get("resumo", {})
-        movimentos_periodo = float(resumo.get("total_debitos_razao", 0) or 0) - float(
-            resumo.get("total_creditos_razao", 0) or 0
+        movimentos_periodo = float(resumo.get("total_entradas_extrato", 0) or 0) - float(
+            resumo.get("total_saidas_extrato", 0) or 0
         )
         validacao_balancete = balancete_service.validar_saldo_calculado(
             db,

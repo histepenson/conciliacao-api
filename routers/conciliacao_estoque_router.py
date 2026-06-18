@@ -57,9 +57,10 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
         resultado = service.executar(request)
 
         # Validar saldo calculado contra balancete importado (se houver)
+        # Movimentos do periodo vem da ORIGEM (Kardex): entradas = debito, saidas = credito
         resumo = resultado.get("resumo", {})
-        movimentos_periodo = float(resumo.get("total_debito_razao", 0) or 0) - float(
-            resumo.get("total_credito_razao", 0) or 0
+        movimentos_periodo = float(resumo.get("total_entradas_kardex", 0) or 0) - float(
+            resumo.get("total_saidas_kardex", 0) or 0
         )
         validacao_balancete = balancete_service.validar_saldo_calculado(
             db,

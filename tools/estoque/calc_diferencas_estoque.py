@@ -523,6 +523,18 @@ def calcular_diferencas_estoque(
         else None
     )
 
+    # Movimentos da ORIGEM (Kardex): entradas = debito, saidas = credito
+    total_entradas_kardex = (
+        df_k.loc[df_k["tipo_movimento"] == "ENTRADA", "valor"].sum()
+        if "valor" in df_k.columns and "tipo_movimento" in df_k.columns
+        else 0.0
+    )
+    total_saidas_kardex = (
+        df_k.loc[df_k["tipo_movimento"] == "SAIDA", "valor"].sum()
+        if "valor" in df_k.columns and "tipo_movimento" in df_k.columns
+        else 0.0
+    )
+
     # ===========================
     # 8. RESUMO
     # ===========================
@@ -553,6 +565,8 @@ def calcular_diferencas_estoque(
         "total_debito_razao": round(float(total_debito_razao), 2),
         "total_credito_razao": round(float(total_credito_razao), 2),
         "saldo_final_razao": round(saldo_final_razao, 2) if saldo_final_razao is not None else None,
+        "total_entradas_kardex": round(float(total_entradas_kardex), 2),
+        "total_saidas_kardex": round(float(total_saidas_kardex), 2),
         "data_processamento": datetime.now().isoformat(),
     }
 
