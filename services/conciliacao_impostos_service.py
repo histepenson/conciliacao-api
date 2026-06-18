@@ -116,6 +116,16 @@ class ConciliacaoImpostosService:
         sft_raw = request.base_sft.registros
         logger.info(f"      SFT: {len(sft_raw)} registros recebidos")
 
+        # ICMS: soma "Valor ICMS" + "Vlr ICMS Com" (icmscom) -- o ICMS proprio
+        # cobrado na nota pode vir parte em "valicm" e parte em "icmscom"
+        # (operacoes com substituicao/complemento), e a coluna escolhida pelo
+        # usuario deve refletir o total do imposto, nao so uma das parcelas.
+        if campo_imposto == "valicm":
+            sft_raw = [
+                {**r, "valicm": round(float(r.get("valicm") or 0) + float(r.get("icmscom") or 0), 2)}
+                for r in sft_raw
+            ]
+
         if tipo_mov_filtro in ("ENTRADA", "SAIDA"):
             sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r) == tipo_mov_filtro]
             logger.info(f"      SFT filtrado por Tipo Mov={tipo_mov_filtro}: {len(sft_raw)} registros")
@@ -148,6 +158,7 @@ class ConciliacaoImpostosService:
         resumo = {
             "campo_imposto": campo_imposto,
             "campo_imposto_label": COLUNAS_IMPOSTO_SFT.get(campo_imposto, campo_imposto),
+            "tipo_mov": tipo_mov_filtro,
             "coluna_razao": coluna_razao,
             "coluna_razao_label": coluna_razao_label,
             "total_lancamento_razao": total_lancamento_razao,
