@@ -127,10 +127,18 @@ def validar_saldo_calculado(
     conta_contabil_id: int | None,
     data_base: str,
     movimentos_periodo: float,
+    saldo_final_origem: float | None = None,
 ) -> dict[str, Any] | None:
     """
     Compara saldo_anterior (balancete) + movimentos_periodo (calculado a partir dos
     arquivos conciliados) com o saldo_atual do balancete importado.
+
+    Se `saldo_final_origem` for informado (saldo atual que vem no final do proprio
+    relatorio de origem, ex: extrato bancario FINR470) e ele bater com o saldo_atual
+    do balancete, a conciliacao tambem e' considerada OK -- mesmo que o calculado
+    (saldo_anterior + movimentos_periodo) nao bata. O relatorio de origem fechando
+    no mesmo saldo do balancete e' por si so um sinal valido de que o periodo
+    concilia, independente de eventuais divergencias internas dos lancamentos.
 
     Retorna None quando nao ha empresa/conta informada ou nao ha balancete
     importado para a conta+periodo (nao bloqueia o processamento, e informativo).
@@ -147,10 +155,18 @@ def validar_saldo_calculado(
     saldo_calculado = saldo_anterior + movimentos_periodo
     diferenca = saldo_atual - saldo_calculado
 
+    bate_calculado = abs(diferenca) <= 0.01
+    bate_origem = (
+        saldo_final_origem is not None
+        and abs(saldo_atual - float(saldo_final_origem)) <= 0.01
+    )
+
     return {
         "balancete_saldo_anterior": round(saldo_anterior, 2),
         "balancete_saldo_atual": round(saldo_atual, 2),
         "saldo_calculado_balancete": round(saldo_calculado, 2),
         "diferenca_balancete": round(diferenca, 2),
-        "balancete_bate": abs(diferenca) <= 0.01,
+        "saldo_final_origem": round(float(saldo_final_origem), 2) if saldo_final_origem is not None else None,
+        "balancete_bate_origem": bate_origem,
+        "balancete_bate": bate_calculado or bate_origem,
     }

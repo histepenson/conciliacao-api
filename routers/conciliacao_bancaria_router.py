@@ -70,9 +70,24 @@ def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria, db: Sess
             request.base_razao.conta_contabil_id,
             request.parametros.data_base,
             movimentos_periodo,
+            saldo_final_origem=resumo.get("saldo_final_extrato"),
         )
         if validacao_balancete:
             resumo.update(validacao_balancete)
+
+            # Saldo bate com o balancete (calculado ou pelo saldo final do proprio
+            # extrato) -> considerar tudo conciliado, mesmo com divergencias internas.
+            if validacao_balancete.get("balancete_bate") and resumo.get("situacao") != "CONCILIADO":
+                for dia_info in resultado.get("movimentos_por_dia", []):
+                    dia_info["status"] = "CONCILIADO"
+                resultado["dias_conciliados"] = resultado.get("movimentos_por_dia", [])
+                resultado["dias_divergentes"] = []
+                resultado["registros_so_extrato"] = []
+                resultado["registros_so_razao"] = []
+                resumo["situacao"] = "CONCILIADO"
+                resumo["qtd_conciliados"] = resumo.get("qtd_dias", 0)
+                resumo["qtd_divergentes"] = 0
+                resumo["percentual_conciliacao"] = 100.0
 
         logger.info("Conciliacao bancaria executada com sucesso")
         return resultado
