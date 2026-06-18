@@ -19,6 +19,8 @@ from schemas.efetivacao_schema import (
     ConciliacaoEfetivadaDetalhe,
     ListaConciliacoesEfetivadas,
     ContasEfetivadas,
+    PeriodoDisponivel,
+    PeriodosDisponiveis,
     ValidacaoEfetivacaoResponse,
     ArquivoDownloadInfo,
     StatusConciliacao,
@@ -142,6 +144,32 @@ async def listar_conciliacoes_efetivadas(
         skip=skip,
         limit=limit,
         has_more=(skip + len(items)) < total
+    )
+
+
+@router.get("/efetivadas/periodos", response_model=PeriodosDisponiveis)
+async def listar_periodos_disponiveis(
+    empresa_id: int = Query(..., description="ID da empresa"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Lista os periodos (ano/mes) que possuem ao menos uma conciliacao
+    efetivada para a empresa. Usado para popular os filtros de ano/mes
+    sem mostrar periodos sem nenhum fechamento.
+    """
+    # Validar acesso a empresa
+    if not current_user.is_admin and current_user.empresa_id != empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem acesso a esta empresa"
+        )
+
+    service = EfetivacaoService()
+    periodos = service.listar_periodos_disponiveis(db, empresa_id)
+
+    return PeriodosDisponiveis(
+        periodos=[PeriodoDisponivel(ano=ano, mes=mes) for ano, mes in periodos]
     )
 
 

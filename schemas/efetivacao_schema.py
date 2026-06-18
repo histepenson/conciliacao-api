@@ -100,6 +100,17 @@ class ContasEfetivadas(BaseModel):
     contas_efetivadas: List[int]
 
 
+class PeriodoDisponivel(BaseModel):
+    """Um periodo (ano/mes) com pelo menos uma conciliacao efetivada."""
+    ano: int
+    mes: int
+
+
+class PeriodosDisponiveis(BaseModel):
+    """Lista de periodos com conciliacoes efetivadas para uma empresa."""
+    periodos: List[PeriodoDisponivel]
+
+
 class ArquivoDownloadInfo(BaseModel):
     """Informacoes sobre arquivo disponivel para download."""
     tipo_arquivo: str

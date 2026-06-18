@@ -392,6 +392,29 @@ class EfetivacaoService:
             updated_at=conciliacao.updated_at
         )
 
+    def listar_periodos_disponiveis(
+        self,
+        db: Session,
+        empresa_id: int
+    ) -> List[Tuple[int, int]]:
+        """
+        Lista periodos (ano, mes) distintos que possuem ao menos uma
+        conciliacao efetivada para a empresa, mais recente primeiro.
+        """
+        periodos = db.query(Conciliacao.periodo).filter(
+            Conciliacao.empresa_id == empresa_id,
+            Conciliacao.status == StatusConciliacao.EFETIVADA.value
+        ).distinct().all()
+
+        resultado = set()
+        for (periodo,) in periodos:
+            try:
+                resultado.add(self._parse_periodo(periodo))
+            except (ValueError, IndexError):
+                continue
+
+        return sorted(resultado, reverse=True)
+
     def listar_contas_efetivadas(
         self,
         db: Session,
