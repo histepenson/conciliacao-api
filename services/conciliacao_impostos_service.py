@@ -28,26 +28,38 @@ COLUNAS_IMPOSTO_SFT = {
 }
 
 
-def _classificar_tipo_mov(registro: Dict[str, Any]) -> str:
+def _classificar_tipo_mov(registro: Dict[str, Any], campo_imposto: str = "") -> str:
     """
     Classifica um registro do SFT como "ENTRADA" ou "SAIDA".
 
     Usa o campo "tipo_mov" do registro se ja vier preenchido (alguns layouts
     manuais ja trazem essa coluna); caso contrario, deriva pelo primeiro
     digito do CFOP (1/2/3 = Entrada, 5/6/7 = Saida - convencao fiscal padrao).
+
+    Para ICMS (campo_imposto == "valicm"): uma entrada com "Estado Ref" == "EX"
+    (operacao com o exterior) e tratada como Saida -- o ICMS dessas notas
+    compoe o lado de saida da apuracao, mesmo a nota sendo uma entrada.
     """
     valor = str(registro.get("tipo_mov") or "").strip().upper()
     if valor in ("ENTRADA", "E", "1"):
-        return "ENTRADA"
-    if valor in ("SAIDA", "SAÍDA", "S", "2"):
-        return "SAIDA"
+        tipo = "ENTRADA"
+    elif valor in ("SAIDA", "SAÍDA", "S", "2"):
+        tipo = "SAIDA"
+    else:
+        cfop = str(registro.get("cfop") or "").strip()
+        if cfop[:1] in ("1", "2", "3"):
+            tipo = "ENTRADA"
+        elif cfop[:1] in ("5", "6", "7"):
+            tipo = "SAIDA"
+        else:
+            tipo = ""
 
-    cfop = str(registro.get("cfop") or "").strip()
-    if cfop[:1] in ("1", "2", "3"):
-        return "ENTRADA"
-    if cfop[:1] in ("5", "6", "7"):
-        return "SAIDA"
-    return ""
+    if campo_imposto == "valicm" and tipo == "ENTRADA":
+        estado = str(registro.get("estado") or "").strip().upper()
+        if estado == "EX":
+            return "SAIDA"
+
+    return tipo
 
 
 class ConciliacaoImpostosService:
@@ -127,7 +139,7 @@ class ConciliacaoImpostosService:
             ]
 
         if tipo_mov_filtro in ("ENTRADA", "SAIDA"):
-            sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r) == tipo_mov_filtro]
+            sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r, campo_imposto) == tipo_mov_filtro]
             logger.info(f"      SFT filtrado por Tipo Mov={tipo_mov_filtro}: {len(sft_raw)} registros")
 
         # ==========================
