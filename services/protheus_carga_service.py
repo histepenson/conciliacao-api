@@ -306,23 +306,37 @@ def _empresa_usa_dados_locais(db: Session, empresa_id: int) -> bool:
     return bool(empresa and empresa.dados_locais)
 
 
-def _obter_carga_local(db: Session, empresa_id: int, tipo: str, data_base: str) -> Optional[ProtheusCarga]:
+def _obter_carga_local(
+    db: Session, empresa_id: int, tipo: str, data_base: str, parametros: Optional[dict[str, Any]] = None
+) -> Optional[ProtheusCarga]:
     """
     Para empresas com `dados_locais=True`, busca a carga local concluida mais
     recente daquele tipo/periodo, ignorando parametros_hash (a carga local
-    cobre todas as contas/filtros de uma vez, ver scripts/importar_carga_manual.py).
+    cobre todas as contas/filtros de uma vez, ver scripts/importar_carga_manual.py)
+    -- EXCETO quando o pedido tras `conta_de`/`conta_ate` (CTBR140, CTBR400,
+    CTBR480, CT2RAZCT5): para esses tipos, a importacao manual grava UMA carga
+    POR CONTA (ver skill importar-csv-protheus), entao varias cargas concluidas
+    podem coexistir com o mesmo tipo/data_base -- sem filtrar por conta aqui,
+    a carga mais recente de QUALQUER conta venceria, devolvendo dados da conta
+    errada (caso real: CTBR140 da conta X devolvendo a carga da conta Y so
+    porque foi importada depois).
     """
-    return (
-        db.query(ProtheusCarga)
-        .filter(
-            ProtheusCarga.empresa_id == empresa_id,
-            ProtheusCarga.tipo_relatorio == tipo,
-            ProtheusCarga.data_base == data_base,
-            ProtheusCarga.status == "concluido",
-        )
-        .order_by(ProtheusCarga.created_at.desc())
-        .first()
+    query = db.query(ProtheusCarga).filter(
+        ProtheusCarga.empresa_id == empresa_id,
+        ProtheusCarga.tipo_relatorio == tipo,
+        ProtheusCarga.data_base == data_base,
+        ProtheusCarga.status == "concluido",
     )
+    conta_de = (parametros or {}).get("conta_de")
+    conta_ate = (parametros or {}).get("conta_ate")
+    if conta_de and conta_ate:
+        candidatas = query.order_by(ProtheusCarga.created_at.desc()).all()
+        for candidata in candidatas:
+            params_candidata = candidata.parametros_json or {}
+            if params_candidata.get("conta_de") == conta_de and params_candidata.get("conta_ate") == conta_ate:
+                return candidata
+        return None
+    return query.order_by(ProtheusCarga.created_at.desc()).first()
 
 
 def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCargaCreate) -> tuple[ProtheusCarga, bool]:
@@ -335,14 +349,17 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
     # Empresas sem acesso real ao Protheus (dados_locais=True): nunca tenta
     # chamar a API/worker - so consulta a carga importada manualmente.
     if _empresa_usa_dados_locais(db, empresa_id):
-        local = _obter_carga_local(db, empresa_id, tipo, data_base)
+        local = _obter_carga_local(db, empresa_id, tipo, data_base, parametros)
         if local and (local.total_registros or 0) > 0:
             return local, True
+        conta_de = parametros.get("conta_de")
+        conta_ate = parametros.get("conta_ate")
+        detalhe_conta = f" para a conta {conta_de}" if conta_de and conta_de == conta_ate else ""
         raise HTTPException(
             status_code=422,
             detail=(
                 f"Empresa configurada para usar dados locais, mas nao existe carga local "
-                f"concluida de {tipo} para a data-base {data_base}. Importe via "
+                f"concluida de {tipo}{detalhe_conta} para a data-base {data_base}. Importe via "
                 f"scripts/importar_carga_manual.py antes de usar esta tela."
             ),
         )

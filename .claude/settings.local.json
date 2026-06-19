@@ -219,7 +219,9 @@
       "Bash(PYTHONPATH=. python -c ' *)",
       "Bash(cd c:/conciliacao-app)",
       "Bash(grep -n \"considerarExportacao\\\\|considerar_exportacao\" \"C:/conciliacao-app/src/pages/ConciliacoesImpostos.jsx\")",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Skill(run)",
+      "Skill(run:*)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
