@@ -218,7 +218,8 @@
       "Bash(PYTHONPATH=. python /tmp/test_match.py)",
       "Bash(PYTHONPATH=. python -c ' *)",
       "Bash(cd c:/conciliacao-app)",
-      "Bash(grep -n \"considerarExportacao\\\\|considerar_exportacao\" \"C:/conciliacao-app/src/pages/ConciliacoesImpostos.jsx\")"
+      "Bash(grep -n \"considerarExportacao\\\\|considerar_exportacao\" \"C:/conciliacao-app/src/pages/ConciliacoesImpostos.jsx\")",
+      "Bash(python3 -c ' *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
