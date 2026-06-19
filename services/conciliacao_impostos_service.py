@@ -28,38 +28,40 @@ COLUNAS_IMPOSTO_SFT = {
 }
 
 
-def _classificar_tipo_mov(registro: Dict[str, Any], campo_imposto: str = "") -> str:
+def _classificar_tipo_mov(registro: Dict[str, Any]) -> str:
     """
-    Classifica um registro do SFT como "ENTRADA" ou "SAIDA".
-
-    Usa o campo "tipo_mov" do registro se ja vier preenchido (alguns layouts
-    manuais ja trazem essa coluna); caso contrario, deriva pelo primeiro
-    digito do CFOP (1/2/3 = Entrada, 5/6/7 = Saida - convencao fiscal padrao).
-
-    Para ICMS (campo_imposto == "valicm"): uma entrada com "Estado Ref" == "EX"
-    (operacao com o exterior) e tratada como Saida -- o ICMS dessas notas
-    compoe o lado de saida da apuracao, mesmo a nota sendo uma entrada.
+    Classifica um registro do SFT como "ENTRADA" ou "SAIDA" pela natureza
+    fiscal da nota (campo "tipo_mov" se preenchido, senao 1o digito do CFOP:
+    1/2/3 = Entrada, 5/6/7 = Saida). Essa classificacao nunca muda -- veja
+    _eh_entrada_tambem_saida_icms para o caso especial do ICMS.
     """
     valor = str(registro.get("tipo_mov") or "").strip().upper()
     if valor in ("ENTRADA", "E", "1"):
-        tipo = "ENTRADA"
-    elif valor in ("SAIDA", "SAÍDA", "S", "2"):
-        tipo = "SAIDA"
-    else:
-        cfop = str(registro.get("cfop") or "").strip()
-        if cfop[:1] in ("1", "2", "3"):
-            tipo = "ENTRADA"
-        elif cfop[:1] in ("5", "6", "7"):
-            tipo = "SAIDA"
-        else:
-            tipo = ""
+        return "ENTRADA"
+    if valor in ("SAIDA", "SAÍDA", "S", "2"):
+        return "SAIDA"
 
-    if campo_imposto == "valicm" and tipo == "ENTRADA":
-        estado = str(registro.get("estado") or "").strip().upper()
-        if estado == "EX":
-            return "SAIDA"
+    cfop = str(registro.get("cfop") or "").strip()
+    if cfop[:1] in ("1", "2", "3"):
+        return "ENTRADA"
+    if cfop[:1] in ("5", "6", "7"):
+        return "SAIDA"
+    return ""
 
-    return tipo
+
+def _eh_entrada_tambem_saida_icms(registro: Dict[str, Any], campo_imposto: str) -> bool:
+    """
+    Para ICMS: uma nota de Entrada com "Estado Ref" == "EX" (operacao com o
+    exterior) ou com "Vlr ICMS Com" (icmscom) > 0 continua sendo Entrada
+    (nao sai dessa lista), mas TAMBEM compoe o lado da Saida -- nesse papel
+    de Saida, soma "Valor ICMS" + "Vlr ICMS Com"; no papel de Entrada usa so
+    o "Valor ICMS" (sem somar).
+    """
+    if campo_imposto != "valicm" or _classificar_tipo_mov(registro) != "ENTRADA":
+        return False
+    estado = str(registro.get("estado") or "").strip().upper()
+    icmscom = float(registro.get("icmscom") or 0)
+    return estado == "EX" or icmscom > 0
 
 
 class ConciliacaoImpostosService:
@@ -128,19 +130,37 @@ class ConciliacaoImpostosService:
         sft_raw = request.base_sft.registros
         logger.info(f"      SFT: {len(sft_raw)} registros recebidos")
 
-        # ICMS: soma "Valor ICMS" + "Vlr ICMS Com" (icmscom) -- o ICMS proprio
-        # cobrado na nota pode vir parte em "valicm" e parte em "icmscom"
-        # (operacoes com substituicao/complemento), e a coluna escolhida pelo
-        # usuario deve refletir o total do imposto, nao so uma das parcelas.
-        if campo_imposto == "valicm":
+        def _soma_icmscom(registro: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                **registro,
+                "valicm": round(float(registro.get("valicm") or 0) + float(registro.get("icmscom") or 0), 2),
+            }
+
+        if tipo_mov_filtro == "ENTRADA":
+            # Papel de Entrada: todas as notas de Entrada (incluindo as que
+            # tambem compoem a Saida do ICMS), sempre com Valor ICMS puro,
+            # sem somar Vlr ICMS Com.
+            sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r) == "ENTRADA"]
+            logger.info(f"      SFT filtrado por Tipo Mov=ENTRADA: {len(sft_raw)} registros")
+        elif tipo_mov_filtro == "SAIDA":
+            # Papel de Saida: notas de Saida de verdade + entradas de ICMS que
+            # tambem compoem a Saida (Estado Ref EX ou Vlr ICMS Com > 0) --
+            # essas continuam aparecendo na lista de Entrada em outra execucao,
+            # nao somem dali.
             sft_raw = [
-                {**r, "valicm": round(float(r.get("valicm") or 0) + float(r.get("icmscom") or 0), 2)}
+                r for r in sft_raw
+                if _classificar_tipo_mov(r) == "SAIDA" or _eh_entrada_tambem_saida_icms(r, campo_imposto)
+            ]
+            if campo_imposto == "valicm":
+                sft_raw = [_soma_icmscom(r) for r in sft_raw]
+            logger.info(f"      SFT filtrado por Tipo Mov=SAIDA: {len(sft_raw)} registros")
+        elif campo_imposto == "valicm":
+            # Sem filtro (Todos): cada nota conta uma unica vez, com a formula
+            # do seu proprio papel (Saida soma, Entrada nao soma).
+            sft_raw = [
+                _soma_icmscom(r) if _classificar_tipo_mov(r) == "SAIDA" else r
                 for r in sft_raw
             ]
-
-        if tipo_mov_filtro in ("ENTRADA", "SAIDA"):
-            sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r, campo_imposto) == tipo_mov_filtro]
-            logger.info(f"      SFT filtrado por Tipo Mov={tipo_mov_filtro}: {len(sft_raw)} registros")
 
         # ==========================
         # 2. MATCHING via CT2_KEY
