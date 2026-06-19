@@ -26,14 +26,18 @@ def match_ct2_sft(
     1. Matching exato 1:1 por chave (filial+nf+fornece) + valor dentro da
        tolerancia.
     2. Reconciliacao por nota: para o que sobrou da fase 1 mas ainda tem
-       chave valida, agrupa por (filial, nf, fornece) e, se a soma do que
+       chave valida, agrupa por (filial, nf, fornece). Se a soma do que
        restou do CT2 bater com a soma do que restou do SFT para aquela
-       MESMA nota, marca tudo daquele grupo como casado. Cobre o caso comum
+       MESMA nota, marca tudo daquele grupo como casado (cobre o caso comum
        de o razao lancar a nota inteira em uma linha so enquanto o SFT lista
-       por item (ou vice-versa) -- sem isso, esse cenario ficava marcado
-       como divergente mesmo a nota batendo perfeitamente.
+       por item, ou vice-versa). Se a soma nao bater exatamente, tenta uma
+       cobertura greedy por valor so' dentro do proprio grupo (mesma nota) --
+       cobre o caso de a nota ter um lancamento extra sem correspondencia no
+       SFT (ex.: complemento de importacao) ao lado de um lancamento
+       principal que bate perfeitamente; o que nao for coberto cai pra fase
+       3.
     3. Fallback greedy global por valor, so para CT2 sem CT2_KEY (ou cujo
-       grupo de NF nao reconciliou na fase 2).
+       grupo de NF nao reconciliou nem parcialmente na fase 2).
 
     Returns:
         Tupla (ct2_resultado, sft_resultado), cada item original com a chave
@@ -69,6 +73,22 @@ def match_ct2_sft(
         if not filial or not nf:
             return None
         return (_norm_filial(filial), _norm_nf(nf), _norm_cliefor(cliefor))
+
+    def _cobrir_greedy(indices, recs, chave_v, budget):
+        ordered = sorted(indices, key=lambda i: -round(float(recs[i].get(chave_v) or 0), 2))
+        cobertos: set = set()
+        restante = budget
+        for i in ordered:
+            v = round(float(recs[i].get(chave_v) or 0), 2)
+            if v == 0:
+                cobertos.add(i)
+                continue
+            if restante <= 0:
+                break
+            if restante >= v - 0.01:
+                cobertos.add(i)
+                restante = round(restante - v, 2)
+        return cobertos
 
     # Indice SFT por (filial, nf, fornece) -> lista de indices
     sft_por_doc: dict = {}
@@ -132,6 +152,21 @@ def match_ct2_sft(
         if sft_idxs and abs(total_ct2 - total_sft) <= tolerancia:
             ct2_matched_set.update(ct2_idxs)
             sft_matched.update(sft_idxs)
+            continue
+
+        # Soma do grupo nao bate exatamente -- comum quando a NF tem um
+        # lancamento "extra" sem correspondencia no SFT (ex.: complemento de
+        # importacao) ao lado do lancamento principal que bate perfeitamente.
+        # Em vez de descartar o grupo inteiro pro fallback global (onde ele
+        # compete por valor com NFs de todo o dataset), tenta uma cobertura
+        # greedy so' dentro da MESMA nota primeiro -- mantem a precisao de
+        # nao misturar NFs diferentes.
+        if sft_idxs:
+            ct2_cob_grupo = _cobrir_greedy(ct2_idxs, ct2_recs, campo_valor_ct2, total_sft)
+            sft_cob_grupo = _cobrir_greedy(sft_idxs, sft_recs, campo_valor_sft, total_ct2)
+            ct2_matched_set.update(ct2_cob_grupo)
+            sft_matched.update(sft_cob_grupo)
+            sem_chave.extend(i for i in ct2_idxs if i not in ct2_cob_grupo)
         else:
             sem_chave.extend(ct2_idxs)
 
@@ -146,22 +181,6 @@ def match_ct2_sft(
         total_restante_sft = round(
             sum(float(sft_recs[i].get(campo_valor_sft) or 0) for i in sft_nao_cobertos), 2
         )
-
-        def _cobrir_greedy(indices, recs, chave_v, budget):
-            ordered = sorted(indices, key=lambda i: -round(float(recs[i].get(chave_v) or 0), 2))
-            cobertos: set = set()
-            restante = budget
-            for i in ordered:
-                v = round(float(recs[i].get(chave_v) or 0), 2)
-                if v == 0:
-                    cobertos.add(i)
-                    continue
-                if restante <= 0:
-                    break
-                if restante >= v - 0.01:
-                    cobertos.add(i)
-                    restante = round(restante - v, 2)
-            return cobertos
 
         ct2_cob = _cobrir_greedy(sem_chave, ct2_recs, campo_valor_ct2, total_restante_sft)
         sft_cob = _cobrir_greedy(sft_nao_cobertos, sft_recs, campo_valor_sft, total_restante_ct2)
