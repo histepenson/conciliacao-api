@@ -40,17 +40,29 @@ def match_ct2_sft(
         booleana "matched" adicionada.
     """
 
+    def _norm_filial(v: str) -> str:
+        return v.strip().zfill(4)
+
+    def _norm_nf(v: str) -> str:
+        return v.strip().zfill(9)
+
+    def _norm_cliefor(v: str) -> str:
+        s = str(v or "").strip()
+        return s[:6].zfill(6) if len(s) >= 6 else s.zfill(6)
+
     def _extrair_chave_ct2(rec: dict):
         key = str(rec.get("ct2_key") or "").strip()
         if len(key) < 22:
             return None
-        return (key[0:4], key[4:13], key[16:22].strip())
+        return (key[0:4], key[4:13], _norm_cliefor(key[16:22].strip()))
 
     def _chave_sft(rec: dict):
         filial = str(rec.get("filial") or "").strip()
         nf = str(rec.get("nf") or "").strip()
         cliefor = str(rec.get("cliefor") or "").strip()
-        return (filial, nf, cliefor) if filial and nf else None
+        if not filial or not nf:
+            return None
+        return (_norm_filial(filial), _norm_nf(nf), _norm_cliefor(cliefor))
 
     # Indice SFT por (filial, nf, fornece) -> lista de indices
     sft_por_doc: dict = {}

@@ -215,7 +215,8 @@
       "Bash(xargs -I{} git branch --contains {} -a)",
       "Bash(grep -rln \"balancete_saldo\\\\|saldo_anterior\\\\|acompanhamento\" services/dashboard_service.py routers/dashboard_router.py)",
       "Bash(grep -rln \"acompanhamento\" --include=\"*.jsx\" /c/conciliacao-app/src/pages)",
-      "Bash(PYTHONPATH=. python /tmp/test_match.py)"
+      "Bash(PYTHONPATH=. python /tmp/test_match.py)",
+      "Bash(PYTHONPATH=. python -c ' *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
