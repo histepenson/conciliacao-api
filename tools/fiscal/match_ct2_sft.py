@@ -54,7 +54,13 @@ def match_ct2_sft(
         key = str(rec.get("ct2_key") or "").strip()
         if len(key) < 22:
             return None
-        return (key[0:4], key[4:13], _norm_cliefor(key[16:22].strip()))
+        # O segmento da NF (posicoes 4:13) nao tem largura fixa de digitos
+        # significativos no CT2_KEY real do Protheus -- varia por tipo de
+        # documento (NF-e, CT-e, etc), vindo com espacos de preenchimento a
+        # direita em vez de zeros a esquerda (ex.: "00005439 ", "001447   ").
+        # _norm_nf (strip + zfill(9)) recanonicaliza para o mesmo formato do
+        # SFT independente da largura original.
+        return (_norm_filial(key[0:4]), _norm_nf(key[4:13]), _norm_cliefor(key[16:22]))
 
     def _chave_sft(rec: dict):
         filial = str(rec.get("filial") or "").strip()
