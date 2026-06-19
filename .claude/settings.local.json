@@ -212,7 +212,10 @@
       "Bash(rm -f ctbr140_clientes_bnp.tmp.json)",
       "Bash(APP_ENV=genix_import python scripts/importar_carga_manual.py --empresa-id 13 --tipo CTBR480 --data-base 20251231 --registros-json ctbr480_clientes.tmp.json --parametros-json '{\"conta_de\":\"112010001\",\"conta_ate\":\"112010001\"}')",
       "Bash(rm -f ctbr480_clientes.tmp.json)",
-      "Bash(xargs -I{} git branch --contains {} -a)"
+      "Bash(xargs -I{} git branch --contains {} -a)",
+      "Bash(grep -rln \"balancete_saldo\\\\|saldo_anterior\\\\|acompanhamento\" services/dashboard_service.py routers/dashboard_router.py)",
+      "Bash(grep -rln \"acompanhamento\" --include=\"*.jsx\" /c/conciliacao-app/src/pages)",
+      "Bash(PYTHONPATH=. python /tmp/test_match.py)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
