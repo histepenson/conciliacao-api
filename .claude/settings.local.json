@@ -216,7 +216,9 @@
       "Bash(grep -rln \"balancete_saldo\\\\|saldo_anterior\\\\|acompanhamento\" services/dashboard_service.py routers/dashboard_router.py)",
       "Bash(grep -rln \"acompanhamento\" --include=\"*.jsx\" /c/conciliacao-app/src/pages)",
       "Bash(PYTHONPATH=. python /tmp/test_match.py)",
-      "Bash(PYTHONPATH=. python -c ' *)"
+      "Bash(PYTHONPATH=. python -c ' *)",
+      "Bash(cd c:/conciliacao-app)",
+      "Bash(grep -n \"considerarExportacao\\\\|considerar_exportacao\" \"C:/conciliacao-app/src/pages/ConciliacoesImpostos.jsx\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

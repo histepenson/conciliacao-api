@@ -130,6 +130,14 @@ class ConciliacaoImpostosService:
         sft_raw = request.base_sft.registros
         logger.info(f"      SFT: {len(sft_raw)} registros recebidos")
 
+        considerar_exportacao = request.parametros.considerar_exportacao
+        if considerar_exportacao is False:
+            # Remove do calculo as notas com Estado Ref "EX" (movimento de
+            # exportacao) -- inclusive do papel duplo Entrada/Saida do ICMS,
+            # ja que elas deixam de existir para esta conciliacao.
+            sft_raw = [r for r in sft_raw if str(r.get("estado") or "").strip().upper() != "EX"]
+            logger.info(f"      SFT apos remover Estado Ref EX (nao considera exportacao): {len(sft_raw)} registros")
+
         def _soma_icmscom(registro: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 **registro,
@@ -191,6 +199,7 @@ class ConciliacaoImpostosService:
             "campo_imposto": campo_imposto,
             "campo_imposto_label": COLUNAS_IMPOSTO_SFT.get(campo_imposto, campo_imposto),
             "tipo_mov": tipo_mov_filtro,
+            "considerar_exportacao": considerar_exportacao,
             "coluna_razao": coluna_razao,
             "coluna_razao_label": coluna_razao_label,
             "total_lancamento_razao": total_lancamento_razao,
@@ -216,6 +225,7 @@ class ConciliacaoImpostosService:
                 f"Coluna do Razao considerada: {coluna_razao_label}",
                 f"Data-base: {request.parametros.data_base}",
                 *([f"SFT filtrado por Tipo Mov: {'Entrada' if tipo_mov_filtro == 'ENTRADA' else 'Saida'}"] if tipo_mov_filtro in ("ENTRADA", "SAIDA") else []),
+                *(["Movimento de exportacao (Estado Ref EX) NAO considerado - notas removidas do calculo"] if considerar_exportacao is False else []),
             ],
             "alertas": self._gerar_alertas(resumo),
         }

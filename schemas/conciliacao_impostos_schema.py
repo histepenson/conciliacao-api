@@ -32,6 +32,7 @@ class ParametrosConciliacaoImpostos(BaseModel):
     empresa_id: Optional[int] = None
     campo_imposto: str  # ex: valicm, valpis, valcof, valipi, icmsret, difal
     tipo_mov: Optional[str] = None  # "ENTRADA" ou "SAIDA" - filtra a coluna Tipo Mov do SFT
+    considerar_exportacao: Optional[bool] = None  # True: considera notas com Estado Ref "EX"; False: remove do calculo
 
 
 class RequestConciliacaoImpostos(BaseModel):
