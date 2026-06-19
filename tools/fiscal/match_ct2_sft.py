@@ -34,10 +34,15 @@ def match_ct2_sft(
        cobertura greedy por valor so' dentro do proprio grupo (mesma nota) --
        cobre o caso de a nota ter um lancamento extra sem correspondencia no
        SFT (ex.: complemento de importacao) ao lado de um lancamento
-       principal que bate perfeitamente; o que nao for coberto cai pra fase
-       3.
-    3. Fallback greedy global por valor, so para CT2 sem CT2_KEY (ou cujo
-       grupo de NF nao reconciliou nem parcialmente na fase 2).
+       principal que bate perfeitamente.
+
+    Propositalmente NAO ha fallback global (cruzando todo o dataset por
+    valor, sem respeitar NF): isso ja causou falsos positivos reais --
+    lancamentos sem nenhuma relacao com nota fiscal (ex.: credito de PIS
+    sobre aluguel) "casando" so' porque a soma batia por coincidencia com
+    sobras de outras notas. CT2 sem CT2_KEY (ou cujo grupo de NF nao
+    reconciliou nem parcialmente na fase 2) fica como diferenca -- mais
+    seguro deixar para revisao manual do que arriscar um match errado.
 
     Returns:
         Tupla (ct2_resultado, sft_resultado), cada item original com a chave
@@ -103,7 +108,6 @@ def match_ct2_sft(
     sft_matched: set = set()
     ct2_matched_set: set = set()
     ct2_pendente_com_chave: list = []  # tem ct2_key valida mas nao casou 1:1
-    ct2_sem_chave: list = []  # nao tem ct2_key valida
 
     for i, rec in enumerate(ct2_recs):
         valor_ct2 = round(float(rec.get(campo_valor_ct2) or 0), 2)
@@ -112,15 +116,7 @@ def match_ct2_sft(
             continue
         chave = _extrair_chave_ct2(rec)
         if chave is None:
-            # So' entra no fallback por valor (fase 3) se o historico pelo
-            # menos sugere ser uma nota fiscal ("NF" em algum lugar do
-            # texto). Lancamentos sem CT2_KEY e sem qualquer referencia a NF
-            # (ex.: credito de PIS/COFINS sobre aluguel, taxas, folha) nunca
-            # vao ter contrapartida no SFT (Livro Fiscal) -- deixar entrar no
-            # fallback global so' arrisca casar por coincidencia de valor com
-            # uma nota completamente nao relacionada.
-            if "NF" in str(rec.get("historico") or "").upper():
-                ct2_sem_chave.append(i)
+            # Sem CT2_KEY valida -- sem fallback global, fica como diferenca.
             continue
 
         matched = False
@@ -152,12 +148,13 @@ def match_ct2_sft(
         if chave:
             sft_pendente_por_chave.setdefault(chave, []).append(i)
 
-    sem_chave: list = list(ct2_sem_chave)
     for chave, ct2_idxs in ct2_por_chave.items():
         sft_idxs = sft_pendente_por_chave.get(chave, [])
+        if not sft_idxs:
+            continue  # nenhuma nota correspondente sobrou -- fica como diferenca
         total_ct2 = round(sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in ct2_idxs), 2)
         total_sft = round(sum(float(sft_recs[i].get(campo_valor_sft) or 0) for i in sft_idxs), 2)
-        if sft_idxs and abs(total_ct2 - total_sft) <= tolerancia:
+        if abs(total_ct2 - total_sft) <= tolerancia:
             ct2_matched_set.update(ct2_idxs)
             sft_matched.update(sft_idxs)
             continue
@@ -165,35 +162,13 @@ def match_ct2_sft(
         # Soma do grupo nao bate exatamente -- comum quando a NF tem um
         # lancamento "extra" sem correspondencia no SFT (ex.: complemento de
         # importacao) ao lado do lancamento principal que bate perfeitamente.
-        # Em vez de descartar o grupo inteiro pro fallback global (onde ele
-        # compete por valor com NFs de todo o dataset), tenta uma cobertura
-        # greedy so' dentro da MESMA nota primeiro -- mantem a precisao de
-        # nao misturar NFs diferentes.
-        if sft_idxs:
-            ct2_cob_grupo = _cobrir_greedy(ct2_idxs, ct2_recs, campo_valor_ct2, total_sft)
-            sft_cob_grupo = _cobrir_greedy(sft_idxs, sft_recs, campo_valor_sft, total_ct2)
-            ct2_matched_set.update(ct2_cob_grupo)
-            sft_matched.update(sft_cob_grupo)
-            sem_chave.extend(i for i in ct2_idxs if i not in ct2_cob_grupo)
-        else:
-            sem_chave.extend(ct2_idxs)
-
-    # ==========================================================
-    # Fase 3: fallback greedy global por valor (ultimo recurso)
-    # ==========================================================
-    sft_nao_cobertos = [i for i in range(len(sft_recs)) if i not in sft_matched]
-    if sem_chave and sft_nao_cobertos:
-        total_restante_ct2 = round(
-            sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in sem_chave), 2
-        )
-        total_restante_sft = round(
-            sum(float(sft_recs[i].get(campo_valor_sft) or 0) for i in sft_nao_cobertos), 2
-        )
-
-        ct2_cob = _cobrir_greedy(sem_chave, ct2_recs, campo_valor_ct2, total_restante_sft)
-        sft_cob = _cobrir_greedy(sft_nao_cobertos, sft_recs, campo_valor_sft, total_restante_ct2)
-        ct2_matched_set.update(ct2_cob)
-        sft_matched.update(sft_cob)
+        # Tenta cobertura greedy por valor so' dentro da MESMA nota -- nunca
+        # mistura com outras NFs do dataset. O que nao for coberto fica como
+        # diferenca (sem fallback global, ver docstring).
+        ct2_cob_grupo = _cobrir_greedy(ct2_idxs, ct2_recs, campo_valor_ct2, total_sft)
+        sft_cob_grupo = _cobrir_greedy(sft_idxs, sft_recs, campo_valor_sft, total_ct2)
+        ct2_matched_set.update(ct2_cob_grupo)
+        sft_matched.update(sft_cob_grupo)
 
     ct2_resultado = [
         {**rec, "matched": i in ct2_matched_set}

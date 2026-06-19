@@ -64,7 +64,12 @@ def processar_conciliacao_impostos(request: RequestConciliacaoImpostos, db: Sess
         resultado = service.executar(request)
 
         # Validar saldo calculado contra balancete importado (se houver)
-        # Movimentos do periodo vem do proprio razao da conta: debito - credito
+        # Movimentos do periodo vem do proprio razao da conta: debito - credito.
+        # Conta credora (fluxo de Saida): credito > debito deixa o movimento
+        # negativo (aumenta o saldo credor); se debito superar credito (ex.:
+        # baixas/pagamentos no periodo maiores que o que foi lancado), o
+        # movimento fica positivo normalmente -- nao ha sinal fixo, e' a
+        # propria formula debito - credito que ja reflete isso.
         resumo = resultado.get("resumo", {})
         movimentos_periodo = float(resumo.get("total_debito_razao", 0) or 0) - float(
             resumo.get("total_credito_razao", 0) or 0
