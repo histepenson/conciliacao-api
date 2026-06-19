@@ -112,7 +112,15 @@ def match_ct2_sft(
             continue
         chave = _extrair_chave_ct2(rec)
         if chave is None:
-            ct2_sem_chave.append(i)
+            # So' entra no fallback por valor (fase 3) se o historico pelo
+            # menos sugere ser uma nota fiscal ("NF" em algum lugar do
+            # texto). Lancamentos sem CT2_KEY e sem qualquer referencia a NF
+            # (ex.: credito de PIS/COFINS sobre aluguel, taxas, folha) nunca
+            # vao ter contrapartida no SFT (Livro Fiscal) -- deixar entrar no
+            # fallback global so' arrisca casar por coincidencia de valor com
+            # uma nota completamente nao relacionada.
+            if "NF" in str(rec.get("historico") or "").upper():
+                ct2_sem_chave.append(i)
             continue
 
         matched = False
