@@ -22,12 +22,17 @@ Tipo Lcto encontrados no export:
 - "Cont.Hist" (ou qualquer linha sem nenhuma conta preenchida) -> descartada
   (so texto adicional do historico, sem valor)
 
-ct2_key (CT2RAZCT5) e' resolvido em melhor esforco: tenta extrair serie/NF do
-texto do historico (padrao Protheus tipo "NF.001/000164716" ou "NF 1/151276")
-e cruza com um SFTENT ja importado (mesma empresa) para descobrir o
-fornecedor/cliente. So funciona de fato para contas de compra (ex: impostos a
-recuperar) que tem NF refletida no SFT; nas demais fica em branco e o
-matching cai no fallback por valor (tools/fiscal/match_ct2_sft.py).
+ct2_key (CT2RAZCT5) vem direto da coluna "Key" do export quando presente -
+e' o CT2_KEY real do Protheus, unico por lancamento (distingue corretamente
+fornecedores diferentes que compartilham o mesmo numero de NF, o que e'
+comum). So' quando "Key" vem vazia/curta demais o script cai no fallback:
+tenta extrair serie/NF do texto do historico (padrao Protheus tipo
+"NF.001/000164716") e cruza com um SFTENT ja importado (mesma empresa) para
+descobrir o fornecedor - e, se a NF for compartilhada por mais de um
+fornecedor no SFT, desambigua comparando o valor do lancamento contra a
+coluna de imposto correspondente (PIS/COFINS/ICMS/IPI) de cada candidato.
+Quando nada disso resolve, fica em branco e o matching cai no fallback
+global por valor (tools/fiscal/match_ct2_sft.py).
 
 Uso:
     python scripts/importar_ct2_completo.py \\
@@ -62,7 +67,19 @@ def _limpar_conta(serie: pd.Series) -> pd.Series:
     return serie.fillna("").astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
 
 
+_CAMPOS_IMPOSTO_SFT = ("valpis", "valcof", "valicm", "icmscom", "valipi", "icmsret", "difal", "valcont")
+
+
 def carregar_lookup_cliefor(db, empresa_id: int, sft_carga_id: int | None) -> dict:
+    """
+    (filial, nf) -> lista de candidatos {"cliefor", "valpis", "valcof", ...}.
+
+    Numero de NF nao e' unico entre fornecedores diferentes (duas notas "345"
+    de fornecedores distintos sao comuns) - por isso cada (filial, nf) pode
+    ter mais de um cliefor candidato. Quando houver mais de um, a escolha do
+    cliefor correto e' feita por valor em _resolver_ct2_key (nao da' pra
+    decidir aqui, sem o valor do lancamento do CT2).
+    """
     if sft_carga_id is None:
         carga = (
             db.query(ProtheusCarga)
@@ -81,13 +98,24 @@ def carregar_lookup_cliefor(db, empresa_id: int, sft_carga_id: int | None) -> di
         return {}
 
     rows = db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == sft_carga_id).all()
-    lookup = {}
+    agregados: dict = {}
     for r in rows:
         d = r.dados_json
         filial = str(d.get("filial") or "").strip().zfill(4)
         nf = str(d.get("nf") or "").strip().zfill(9)
-        lookup[(filial, nf)] = str(d.get("cliefor") or "").strip().zfill(6)
-    print(f"Lookup SFT (carga {sft_carga_id}): {len(lookup)} pares (filial, nf)")
+        cliefor = str(d.get("cliefor") or "").strip().zfill(6)
+        if not filial or not nf:
+            continue
+        soma = agregados.setdefault((filial, nf, cliefor), dict.fromkeys(_CAMPOS_IMPOSTO_SFT, 0.0))
+        for campo in _CAMPOS_IMPOSTO_SFT:
+            soma[campo] += float(d.get(campo) or 0)
+
+    lookup: dict = {}
+    for (filial, nf, cliefor), somas in agregados.items():
+        candidato = {"cliefor": cliefor, **{c: round(v, 2) for c, v in somas.items()}}
+        lookup.setdefault((filial, nf), []).append(candidato)
+    print(f"Lookup SFT (carga {sft_carga_id}): {len(lookup)} pares (filial, nf), "
+          f"{sum(1 for v in lookup.values() if len(v) > 1)} com mais de um cliefor (NF duplicada entre fornecedores)")
     return lookup
 
 
@@ -132,7 +160,31 @@ def _campos_base(row, lado: str) -> dict:
     }
 
 
-def _resolver_ct2_key(historico: str, filial_raw: str, lookup_cliefor: dict) -> str:
+def _detectar_campo_imposto(historico: str) -> str | None:
+    """
+    Identifica, pelo texto do historico do CT2, qual coluna do SFT comparar
+    para desambiguar o cliefor quando uma NF e' compartilhada por mais de um
+    fornecedor. "RET" de PIS/COFINS/CSLL/IRRF e' retencao na fonte (servicos)
+    - nao existe coluna equivalente no SFT (Livro Fiscal de mercadoria), por
+    isso fica sem campo (None) e a desambiguacao por valor nao e' possivel.
+    """
+    h = historico.upper()
+    if "DIFAL" in h:
+        return "difal"
+    if "ICMS" in h and "RET" in h:
+        return "icmsret"
+    if "ICMS" in h:
+        return "valicm"
+    if "IPI" in h:
+        return "valipi"
+    if "COFINS" in h and "RET" not in h:
+        return "valcof"
+    if "PIS" in h and "RET" not in h:
+        return "valpis"
+    return None
+
+
+def _resolver_ct2_key(historico: str, filial_raw: str, valor: float, lookup_cliefor: dict, tolerancia: float = 0.10) -> str:
     m = PAT_NF.search(historico)
     if not m:
         return ""
@@ -140,10 +192,34 @@ def _resolver_ct2_key(historico: str, filial_raw: str, lookup_cliefor: dict) -> 
     filial = str(filial_raw or "").strip().zfill(4)
     nf = nf_raw.strip().zfill(9)
     serie = serie_raw.strip().zfill(3) if serie_raw.isdigit() else serie_raw.strip().ljust(3, " ")[:3]
-    cliefor = lookup_cliefor.get((filial, nf))
-    if not cliefor:
+
+    candidatos = lookup_cliefor.get((filial, nf)) or []
+    if not candidatos:
         return ""
-    return f"{filial}{nf}{serie}{cliefor}"
+    if len(candidatos) == 1:
+        return f"{filial}{nf}{serie}{candidatos[0]['cliefor']}"
+
+    # NF compartilhada por mais de um fornecedor - so resolve se conseguir
+    # desambiguar por valor; senao, melhor deixar em branco (cai no fallback
+    # por valor do matching) do que gravar um cliefor errado.
+    campo = _detectar_campo_imposto(historico)
+    if campo is None:
+        return ""
+
+    valor_abs = abs(round(valor, 2))
+    batem = []
+    for c in candidatos:
+        soma = c.get(campo, 0.0)
+        if abs(soma - valor_abs) <= tolerancia:
+            batem.append(c)
+        elif campo == "valicm":
+            soma_com_icmscom = round(soma + c.get("icmscom", 0.0), 2)
+            if abs(soma_com_icmscom - valor_abs) <= tolerancia:
+                batem.append(c)
+
+    if len(batem) == 1:
+        return f"{filial}{nf}{serie}{batem[0]['cliefor']}"
+    return ""
 
 
 def construir_registros(df: pd.DataFrame, lookup_cliefor: dict) -> tuple[list[dict], list[dict]]:
@@ -166,6 +242,7 @@ def construir_registros(df: pd.DataFrame, lookup_cliefor: dict) -> tuple[list[di
             continue  # Cont.Hist ou linha sem conta - descarta
 
         filial_raw = row.get("Filial")
+        key_raw = str(row.get("Key") or "").strip()
 
         for lado in lados:
             base = _campos_base(row, lado)
@@ -173,7 +250,15 @@ def construir_registros(df: pd.DataFrame, lookup_cliefor: dict) -> tuple[list[di
 
             registros_ctbr480.append(dict(base))
 
-            ct2_key = _resolver_ct2_key(base["historico"], filial_raw, lookup_cliefor)
+            # CT2_KEY real do Protheus, quando o export trouxe a coluna "Key"
+            # preenchida - e' a fonte mais confiavel (distingue corretamente
+            # fornecedores diferentes que usam o mesmo numero de NF). So cai
+            # no fallback por NF+valor (historico) quando vier vazia.
+            if len(key_raw) >= 22:
+                ct2_key = key_raw
+            else:
+                valor_lancamento = base["debito"] if lado == "debito" else base["credito"]
+                ct2_key = _resolver_ct2_key(base["historico"], filial_raw, valor_lancamento, lookup_cliefor)
             registros_ct2razct5.append({
                 **base,
                 "ct2_key": ct2_key,
