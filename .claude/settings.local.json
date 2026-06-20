@@ -221,7 +221,8 @@
       "Bash(grep -n \"considerarExportacao\\\\|considerar_exportacao\" \"C:/conciliacao-app/src/pages/ConciliacoesImpostos.jsx\")",
       "Bash(python3 -c ' *)",
       "Skill(run)",
-      "Skill(run:*)"
+      "Skill(run:*)",
+      "Bash(python -m py_compile services/analise_diferencas_service.py)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

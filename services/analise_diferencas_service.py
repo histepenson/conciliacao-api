@@ -407,7 +407,7 @@ class AnaliseDiferencasService:
                         else ""
                     )
                     data_lanc = self._formatar_data(
-                        r.get(col_data_geral, "") if col_data_geral else ""
+                        r.get(col_data_geral, "") if col_data_geral else "", periodo
                     )
                     nome_cliente = codigo_nome_map.get(codigo, "")
 
@@ -476,7 +476,7 @@ class AnaliseDiferencasService:
                             continue
 
                         data_lanc = self._formatar_data(
-                            r.get(col_data_geral, "") if col_data_geral else ""
+                            r.get(col_data_geral, "") if col_data_geral else "", periodo
                         )
                         tem_corr_det, vlr_fin_det = _correspondencia_financeiro(
                             codigo, data_lanc, valor_lancamento
@@ -563,7 +563,7 @@ class AnaliseDiferencasService:
                         else ""
                     )
                     data_lanc = self._formatar_data(
-                        r.get(col_data_geral, "") if col_data_geral else ""
+                        r.get(col_data_geral, "") if col_data_geral else "", periodo
                     )
                     tem_corr_div, vlr_fin_div = _correspondencia_financeiro(
                         codigo, data_lanc, valor_lancamento
@@ -631,7 +631,7 @@ class AnaliseDiferencasService:
                         continue
 
                     data_lanc = self._formatar_data(
-                        r.get(col_data_geral, "") if col_data_geral else ""
+                        r.get(col_data_geral, "") if col_data_geral else "", periodo
                     )
                     tem_corr_sf, vlr_fin_sf = _correspondencia_financeiro(
                         codigo, data_lanc, valor_lancamento
@@ -735,7 +735,7 @@ class AnaliseDiferencasService:
 
                     # Entradas fora do periodo analisado nao tem correspondencia esperada no razao
                     # (o razao so cobre o periodo fechado). Nesses casos, nao marcar como vermelho.
-                    _data_emissao_fmt = self._formatar_data(data_emissao)
+                    _data_emissao_fmt = self._formatar_data(data_emissao, periodo)
                     if periodo and not self._data_no_periodo(_data_emissao_fmt, periodo):
                         tem_corr = None  # fora do periodo -> frontend: neutro (sem cor)
                     else:
@@ -750,7 +750,7 @@ class AnaliseDiferencasService:
                             "descricao_conta": cliente,
                             "valor": round(valor_fin_det, 2),
                             "tipo_lancamento": "",
-                            "data_lancamento": self._formatar_data(data_emissao),
+                            "data_lancamento": self._formatar_data(data_emissao, periodo),
                             "documento": documento,
                             "tipo_titulo": tp_str,
                             "historico": "",
@@ -796,7 +796,7 @@ class AnaliseDiferencasService:
                         continue
 
                     data_lanc = self._formatar_data(
-                        r.get(col_data_geral, "") if col_data_geral else ""
+                        r.get(col_data_geral, "") if col_data_geral else "", periodo
                     )
                     tem_corr_tmp, vlr_fin_tmp = _correspondencia_financeiro(
                         codigo, data_lanc, valor_lancamento
@@ -899,7 +899,7 @@ class AnaliseDiferencasService:
                         # Titulo fora do periodo analisado: nao tem como ter correspondencia
                         # esperada no razao do periodo -- deixa neutro (sem cor) em vez de
                         # avaliar/marcar como divergente.
-                        _data_emissao_rec_fmt = self._formatar_data(r.get("data_emissao", ""))
+                        _data_emissao_rec_fmt = self._formatar_data(r.get("data_emissao", ""), periodo)
                         _fora_do_periodo_rec = periodo is not None and not self._data_no_periodo(
                             _data_emissao_rec_fmt, periodo
                         )
@@ -924,7 +924,7 @@ class AnaliseDiferencasService:
                         entry: Dict[str, Any] = {
                             "descricao": str(r.get("cliente", "")).strip(),
                             "valor": valor_fin_rec,
-                            "data_emissao": self._formatar_data(r.get("data_emissao", "")),
+                            "data_emissao": self._formatar_data(r.get("data_emissao", ""), periodo),
                             "documento": "-".join(doc_parts),
                             "tipo_titulo": tp_str2,
                             "status": status_rec,
@@ -1171,8 +1171,14 @@ class AnaliseDiferencasService:
 
         return list(set(variacoes))
 
-    def _formatar_data(self, valor: object) -> str:
-        """Formata datas em dd/mm/aaaa, tratando serial do Excel e strings MM/DD/AAAA."""
+    def _formatar_data(self, valor: object, periodo: Optional[tuple] = None) -> str:
+        """Formata datas em dd/mm/aaaa, tratando serial do Excel e strings MM/DD/AAAA.
+
+        Quando `periodo` (mes, ano) e' informado, datas ambiguas (string onde
+        tanto dia quanto mes sao <=12) sao desambiguadas pela leitura
+        (MM/DD ou DD/MM) cujo mes/ano resultante bate com o periodo da
+        conciliacao -- em vez de assumir sempre o padrao americano.
+        """
         if pd.isna(valor):
             return ""
 
@@ -1202,6 +1208,19 @@ class AnaliseDiferencasService:
                         return dt.strftime("%d/%m/%Y")
                 except Exception:
                     pass
+
+            # Se sabemos o periodo da conciliacao, tenta desambiguar pelo mes/ano
+            # esperado antes de cair na ordem fixa abaixo -- evita assumir o
+            # padrao americano quando a base na verdade esta em DD/MM.
+            if periodo is not None:
+                mes_esperado, ano_esperado = periodo
+                for fmt in ("%m/%d/%Y", "%d/%m/%Y"):
+                    try:
+                        dt = datetime.strptime(valor_str, fmt)
+                    except ValueError:
+                        continue
+                    if dt.month == mes_esperado and dt.year == ano_esperado:
+                        return dt.strftime("%d/%m/%Y")
 
             # Tenta formatos explicitos em ordem de prioridade.
             # MM/DD/AAAA e tentado antes de DD/MM/AAAA para lidar com datas do razao
