@@ -27,6 +27,8 @@ RELATORIOS_SUPORTADOS = {
     "MATR900",
     "SFTENT",
     "CT2RAZCT5",
+    "SN3",
+    "SN4",
 }
 
 STATUS_REUTILIZAVEIS = {"concluido"}

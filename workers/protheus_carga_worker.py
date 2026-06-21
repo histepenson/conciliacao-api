@@ -16,6 +16,8 @@ from services.finr470_service import FinR470Service
 from services.matr900_service import Matr900Service
 from services.sft_ent_service import SftEntService
 from services.ct2raz_ct5_service import Ct2RazCt5Service
+from services.sn3_service import Sn3Service
+from services.sn4_service import Sn4Service
 from services.protheus_carga_service import marcar_concluido, marcar_erro, marcar_processando
 from services.lancamento_padrao_service import upsert_de_carga as lp_upsert_de_carga
 
@@ -130,6 +132,7 @@ async def _buscar_todas_paginas(
         "CTBR480": Ctbr480Service, "FINR470": FinR470Service,
         "MATR900": Matr900Service, "SFTENT": SftEntService,
         "CT2RAZCT5": Ct2RazCt5Service,
+        "SN3": Sn3Service, "SN4": Sn4Service,
     }
     if tipo not in services:
         raise RuntimeError(f"Relatorio {carga.tipo_relatorio} nao suportado")
@@ -195,6 +198,8 @@ async def _iterar_paginas(
         "MATR900": Matr900Service,
         "SFTENT":    SftEntService,
         "CT2RAZCT5": Ct2RazCt5Service,
+        "SN3":       Sn3Service,
+        "SN4":       Sn4Service,
     }
 
     if tipo not in services:

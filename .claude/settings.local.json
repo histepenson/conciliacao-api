@@ -225,7 +225,10 @@
       "Bash(python -m py_compile services/analise_diferencas_service.py)",
       "Bash(git log *)",
       "Bash(PowerShell -NoProfile -Command \"Get-ChildItem -Path 'C:\\\\Users\\\\histepenson\\\\Documents\\\\GENIX' -Filter '*ctbr140*' -Recurse -ErrorAction SilentlyContinue | Select-Object FullName, LastWriteTime\")",
-      "Bash(PowerShell -NoProfile -Command 'Get-ChildItem -Path '\\\\''C:\\\\Users\\\\histepenson\\\\Documents\\\\GENIX'\\\\'' -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '\\\\''*CTBR*'\\\\'' -or $_.Name -like '\\\\''*ctbr*'\\\\'' } | Select-Object FullName, LastWriteTime')"
+      "Bash(PowerShell -NoProfile -Command 'Get-ChildItem -Path '\\\\''C:\\\\Users\\\\histepenson\\\\Documents\\\\GENIX'\\\\'' -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '\\\\''*CTBR*'\\\\'' -or $_.Name -like '\\\\''*ctbr*'\\\\'' } | Select-Object FullName, LastWriteTime')",
+      "Bash(mkdir -p Sn4ParamsDialog)",
+      "Bash(sed -e s/SN3/SN4/g -e s/sn3_params/sn4_params/g -e s/Sn3ParamsDialog/Sn4ParamsDialog/g -e 's/Baixas de Ativo Fixo/Lancamentos de Ativo Fixo/g' -e 's/baixas de ativo fixo/lancamentos de ativo fixo/g' Sn3ParamsDialog/Sn3ParamsDialog.jsx)",
+      "Bash(npx vite *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
