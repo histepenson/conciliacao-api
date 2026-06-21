@@ -39,14 +39,10 @@ class ConciliacaoService:
         if not request.base_contabil_filtrada or not request.base_contabil_filtrada.registros:
             return False, "Base contabil filtrada vazia"
 
-        # base_contabil_geral pode vir vazia quando ctbr480_params esta preenchido
-        # (busca automatica no Protheus -- resolvida em executar_async)
-        tem_registros = bool(request.base_contabil_geral and request.base_contabil_geral.registros)
-        tem_params = bool(
-            request.base_contabil_geral and request.base_contabil_geral.ctbr480_params
-        )
-        if not tem_registros and not tem_params:
-            return False, "Base geral da contabilidade vazia"
+        # base_contabil_geral pode vir vazia (conta sem lancamentos no periodo --
+        # nesse caso ainda e' possivel fazer o comparativo de saldos, so' fica
+        # sem a analise detalhada por linha de razao) ou quando ctbr480_params
+        # esta preenchido (busca automatica no Protheus, resolvida em executar_async).
 
         if not request.parametros or not request.parametros.get("data_base"):
             return False, "Data-base nao informada"
