@@ -228,7 +228,13 @@
       "Bash(PowerShell -NoProfile -Command 'Get-ChildItem -Path '\\\\''C:\\\\Users\\\\histepenson\\\\Documents\\\\GENIX'\\\\'' -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '\\\\''*CTBR*'\\\\'' -or $_.Name -like '\\\\''*ctbr*'\\\\'' } | Select-Object FullName, LastWriteTime')",
       "Bash(mkdir -p Sn4ParamsDialog)",
       "Bash(sed -e s/SN3/SN4/g -e s/sn3_params/sn4_params/g -e s/Sn3ParamsDialog/Sn4ParamsDialog/g -e 's/Baixas de Ativo Fixo/Lancamentos de Ativo Fixo/g' -e 's/baixas de ativo fixo/lancamentos de ativo fixo/g' Sn3ParamsDialog/Sn3ParamsDialog.jsx)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(find /c/Users/histepenson/Documents -iname \"*kardex*\" -newermt \"2026-06-15\")",
+      "Bash(find /c/Users/histepenson/Documents -iname \"*matr900*\" -newermt \"2026-06-15\")",
+      "Bash(xargs -I{} sh -c 'echo \"{}\"; stat -c \"%y\" \"{}\"')",
+      "Bash(sed -i 's/CARGA_RAZAO = 188.*/CARGA_RAZAO = 189  # conta 113010002 \\(maior\\)/' scripts/_debug_estoque.py)",
+      "Bash(sed -i 's/conta_contabil=\"113010001\"/conta_contabil=\"113010002\"/' scripts/_debug_estoque.py)",
+      "Bash(timeout 60 python -u scripts/_debug_estoque.py)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

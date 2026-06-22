@@ -14,6 +14,7 @@ Regras:
 
 import pandas as pd
 import logging
+import time
 from typing import Dict, Any
 from datetime import datetime
 import re
@@ -21,6 +22,15 @@ import re
 logger = logging.getLogger(__name__)
 
 THRESHOLD_CONCILIACAO = 0.01
+
+# Orcamento de tempo total (todas as chamadas somadas) para a decomposicao
+# exata por subset-sum em _selecionar_registros_para_total -- e' um recurso
+# de UI (mostrar quais lancamentos compoem uma diferenca), nao essencial pro
+# resultado da conciliacao (o chamador ja cai de volta pra lista completa de
+# registros quando a funcao retorna vazio). Sem esse teto, um Kardex grande
+# (milhares de movimentos, muitos buckets data+cf divergentes) pode disparar
+# a funcao centenas/milhares de vezes e travar a requisicao por minutos.
+_DECOMP_DEADLINE = {"value": 0.0}
 
 # Codigos de movimento que representam entradas (debito no razao)
 CODIGOS_ENTRADA = {
@@ -105,6 +115,9 @@ def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list
     if alvo_cent <= 0 or not registros:
         return []
 
+    if time.monotonic() > _DECOMP_DEADLINE["value"]:
+        return []
+
     itens = []
     for idx, reg in enumerate(registros):
         v_cent = int(round(abs(float(reg.get("valor", 0) or 0)) * 100))
@@ -114,31 +127,69 @@ def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list
     if not itens:
         return []
 
-    estados = {0: []}  # soma_cent -> lista de indices
-    max_estados = 60000
+    # Bucket grande demais: a busca exata por subconjunto (DP) fica cara
+    # (O(len(itens) * estados)) sem trazer beneficio proporcional -- o
+    # chamador ja cai de volta para a lista completa de registros quando
+    # isso retorna vazio (ver "composicao if composicao else regs_chave").
+    if len(itens) > 500:
+        return []
+
+    # soma_cent -> (idx_do_item_usado, soma_anterior) -- back-pointer em vez
+    # de guardar a lista completa de indices em cada estado. A versao antiga
+    # fazia "idxs + [idx]" (copia de lista, O(tamanho)) a cada transicao; com
+    # ate max_estados*len(itens) transicoes, isso explodia para buckets de
+    # centenas de itens. Guardar so' o passo anterior e' O(1) por transicao;
+    # a lista de indices so' e' reconstruida UMA vez, no final, para o
+    # candidato escolhido.
+    estados: dict[int, Any] = {0: None}
+    # 60000 estados tornava a poda (sort + rebuild) cara o suficiente para
+    # travar com buckets de centenas de itens (cada poda chama a key function
+    # uma vez por estado -- com poda disparando em quase toda iteracao do
+    # loop principal, o custo total explode). 2000 ja' cobre com folga os
+    # casos reais (poucas dezenas/centenas de lancamentos por bucket).
+    max_estados = 2000
 
     for idx, v_cent in itens:
-        novos = dict(estados)
-        for soma, idxs in estados.items():
+        # Checagem por iteracao (nao so' na entrada da funcao): uma unica
+        # chamada com itens proximos do limite (500) e muitos estados pode
+        # estourar o orcamento por conta propria antes de outra chamada
+        # nova ser bloqueada pela checagem inicial.
+        if time.monotonic() > _DECOMP_DEADLINE["value"]:
+            return []
+
+        # Itera sobre um snapshot das somas atuais e insere as novas somas
+        # diretamente em "estados" -- evita copiar o dict inteiro a cada
+        # item processado.
+        for soma in list(estados.keys()):
             ns = soma + v_cent
             if ns > alvo_cent + 1:
                 continue
-            if ns not in novos:
-                novos[ns] = idxs + [idx]
-        estados = novos
+            if ns not in estados:
+                estados[ns] = (idx, soma)
 
         if len(estados) > max_estados:
             # poda por proximidade ao alvo
             chaves = sorted(estados.keys(), key=lambda s: abs(alvo_cent - s))[: max_estados // 2]
             estados = {k: estados[k] for k in chaves}
 
+    def _reconstruir(soma_final: int) -> list:
+        idxs = []
+        soma = soma_final
+        passo = estados.get(soma)
+        while passo is not None:
+            idx_usado, soma_anterior = passo
+            idxs.append(idx_usado)
+            soma = soma_anterior
+            passo = estados.get(soma)
+        return idxs
+
     for candidato in (alvo_cent, alvo_cent - 1, alvo_cent + 1):
         if candidato in estados:
-            return [registros[i] for i in estados[candidato]]
+            return [registros[i] for i in _reconstruir(candidato)]
 
     # fallback: melhor aproximacao
     melhor = min(estados.keys(), key=lambda s: abs(alvo_cent - s))
-    return [registros[i] for i in estados[melhor]]
+    return [registros[i] for i in _reconstruir(melhor)]
 
 
 def calcular_diferencas_estoque(
@@ -170,6 +221,8 @@ def calcular_diferencas_estoque(
         - 'registros_so_razao': Registros individuais do Razao sem match no Kardex
     """
     logger.info("[CALC DIFERENCAS ESTOQUE] Iniciando calculo")
+
+    _DECOMP_DEADLINE["value"] = time.monotonic() + 5.0
 
     df_k = df_kardex.copy()
     df_r = df_razao.copy()
@@ -272,7 +325,10 @@ def calcular_diferencas_estoque(
     def _normalizar_razao_para_matching(df_razao_grupo, is_entrada):
         """Normaliza registros do Razao para formato comparavel com Kardex."""
         registros = []
-        for idx, (_, reg) in enumerate(df_razao_grupo.iterrows()):
+        # to_dict("records") em vez de iterrows() -- iterrows() reconstroi uma
+        # Series por linha (custoso em DataFrame com colunas de tipos mistos),
+        # e esse grupo pode ter milhares de linhas num Kardex/Razao grandes.
+        for idx, reg in enumerate(df_razao_grupo.to_dict("records")):
             valor = float(reg.get("debito", 0)) if is_entrada else float(reg.get("credito", 0))
             data_mov = reg.get("data_movimento", "") or reg.get("data_lancamento", "")
             cm = _normalizar_codigo_movimento(reg.get("codigo_movimento", ""))
@@ -293,7 +349,7 @@ def calcular_diferencas_estoque(
     def _normalizar_kardex_para_matching(df_kardex_grupo):
         """Normaliza registros do Kardex para formato comparavel."""
         registros = []
-        for idx, (_, reg) in enumerate(df_kardex_grupo.iterrows()):
+        for idx, reg in enumerate(df_kardex_grupo.to_dict("records")):
             cm = _normalizar_codigo_movimento(reg.get("codigo_movimento", ""))
             registros.append({
                 "_idx": idx,
