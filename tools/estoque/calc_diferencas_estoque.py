@@ -21,7 +21,7 @@ import re
 
 logger = logging.getLogger(__name__)
 
-THRESHOLD_CONCILIACAO = 0.01
+THRESHOLD_CONCILIACAO = 1.0
 
 # Orcamento de tempo total (todas as chamadas somadas) para a decomposicao
 # exata por subset-sum em _selecionar_registros_para_total -- e' um recurso
