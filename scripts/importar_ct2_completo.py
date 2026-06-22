@@ -248,17 +248,21 @@ def construir_registros(df: pd.DataFrame, lookup_cliefor: dict) -> tuple[list[di
             base = _campos_base(row, lado)
             ct2_lp = base.pop("_ct2_lp")
 
-            registros_ctbr480.append(dict(base))
-
             # CT2_KEY real do Protheus, quando o export trouxe a coluna "Key"
             # preenchida - e' a fonte mais confiavel (distingue corretamente
             # fornecedores diferentes que usam o mesmo numero de NF). So cai
             # no fallback por NF+valor (historico) quando vier vazia.
+            # Gravado tambem em registros_ctbr480 (mesmo padrao do
+            # CT2RAZCT5) para viabilizar matching por chave exata em telas
+            # que usam CTBR480/CTBR400 (ex.: conciliacao de estoque).
             if len(key_raw) >= 22:
                 ct2_key = key_raw
             else:
                 valor_lancamento = base["debito"] if lado == "debito" else base["credito"]
                 ct2_key = _resolver_ct2_key(base["historico"], filial_raw, valor_lancamento, lookup_cliefor)
+
+            registros_ctbr480.append({**base, "ct2_key": ct2_key})
+
             registros_ct2razct5.append({
                 **base,
                 "ct2_key": ct2_key,

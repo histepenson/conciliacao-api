@@ -342,6 +342,7 @@ def calcular_diferencas_estoque(
                 "debito": round(float(reg.get("debito", 0)), 2),
                 "credito": round(float(reg.get("credito", 0)), 2),
                 "codigo_movimento": cm,
+                "ct2_key": str(reg.get("ct2_key", "") or "").strip(),
                 "_origem": "razao",
             })
         return registros
@@ -360,6 +361,7 @@ def calcular_diferencas_estoque(
                 "descricao": str(reg.get("descricao", "")),
                 "codigo_produto": str(reg.get("codigo_produto", "")),
                 "codigo_movimento": cm,
+                "ct2_key": str(reg.get("ct2_key", "") or "").strip(),
                 "_origem": "kardex",
             })
         return registros
@@ -393,13 +395,57 @@ def calcular_diferencas_estoque(
     def _skip_cf_match(codigo_movimento):
         return codigo_movimento in {"CPV", "DEV"}
 
+    def _matching_por_ct2_key(regs_kardex, regs_razao):
+        """
+        Passada 0 (antes do matching agregado por data+cf): casa Kardex x
+        Razao pelo ct2_key -- mesma chave que o Protheus grava na CT2 ao
+        gerar o lancamento contabil a partir do movimento de estoque
+        (Codigo+ARM+Data+Documento no Kardex; CT2_KEY nativo no Razao).
+        So' consome o par quando chave E valor batem (tolerancia de R$ 0,01)
+        -- sem fallback global, mesmo principio de tools/fiscal/match_ct2_sft.py
+        (evita falso positivo por colisao de chave). O que nao casar aqui
+        (sem ct2_key de um dos lados, ou chave sem par) segue no fluxo
+        existente de matching por (data, cf).
+        """
+        por_chave_razao: dict = {}
+        for idx, reg in enumerate(regs_razao):
+            chave = reg.get("ct2_key") or ""
+            if chave:
+                por_chave_razao.setdefault(chave, []).append(idx)
+
+        usados_kardex = set()
+        usados_razao = set()
+        for idx_k, reg_k in enumerate(regs_kardex):
+            chave = reg_k.get("ct2_key") or ""
+            if not chave:
+                continue
+            candidatos = [i for i in por_chave_razao.get(chave, []) if i not in usados_razao]
+            if not candidatos:
+                continue
+            valor_k = float(reg_k.get("valor", 0) or 0)
+            for idx_r in candidatos:
+                valor_r = float(regs_razao[idx_r].get("valor", 0) or 0)
+                if abs(valor_k - valor_r) <= THRESHOLD_CONCILIACAO:
+                    usados_kardex.add(idx_k)
+                    usados_razao.add(idx_r)
+                    break
+
+        if not usados_kardex and not usados_razao:
+            return regs_kardex, regs_razao
+
+        regs_kardex_restantes = [r for i, r in enumerate(regs_kardex) if i not in usados_kardex]
+        regs_razao_restantes = [r for i, r in enumerate(regs_razao) if i not in usados_razao]
+        return regs_kardex_restantes, regs_razao_restantes
+
     def _matching_registros(regs_kardex, regs_razao, match_cf=True):
         """
         Matching aglutinado:
+        - passada 0: chave exata por ct2_key (quando disponivel)
         - por (data, cf_normalizado) quando match_cf=True
         - por (data) quando match_cf=False
         Compara soma de valor por chave.
         """
+        regs_kardex, regs_razao = _matching_por_ct2_key(regs_kardex, regs_razao)
         k_ag = _agrupar_para_matching(regs_kardex, usar_cf=match_cf)
         r_ag = _agrupar_para_matching(regs_razao, usar_cf=match_cf)
 

@@ -60,6 +60,7 @@ CPV_CFOPS = {
     "5401", "5402", "5405", "5551", "5556", "5910", "5949",
     "6101", "6102", "6103", "6104", "6105", "6106", "6107", "6109", "6110", "6910", "6949",
     "6401", "6402", "6405", "6551", "6556",
+    "7101",
 }
 
 
@@ -111,6 +112,15 @@ def _cf_lookup_key(cf_texto: str) -> str:
         return digitos[:4]
 
     return digitos
+
+
+def _data_br_para_dtos(data_br: str) -> str:
+    """Converte DD/MM/YYYY (formato ja' normalizado por formatar_data) para YYYYMMDD."""
+    partes = str(data_br or "").strip().split("/")
+    if len(partes) != 3:
+        return ""
+    dia, mes, ano = partes
+    return f"{ano}{mes.zfill(2)}{dia.zfill(2)}"
 
 
 def classificar_movimento_kardex(cf: str) -> tuple:
@@ -171,6 +181,9 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
     - valor: Valor do custo (Entradas Custo Total ou Saidas Custo Total)
     - documento_numero: Numero do documento
     - descricao: Descricao do item
+    - armazem: Armazem (ARM)
+    - ct2_key: Codigo + Armazem + Data (AAAAMMDD) + Documento Numero -- mesma
+      chave gravada pelo Protheus na CT2 ao lancar o movimento contabil
     """
     logger.info("[KARDEX] Iniciando normalizacao")
 
@@ -201,6 +214,7 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
     col_documento = obter_coluna(df, ["documento_numero", "documento", "doc_numero"])
     col_descricao = obter_coluna(df, ["descricao", "desc"])
     col_codigo = obter_coluna(df, ["codigo", "cod"])
+    col_arm = obter_coluna(df, ["arm", "armazem"])
 
     logger.info(f"[KARDEX] Coluna DATA: {col_data}")
     logger.info(f"[KARDEX] Coluna CF: {col_cf}")
@@ -250,6 +264,11 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
     else:
         df_norm["codigo_produto"] = ""
 
+    if col_arm:
+        df_norm["armazem"] = df[col_arm].astype(str).str.strip()
+    else:
+        df_norm["armazem"] = ""
+
     # Classificar cada linha
     classificacao = df_norm["cf"].apply(classificar_movimento_kardex)
     df_norm["codigo_movimento"] = classificacao.apply(lambda x: x[0])
@@ -284,6 +303,16 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
         "[KARDEX] Total DEV (qtd=%s, valor=%s)",
         int((df_norm["codigo_movimento"] == "DEV").sum()),
         round(float(df_norm.loc[df_norm["codigo_movimento"] == "DEV", "valor"].sum()), 2),
+    )
+
+    # ct2_key: mesma chave que o Protheus grava na CT2 ao gerar o lancamento
+    # contabil a partir do movimento de estoque -- permite matching exato
+    # contra o ct2_key do Razao (CTBR400), em vez de so' (data, cf) agregado.
+    df_norm["ct2_key"] = (
+        df_norm["codigo_produto"].astype(str).str.strip()
+        + df_norm["armazem"].astype(str).str.strip()
+        + df_norm["data"].apply(_data_br_para_dtos)
+        + df_norm["documento_numero"].astype(str).str.strip()
     )
 
     return df_norm
