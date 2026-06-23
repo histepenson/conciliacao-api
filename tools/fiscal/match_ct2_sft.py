@@ -230,6 +230,20 @@ def match_ct2_sft(
         grupo = (_norm_filial(filial_ct2), nf) if filial_ct2 else nf
         ct2_sem_chave_por_grupo.setdefault(grupo, []).append(i)
 
+    def _reconciliar_subgrupo(ct2_idxs_sub, sft_idxs_sub):
+        """Soma (fase 2) + cobertura greedy entre um subconjunto de CT2 e SFT
+        ja' confirmados do MESMO fornecedor -- preenche os sets de matched."""
+        total_ct2 = round(sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in ct2_idxs_sub), 2)
+        total_sft = round(sum(float(sft_recs[i].get(campo_valor_sft) or 0) for i in sft_idxs_sub), 2)
+        if abs(total_ct2 - total_sft) <= tolerancia:
+            ct2_matched_set.update(ct2_idxs_sub)
+            sft_matched.update(sft_idxs_sub)
+            return
+        ct2_cob = _cobrir_greedy(ct2_idxs_sub, ct2_recs, campo_valor_ct2, total_sft)
+        sft_cob = _cobrir_greedy(sft_idxs_sub, sft_recs, campo_valor_sft, total_ct2)
+        ct2_matched_set.update(ct2_cob)
+        sft_matched.update(sft_cob)
+
     for grupo, ct2_idxs in ct2_sem_chave_por_grupo.items():
         if isinstance(grupo, tuple):
             candidatos = sft_pendente_por_filial_nf.get(grupo, [])
@@ -239,35 +253,39 @@ def match_ct2_sft(
             continue  # nenhuma nota com essa (filial+)NF sobrou no SFT -- fica como diferenca
 
         fornecedores = {str(sft_recs[idx].get("cliefor") or "").strip() for idx in candidatos}
-        if len(fornecedores) > 1:
-            # NF repetida entre fornecedores diferentes -- tenta desambiguar
-            # pela data (CT2_DATA do razao == FT_ENTRADA da nota no SFT).
-            datas_ct2 = {str(ct2_recs[i].get("data") or "").strip() for i in ct2_idxs}
-            datas_ct2.discard("")
-            candidatos_data = [idx for idx in candidatos if str(sft_recs[idx].get("entrada") or "").strip() in datas_ct2]
-            fornecedores_data = {str(sft_recs[idx].get("cliefor") or "").strip() for idx in candidatos_data}
-            if len(fornecedores_data) == 1:
-                candidatos = candidatos_data
-            else:
-                # Ainda ambiguo mesmo com a data -- sem CT2_KEY nao ha como
-                # confirmar de qual fornecedor e'. Fica como diferenca.
-                continue
-
-        total_ct2 = round(sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in ct2_idxs), 2)
-        total_sft = round(sum(float(sft_recs[idx].get(campo_valor_sft) or 0) for idx in candidatos), 2)
-        if abs(total_ct2 - total_sft) <= tolerancia:
-            # Cobre tanto o 1:1 quanto a NF dividida em varios itens no SFT
-            # (ou varios lancamentos do CT2 sem chave para a mesma NF).
-            ct2_matched_set.update(ct2_idxs)
-            sft_matched.update(candidatos)
+        if len(fornecedores) <= 1:
+            # Fornecedor unico no grupo inteiro -- caso simples, soma tudo de uma vez.
+            _reconciliar_subgrupo(ct2_idxs, candidatos)
             continue
 
-        # Soma nao bate exatamente -- tenta cobertura greedy so' dentro da
-        # mesma NF, mesma logica da fase 2.
-        ct2_cob = _cobrir_greedy(ct2_idxs, ct2_recs, campo_valor_ct2, total_sft)
-        sft_cob = _cobrir_greedy(candidatos, sft_recs, campo_valor_sft, total_ct2)
-        ct2_matched_set.update(ct2_cob)
-        sft_matched.update(sft_cob)
+        # Fornecedor ambiguo no grupo inteiro -- comum quando o numero do
+        # NF/CT-e (extraido do historico, sem filial/fornecedor) coincide
+        # entre faturas DIFERENTES de fornecedores diferentes. Divide o
+        # grupo por data (CT2_DATA do razao == FT_ENTRADA do SFT) e tenta
+        # resolver cada data separadamente -- cada lancamento do CT2 so'
+        # disputa contra as notas do SFT daquele MESMO dia.
+        ct2_por_data: dict = {}
+        for i in ct2_idxs:
+            data = str(ct2_recs[i].get("data") or "").strip()
+            if data:
+                ct2_por_data.setdefault(data, []).append(i)
+
+        sft_por_data: dict = {}
+        for idx in candidatos:
+            data = str(sft_recs[idx].get("entrada") or "").strip()
+            if data:
+                sft_por_data.setdefault(data, []).append(idx)
+
+        for data, ct2_idxs_data in ct2_por_data.items():
+            sft_idxs_data = sft_por_data.get(data, [])
+            if not sft_idxs_data:
+                continue  # nenhuma nota nesse dia -- fica como diferenca
+            fornecedores_data = {str(sft_recs[idx].get("cliefor") or "").strip() for idx in sft_idxs_data}
+            if len(fornecedores_data) != 1:
+                # Ainda ambiguo mesmo dentro do mesmo dia -- sem CT2_KEY nao
+                # ha como confirmar de qual fornecedor e'. Fica como diferenca.
+                continue
+            _reconciliar_subgrupo(ct2_idxs_data, sft_idxs_data)
 
     ct2_resultado = [
         {**rec, "matched": i in ct2_matched_set}
