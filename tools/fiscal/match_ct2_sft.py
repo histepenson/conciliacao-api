@@ -43,16 +43,20 @@ def match_ct2_sft(
        SFT (ex.: complemento de importacao) ao lado de um lancamento
        principal que bate perfeitamente.
     3. Fallback por historico (so' para CT2 SEM CT2_KEY): extrai o numero da
-       NF do texto do historico (ex.: "PIS CREDITADO NFE 61" -> NF 61) e
-       agrupa pelas notas do SFT que ainda sobraram com essa MESMA NF -- por
-       (filial, NF) quando o CT2 tiver o campo "filial" (chave mais forte),
-       ou so' por NF quando nao tiver (cargas antigas, antes do campo
-       existir no CT2RAZCT5). Sem fornecedor no CT2 pra validar a chave
-       inteira, so' segue se todas as notas do SFT daquele grupo forem do
-       MESMO fornecedor (senao e' ambiguo -- NF repetida entre fornecedores
-       diferentes -- e fica como diferenca). Com fornecedor unico, soma o
-       grupo igual a fase 2 (cobre NF dividida em varios itens no SFT) e,
-       se a soma nao bater, tenta cobertura greedy dentro do mesmo grupo.
+       NF/CT-e do texto do historico (ex.: "PIS CREDITADO NFE 61" -> 61,
+       "COFINS AQUISICAO FRETE CTE 124" -> 124) e agrupa pelas notas do SFT
+       que ainda sobraram com esse MESMO numero -- por (filial, NF) quando
+       o CT2 tiver o campo "filial" (chave mais forte), ou so' por NF
+       quando nao tiver (cargas antigas, antes do campo existir no
+       CT2RAZCT5). Sem fornecedor no CT2 pra validar a chave inteira, so'
+       segue se todas as notas do SFT daquele grupo forem do MESMO
+       fornecedor; se houver mais de um, tenta desambiguar comparando
+       CT2_DATA (campo "data" do razao) com FT_ENTRADA (campo "entrada" do
+       SFT) -- se isso isolar um unico fornecedor, segue com ele, senao
+       continua ambiguo e fica como diferenca. Com fornecedor unico
+       confirmado, soma o grupo igual a fase 2 (cobre NF dividida em varios
+       itens no SFT) e, se a soma nao bater, tenta cobertura greedy dentro
+       do mesmo grupo.
 
     Propositalmente NAO ha fallback global (cruzando todo o dataset por
     valor, sem respeitar NF): isso ja causou falsos positivos reais --
@@ -236,9 +240,18 @@ def match_ct2_sft(
 
         fornecedores = {str(sft_recs[idx].get("cliefor") or "").strip() for idx in candidatos}
         if len(fornecedores) > 1:
-            # NF repetida entre fornecedores diferentes -- sem CT2_KEY nao ha
-            # como confirmar de qual fornecedor e', ambiguo. Fica como diferenca.
-            continue
+            # NF repetida entre fornecedores diferentes -- tenta desambiguar
+            # pela data (CT2_DATA do razao == FT_ENTRADA da nota no SFT).
+            datas_ct2 = {str(ct2_recs[i].get("data") or "").strip() for i in ct2_idxs}
+            datas_ct2.discard("")
+            candidatos_data = [idx for idx in candidatos if str(sft_recs[idx].get("entrada") or "").strip() in datas_ct2]
+            fornecedores_data = {str(sft_recs[idx].get("cliefor") or "").strip() for idx in candidatos_data}
+            if len(fornecedores_data) == 1:
+                candidatos = candidatos_data
+            else:
+                # Ainda ambiguo mesmo com a data -- sem CT2_KEY nao ha como
+                # confirmar de qual fornecedor e'. Fica como diferenca.
+                continue
 
         total_ct2 = round(sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in ct2_idxs), 2)
         total_sft = round(sum(float(sft_recs[idx].get(campo_valor_sft) or 0) for idx in candidatos), 2)
