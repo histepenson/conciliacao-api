@@ -1,16 +1,18 @@
 """
 NF-e Service — parse, persistência, De-Para automático e alertas.
 """
+import re
 import xml.etree.ElementTree as ET
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from models.certificado_digital import CertificadoDigital
 from models.estoque_alerta import EstoqueAlerta, TipoAlerta
 from models.nfe import NfeEntrada, NfeEntradaItem, NfeSaida, NfeSaidaItem, StatusNfe
-from models.produto_fornecedor import ProdutoFornecedor
+from models.produto_fornecedor import OperacaoConversao, ProdutoFornecedor
 from services import task_service
 from services.certificado_service import carregar_pfx
 from services.sefaz_service import buscar_nfes_sefaz
@@ -252,6 +254,65 @@ def _salvar_nfe_saida(db: Session, empresa_id: int, cnpj_empresa: str, dados: di
 
 
 # ─────────────────────────────────────────
+# IMPORTAÇÃO MANUAL DE XML (NF DE SAÍDA)
+# ─────────────────────────────────────────
+
+def importar_nfe_saida_xml(db: Session, empresa_id: int, xml_bytes: bytes) -> dict:
+    """
+    Importa uma NF de saída a partir do XML completo (nfeProc) gerado pela
+    própria empresa na emissão. A SEFAZ (DistDFe) não devolve o XML completo
+    de notas emitidas pela empresa, apenas o resumo — por isso a importação
+    de saída é feita via upload do XML já existente no emissor.
+    """
+    from models.empresa import Empresa
+
+    try:
+        xml_str = xml_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        xml_str = xml_bytes.decode("latin-1")
+
+    dados = _parse_nfe_xml(xml_str)
+    if not dados:
+        return {"status": "erro", "mensagem": "XML invalido ou nao reconhecido"}
+
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    cnpj_empresa = re.sub(r"\D", "", empresa.cnpj) if empresa and empresa.cnpj else None
+
+    if cnpj_empresa and dados["cnpj_emitente"] != cnpj_empresa:
+        return {
+            "status": "erro",
+            "numero_nf": dados["numero_nf"],
+            "mensagem": f"NF {dados['numero_nf']}: emitente ({dados['cnpj_emitente']}) "
+                        f"nao corresponde ao CNPJ da empresa ({cnpj_empresa})",
+        }
+
+    existe = db.query(NfeSaida).filter(
+        NfeSaida.empresa_id == empresa_id,
+        NfeSaida.chave_acesso == dados["chave_acesso"],
+    ).first()
+    if existe:
+        return {"status": "duplicada", "numero_nf": dados["numero_nf"], "chave_acesso": dados["chave_acesso"]}
+
+    _, pendentes = _salvar_nfe_saida(db, empresa_id, cnpj_empresa or dados["cnpj_emitente"], dados)
+
+    if pendentes > 0:
+        db.add(EstoqueAlerta(
+            empresa_id=empresa_id,
+            tipo=TipoAlerta.sem_depara,
+            referencia_id=None,
+            mensagem=f"NF saida {dados['numero_nf']}: {pendentes} item(ns) sem De-Para",
+        ))
+
+    db.commit()
+    return {
+        "status": "importada",
+        "numero_nf": dados["numero_nf"],
+        "chave_acesso": dados["chave_acesso"],
+        "pendentes_vinculo": pendentes,
+    }
+
+
+# ─────────────────────────────────────────
 # IMPORTAÇÃO ASSÍNCRONA (BackgroundTask)
 # ─────────────────────────────────────────
 
@@ -259,8 +320,8 @@ def importar_nfes_background(
     db: Session,
     empresa_id: int,
     cnpj_certificado: str,
-    data_inicio: date,
-    data_fim: date,
+    data_inicio: Optional[date],
+    data_fim: Optional[date],
     task_id: str,
 ) -> None:
     """
@@ -283,7 +344,16 @@ def importar_nfes_background(
         total_pendentes = 0
         processadas = 0
 
-        for doc in buscar_nfes_sefaz(cnpj, pfx_bytes, senha_bytes, data_inicio, data_fim):
+        def _persistir_nsu(novo_nsu: str) -> None:
+            cert.ultimo_nsu = novo_nsu
+            db.commit()
+
+        ult_nsu_inicial = cert.ultimo_nsu or "000000000000000"
+
+        for doc in buscar_nfes_sefaz(
+            cnpj, pfx_bytes, senha_bytes,
+            ult_nsu=ult_nsu_inicial, on_nsu_update=_persistir_nsu,
+        ):
             xml_str = doc["xml_str"]
             chave = doc["chave_acesso"]
 
@@ -291,9 +361,9 @@ def importar_nfes_background(
             if not dados:
                 continue
 
-            # Filtra pelo período
+            # Filtra pelo período (se informado)
             data_ref = dados["data_autorizacao"] or dados["data_emissao"]
-            if data_ref and not (data_inicio <= data_ref <= data_fim):
+            if data_inicio and data_fim and data_ref and not (data_inicio <= data_ref <= data_fim):
                 continue
 
             # Determina se é entrada ou saída pelo destinatário
@@ -406,10 +476,56 @@ def cancelar_nfe_saida(db: Session, nfe_id: int) -> NfeSaida:
 # VÍNCULO MANUAL + REPROCESSAMENTO
 # ─────────────────────────────────────────
 
+def _registrar_depara(
+    db: Session,
+    empresa_id: int,
+    produto_id: int,
+    cnpj_fornecedor: str,
+    razao_social_fornecedor: str | None,
+    codigo_produto_fornecedor: str | None,
+    descricao_fornecedor: str | None,
+    unidade_comercial: str | None,
+) -> "ProdutoFornecedor | None":
+    """Cria ou atualiza o De-Para (produto_fornecedor) ao vincular um item manualmente,
+    para que proximas NFs com o mesmo codigo/fornecedor sejam reconhecidas automaticamente."""
+    if not codigo_produto_fornecedor:
+        return None
+
+    unidade = unidade_comercial or "UN"
+
+    depara = db.query(ProdutoFornecedor).filter(
+        ProdutoFornecedor.empresa_id == empresa_id,
+        ProdutoFornecedor.cnpj_fornecedor == cnpj_fornecedor,
+        ProdutoFornecedor.codigo_produto_fornecedor == codigo_produto_fornecedor,
+    ).first()
+
+    if depara:
+        depara.produto_id = produto_id
+        if razao_social_fornecedor:
+            depara.razao_social_fornecedor = razao_social_fornecedor
+        if descricao_fornecedor:
+            depara.descricao_fornecedor = descricao_fornecedor
+        return depara
+
+    depara = ProdutoFornecedor(
+        produto_id=produto_id,
+        empresa_id=empresa_id,
+        cnpj_fornecedor=cnpj_fornecedor,
+        razao_social_fornecedor=razao_social_fornecedor,
+        codigo_produto_fornecedor=codigo_produto_fornecedor,
+        descricao_fornecedor=descricao_fornecedor,
+        unidade_compra=unidade,
+        fator_conversao=1,
+        operacao_conversao=OperacaoConversao.multiplicar,
+        unidade_convertida=unidade,
+    )
+    db.add(depara)
+    return depara
+
+
 def vincular_item_entrada(db: Session, item_id: int, produto_id: int) -> NfeEntradaItem:
     from fastapi import HTTPException
     from models.produto import Produto
-    from models.produto_fornecedor import ProdutoFornecedor
 
     item = db.query(NfeEntradaItem).filter(NfeEntradaItem.id == item_id).first()
     if not item:
@@ -420,11 +536,16 @@ def vincular_item_entrada(db: Session, item_id: int, produto_id: int) -> NfeEntr
         raise HTTPException(404, "Produto nao encontrado")
 
     nfe = item.nfe
-    depara = db.query(ProdutoFornecedor).filter(
-        ProdutoFornecedor.empresa_id == nfe.empresa_id,
-        ProdutoFornecedor.produto_id == produto_id,
-        ProdutoFornecedor.cnpj_fornecedor == nfe.cnpj_emitente,
-    ).first()
+
+    depara = _registrar_depara(
+        db, nfe.empresa_id, produto_id,
+        cnpj_fornecedor=nfe.cnpj_emitente,
+        razao_social_fornecedor=nfe.razao_social_emitente,
+        codigo_produto_fornecedor=item.codigo_produto_fornecedor,
+        descricao_fornecedor=item.descricao_produto,
+        unidade_comercial=item.unidade_comercial,
+    )
+    db.flush()
 
     item.produto_id = produto_id
     item.vinculo_pendente = False
@@ -439,11 +560,18 @@ def vincular_item_entrada(db: Session, item_id: int, produto_id: int) -> NfeEntr
 
     db.commit()
     db.refresh(item)
+
+    periodo = nfe.data_emissao or nfe.data_autorizacao
+    if periodo:
+        from services.estoque_service import apurar_saldo
+        apurar_saldo(db, nfe.empresa_id, produto_id, periodo)
+
     return item
 
 
 def vincular_item_saida(db: Session, item_id: int, produto_id: int) -> NfeSaidaItem:
     from fastapi import HTTPException
+    from models.empresa import Empresa
     from models.produto import Produto
 
     item = db.query(NfeSaidaItem).filter(NfeSaidaItem.id == item_id).first()
@@ -452,10 +580,30 @@ def vincular_item_saida(db: Session, item_id: int, produto_id: int) -> NfeSaidaI
     if not db.query(Produto).filter(Produto.id == produto_id).first():
         raise HTTPException(404, "Produto nao encontrado")
 
+    nfe = item.nfe
+    empresa = db.query(Empresa).filter(Empresa.id == nfe.empresa_id).first()
+    cnpj_empresa = re.sub(r"\D", "", empresa.cnpj) if empresa and empresa.cnpj else None
+
+    if cnpj_empresa:
+        _registrar_depara(
+            db, nfe.empresa_id, produto_id,
+            cnpj_fornecedor=cnpj_empresa,
+            razao_social_fornecedor=empresa.nome if empresa else None,
+            codigo_produto_fornecedor=item.codigo_produto_empresa,
+            descricao_fornecedor=item.descricao_produto,
+            unidade_comercial=item.unidade_comercial,
+        )
+
     item.produto_id = produto_id
     item.vinculo_pendente = False
     db.commit()
     db.refresh(item)
+
+    periodo = nfe.data_emissao or nfe.data_autorizacao
+    if periodo:
+        from services.estoque_service import apurar_saldo
+        apurar_saldo(db, nfe.empresa_id, produto_id, periodo)
+
     return item
 
 
@@ -466,6 +614,7 @@ def reprocessar_nfe_entrada(db: Session, nfe_id: int) -> int:
         return 0
 
     vinculados = 0
+    produtos_afetados: set[int] = set()
     for item in db.query(NfeEntradaItem).filter(
         NfeEntradaItem.nfe_entrada_id == nfe_id,
         NfeEntradaItem.vinculo_pendente == True,  # noqa
@@ -480,6 +629,14 @@ def reprocessar_nfe_entrada(db: Session, nfe_id: int) -> int:
             item.unidade_convertida = unid_conv
             item.vinculo_pendente = False
             vinculados += 1
+            produtos_afetados.add(prod_id)
 
     db.commit()
+
+    periodo = nfe.data_emissao or nfe.data_autorizacao
+    if periodo and produtos_afetados:
+        from services.estoque_service import apurar_saldo
+        for prod_id in produtos_afetados:
+            apurar_saldo(db, nfe.empresa_id, prod_id, periodo)
+
     return vinculados

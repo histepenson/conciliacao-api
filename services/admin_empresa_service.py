@@ -9,7 +9,7 @@ from core.protheus import encrypt_password
 from models import Empresa, UsuarioEmpresa, Usuario, Perfil, AuditLog, AuditAction
 
 _UPDATABLE_FIELDS = [
-    "nome", "cnpj", "status", "permite_efetivar_divergente",
+    "nome", "cnpj", "status", "permite_efetivar_divergente", "dados_locais",
     "protheus_tenant", "protheus_url", "protheus_rest_prefix", "protheus_user",
 ]
 

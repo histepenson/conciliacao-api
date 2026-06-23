@@ -1,12 +1,12 @@
 from datetime import date, datetime, timezone
-from pathlib import Path
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.serialization import pkcs12
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from core.config import resolve_storage_dir, settings
+from core import storage
+from core.config import settings
 from models.certificado_digital import CertificadoDigital, StatusCertificado
 
 
@@ -83,14 +83,10 @@ def salvar_certificado(db: Session, empresa_id: int, arquivo: UploadFile, senha:
     if existente:
         raise HTTPException(400, f"Certificado para CNPJ {info['cnpj']} ja cadastrado nesta empresa")
 
-    # Salva arquivo no storage
-    storage = resolve_storage_dir()
-    dest_dir = storage / "certificados" / str(empresa_id)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
+    # Salva arquivo no bucket
     nome_arquivo = f"{info['cnpj']}_{arquivo.filename}"
-    caminho = dest_dir / nome_arquivo
-    caminho.write_bytes(pfx_bytes)
+    chave = f"certificados/{empresa_id}/{nome_arquivo}"
+    storage.upload_bytes(chave, pfx_bytes)
 
     # Criptografa senha
     fernet = _get_fernet()
@@ -100,7 +96,7 @@ def salvar_certificado(db: Session, empresa_id: int, arquivo: UploadFile, senha:
         empresa_id=empresa_id,
         cnpj_certificado=info["cnpj"],
         razao_social_certificado=info["razao_social"],
-        caminho_arquivo=str(caminho.relative_to(storage)),
+        caminho_arquivo=chave,
         senha_criptografada=senha_criptografada,
         validade=info["validade"],
         status=info["status"],
@@ -126,11 +122,9 @@ def deletar_certificado(db: Session, cert_id: int) -> bool:
     if not cert:
         raise HTTPException(404, "Certificado nao encontrado")
 
-    # Remove arquivo do storage
-    storage = resolve_storage_dir()
-    caminho = storage / cert.caminho_arquivo
-    if caminho.exists():
-        caminho.unlink()
+    # Remove arquivo do bucket
+    if storage.file_exists(cert.caminho_arquivo):
+        storage.delete_file(cert.caminho_arquivo)
 
     db.delete(cert)
     db.commit()
@@ -143,8 +137,7 @@ def carregar_pfx(db: Session, cert_id: int) -> tuple[bytes, bytes]:
     if not cert:
         raise HTTPException(404, "Certificado nao encontrado")
 
-    storage = resolve_storage_dir()
-    pfx_bytes = (storage / cert.caminho_arquivo).read_bytes()
+    pfx_bytes = storage.download_bytes(cert.caminho_arquivo)
 
     fernet = _get_fernet()
     senha = fernet.decrypt(cert.senha_criptografada.encode()).decode()

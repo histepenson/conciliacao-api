@@ -33,3 +33,6 @@ apscheduler>=3.10.0
 # Cargas Protheus em background
 redis>=5.0.0
 rq>=1.16.0
+
+# Storage S3-compatible (Railway Bucket Storage)
+boto3>=1.34.0

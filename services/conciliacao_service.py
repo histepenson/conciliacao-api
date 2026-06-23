@@ -9,6 +9,7 @@ from schemas.conciliacao_schema import RequestConciliacao
 from services.analise_diferencas_service import AnaliseDiferencasService
 from services.ctbr480_service import Ctbr480Service
 from core.config import settings
+from core.protheus import ProtheusConfig
 from tools.calc_diferencas import calcular_diferencas
 from tools.contabilidade import normalizar_planilha_contabilidade
 from tools.financeiro import (
@@ -38,14 +39,10 @@ class ConciliacaoService:
         if not request.base_contabil_filtrada or not request.base_contabil_filtrada.registros:
             return False, "Base contabil filtrada vazia"
 
-        # base_contabil_geral pode vir vazia quando ctbr480_params esta preenchido
-        # (busca automatica no Protheus -- resolvida em executar_async)
-        tem_registros = bool(request.base_contabil_geral and request.base_contabil_geral.registros)
-        tem_params = bool(
-            request.base_contabil_geral and request.base_contabil_geral.ctbr480_params
-        )
-        if not tem_registros and not tem_params:
-            return False, "Base geral da contabilidade vazia"
+        # base_contabil_geral pode vir vazia (conta sem lancamentos no periodo --
+        # nesse caso ainda e' possivel fazer o comparativo de saldos, so' fica
+        # sem a analise detalhada por linha de razao) ou quando ctbr480_params
+        # esta preenchido (busca automatica no Protheus, resolvida em executar_async).
 
         if not request.parametros or not request.parametros.get("data_base"):
             return False, "Data-base nao informada"
@@ -148,7 +145,9 @@ class ConciliacaoService:
     # ==================================================
     # BUSCA AUTOMATICA DO CTBR480 (RAZAO GERAL)
     # ==================================================
-    async def _buscar_razao_geral_protheus(self, request: RequestConciliacao) -> list[dict]:
+    async def _buscar_razao_geral_protheus(
+        self, request: RequestConciliacao, config: ProtheusConfig
+    ) -> list[dict]:
         """
         Se base_contabil_geral.ctbr480_params estiver preenchido, busca o razao
         contabil diretamente do Protheus via ZCTBR480API e retorna os registros.
@@ -163,17 +162,18 @@ class ConciliacaoService:
             return geral.registros
 
         logger.info(" base_contabil_geral.ctbr480_params detectado -- buscando CTBR480 do Protheus")
-        protheus_url = params.protheus_url or getattr(settings, "PROTHEUS_URL", "")
+        protheus_url = params.protheus_url or config.url
         if not protheus_url:
             raise ValueError(
-                "CTBR480 automatico requer PROTHEUS_URL no .env ou 'protheus_url' em ctbr480_params"
+                "CTBR480 automatico requer URL do Protheus configurada na empresa."
             )
 
         service = Ctbr480Service(
             protheus_base_url=protheus_url,
-            user=getattr(settings, "PROTHEUS_USER", ""),
-            password=getattr(settings, "PROTHEUS_PASSWORD", ""),
-            tenant_id=getattr(settings, "PROTHEUS_TENANT", "02,0201"),
+            user=config.user,
+            password=config.password,
+            tenant_id=config.tenant,
+            rest_prefix=config.rest_prefix,
         )
         query = {
             "data_fim": params.data_fim,
@@ -200,7 +200,7 @@ class ConciliacaoService:
     # ==================================================
     # EXECUCAO ASSINCRONA (suporta ctbr480_params)
     # ==================================================
-    async def executar_async(self, request: RequestConciliacao) -> dict:
+    async def executar_async(self, request: RequestConciliacao, config: ProtheusConfig) -> dict:
         """
         Versao assincrona do executar() com suporte a busca automatica do CTBR480.
         Quando base_contabil_geral.ctbr480_params estiver preenchido, busca o razao
@@ -208,7 +208,7 @@ class ConciliacaoService:
         """
         # Injeta registros do Protheus se ctbr480_params estiver presente
         if request.base_contabil_geral and request.base_contabil_geral.ctbr480_params:
-            registros = await self._buscar_razao_geral_protheus(request)
+            registros = await self._buscar_razao_geral_protheus(request, config)
             request.base_contabil_geral.registros = registros
 
         return self.executar(request)

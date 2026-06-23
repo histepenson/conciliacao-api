@@ -191,6 +191,13 @@ def formatar_data(data: Any) -> str:
     if pd.isna(data):
         return ""
 
+    # Atalho: ja esta no formato final (ex: vem assim de cargas MATR900/CTBR400
+    # importadas manualmente) -- evita chamar pd.to_datetime() escalar por linha,
+    # que e' extremamente lento quando aplicado em milhares de linhas (cada
+    # chamada individual tem overhead de parsing significativo).
+    if isinstance(data, str) and re.fullmatch(r"\d{2}/\d{2}/\d{4}", data.strip()):
+        return data.strip()
+
     try:
         # Se for numero (serial do Excel), converter
         if isinstance(data, (int, float)):

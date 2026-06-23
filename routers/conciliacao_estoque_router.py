@@ -15,6 +15,7 @@ from schemas.conciliacao_estoque_schema import (
 )
 from services.conciliacao_estoque_service import ConciliacaoEstoqueService
 from services.conciliacao_estoque_efetivacao_service import ConciliacaoEstoqueEfetivacaoService
+from services import balancete_service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
 from db import get_db
@@ -29,7 +30,7 @@ router = APIRouter(
 
 
 @router.post("/estoque", response_model=None)
-def processar_conciliacao_estoque(request: RequestConciliacaoEstoque):
+def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Session = Depends(get_db)):
     """
     Processa conciliacao de estoque.
 
@@ -54,6 +55,23 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque):
 
     try:
         resultado = service.executar(request)
+
+        # Validar saldo calculado contra balancete importado (se houver)
+        # Movimentos do periodo vem da ORIGEM (Kardex): entradas = debito, saidas = credito
+        resumo = resultado.get("resumo", {})
+        movimentos_periodo = float(resumo.get("total_entradas_kardex", 0) or 0) - float(
+            resumo.get("total_saidas_kardex", 0) or 0
+        )
+        validacao_balancete = balancete_service.validar_saldo_calculado(
+            db,
+            request.parametros.empresa_id,
+            request.base_razao.conta_contabil_id,
+            request.parametros.data_base,
+            movimentos_periodo,
+        )
+        if validacao_balancete:
+            resumo.update(validacao_balancete)
+
         logger.info("Conciliacao de estoque executada com sucesso")
         return resultado
 

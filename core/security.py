@@ -1,6 +1,7 @@
 # core/security.py
 from datetime import datetime, timedelta
 from typing import Optional
+import hashlib
 import secrets
 import re
 
@@ -21,6 +22,16 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifica se a senha corresponde ao hash."""
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def hash_token(token: str) -> str:
+    """
+    Gera hash determinístico (SHA-256) de um token (refresh token, etc).
+
+    Usado para tokens de alta entropia (JWT), onde não há necessidade de salt
+    e é preciso buscar a sessão diretamente por hash (sem loop + bcrypt).
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def validate_password_strength(password: str) -> tuple[bool, str]:

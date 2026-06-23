@@ -17,6 +17,7 @@ class Empresa(Base):
     cnpj = Column(String(20), nullable=False, unique=True, index=True)
     status = Column(Boolean, default=True, nullable=False)
     permite_efetivar_divergente = Column(Boolean, default=False, nullable=False)
+    dados_locais = Column(Boolean, default=False, nullable=False)
     protheus_tenant = Column(String(100), nullable=True)
     protheus_url = Column(String(200), nullable=True)
     protheus_rest_prefix = Column(String(50), nullable=True)

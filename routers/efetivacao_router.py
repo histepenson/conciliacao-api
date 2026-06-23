@@ -1,15 +1,16 @@
 """
 Router para endpoints de efetivacao de conciliacoes.
 """
+import io
 import logging
 import json
-import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
-from fastapi.responses import FileResponse
+import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session
 
+from core import storage
 from db import get_db
 from middleware.auth import get_current_user, CurrentUser
 from schemas.efetivacao_schema import (
@@ -18,6 +19,8 @@ from schemas.efetivacao_schema import (
     ConciliacaoEfetivadaDetalhe,
     ListaConciliacoesEfetivadas,
     ContasEfetivadas,
+    PeriodoDisponivel,
+    PeriodosDisponiveis,
     ValidacaoEfetivacaoResponse,
     ArquivoDownloadInfo,
     StatusConciliacao,
@@ -144,6 +147,32 @@ async def listar_conciliacoes_efetivadas(
     )
 
 
+@router.get("/efetivadas/periodos", response_model=PeriodosDisponiveis)
+async def listar_periodos_disponiveis(
+    empresa_id: int = Query(..., description="ID da empresa"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Lista os periodos (ano/mes) que possuem ao menos uma conciliacao
+    efetivada para a empresa. Usado para popular os filtros de ano/mes
+    sem mostrar periodos sem nenhum fechamento.
+    """
+    # Validar acesso a empresa
+    if not current_user.is_admin and current_user.empresa_id != empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem acesso a esta empresa"
+        )
+
+    service = EfetivacaoService()
+    periodos = service.listar_periodos_disponiveis(db, empresa_id)
+
+    return PeriodosDisponiveis(
+        periodos=[PeriodoDisponivel(ano=ano, mes=mes) for ano, mes in periodos]
+    )
+
+
 @router.get("/contas-efetivadas", response_model=ContasEfetivadas)
 async def listar_contas_efetivadas(
     empresa_id: int = Query(..., description="ID da empresa"),
@@ -219,9 +248,9 @@ async def listar_arquivos_conciliacao(
     for tipo, formatos in caminhos.items():
         if isinstance(formatos, dict):
             for formato, caminho in formatos.items():
-                existe = os.path.exists(caminho) if caminho else False
-                tamanho = os.path.getsize(caminho) if existe else None
-                nome = os.path.basename(caminho) if caminho else ""
+                existe = storage.file_exists(caminho) if caminho else False
+                tamanho = storage.get_file_size(caminho) if existe else None
+                nome = caminho.rsplit("/", 1)[-1] if caminho else ""
 
                 arquivos.append(ArquivoDownloadInfo(
                     tipo_arquivo=tipo,
@@ -280,22 +309,39 @@ async def download_arquivo(
         )
 
     service = EfetivacaoService()
-    file_path = service.obter_arquivo(db, conciliacao_id, tipo_arquivo, formato, empresa_id)
+    file_key = service.obter_arquivo(db, conciliacao_id, tipo_arquivo, formato, empresa_id)
 
-    # Determinar media type
-    if file_path.endswith(".xlsx"):
+    filename = file_key.rsplit("/", 1)[-1]
+    content = storage.download_bytes(file_key)
+
+    # Arquivos "originais" de conciliacoes vindas direto do Protheus (sem upload manual)
+    # sao salvos como JSON puro (ex: finr130_protheus.json) - nao ha planilha real por
+    # tras. Para o usuario conseguir abrir no Excel, convertemos para .xlsx aqui.
+    if formato == "original" and file_key.endswith(".json") and tipo_arquivo != "relatorio":
+        registros = json.loads(content)
+        if isinstance(registros, dict):
+            registros = registros.get("registros", [])
+        df = pd.DataFrame(registros)
+        buffer = io.BytesIO()
+        df.to_excel(buffer, index=False)
+        content = buffer.getvalue()
+        filename = filename.rsplit(".", 1)[0] + ".xlsx"
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    elif file_path.endswith(".json"):
+    elif file_key.endswith(".xlsx"):
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif file_key.endswith(".xls"):
+        media_type = "application/vnd.ms-excel"
+    elif file_key.endswith(".csv"):
+        media_type = "text/csv"
+    elif file_key.endswith(".json"):
         media_type = "application/json"
     else:
         media_type = "application/octet-stream"
 
-    filename = os.path.basename(file_path)
-
-    return FileResponse(
-        path=file_path,
-        filename=filename,
-        media_type=media_type
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 

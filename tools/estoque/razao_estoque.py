@@ -221,6 +221,8 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
     - valor: debito - credito
     - tipo: DEBITO ou CREDITO
     - saldo_atual: Saldo apos lancamento
+    - ct2_key: CT2_KEY de origem, quando disponivel no CTBR400 (vazio em
+      cargas antigas sem esse campo)
     """
     logger.info("[RAZAO ESTOQUE] Iniciando normalizacao")
 
@@ -246,6 +248,7 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
     col_credito = obter_coluna(df, ["credito", "cred", "valor_credito"])
     col_saldo = obter_coluna(df, ["saldo_atual", "saldo", "saldo_final"])
     col_lote_doc = obter_coluna(df, ["lote_sub_doc_linha", "lote", "documento", "doc"])
+    col_ct2_key = obter_coluna(df, ["ct2_key"])
 
     logger.info(f"[RAZAO ESTOQUE] Coluna DATA: {col_data}")
     logger.info(f"[RAZAO ESTOQUE] Coluna HISTORICO: {col_historico}")
@@ -274,6 +277,14 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
         df_norm["lote_doc"] = df[col_lote_doc].astype(str).str.strip()
     else:
         df_norm["lote_doc"] = ""
+
+    # ct2_key: presente quando o CTBR400 (real ou importado manualmente) traz
+    # o CT2_KEY de origem -- permite matching exato contra o ct2_key montado
+    # no Kardex, em vez de so' (data, cf) agregado. Ausente em cargas antigas.
+    if col_ct2_key:
+        df_norm["ct2_key"] = df[col_ct2_key].astype(str).str.strip()
+    else:
+        df_norm["ct2_key"] = ""
 
     # Extrair CF original (3 primeiros caracteres do historico, sem mapeamento)
     df_norm["cf_original"] = df_norm["historico"].apply(extrair_cf_original)

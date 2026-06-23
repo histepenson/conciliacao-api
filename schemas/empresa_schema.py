@@ -8,6 +8,7 @@ class EmpresaBase(BaseModel):
     cnpj: str
     status: bool = True
     permite_efetivar_divergente: bool = False
+    dados_locais: bool = False
     protheus_tenant: Optional[str] = None
     protheus_url: Optional[str] = None
     protheus_rest_prefix: Optional[str] = None
@@ -23,6 +24,7 @@ class EmpresaUpdate(BaseModel):
     cnpj: Optional[str] = None
     status: Optional[bool] = None
     permite_efetivar_divergente: Optional[bool] = None
+    dados_locais: Optional[bool] = None
     protheus_tenant: Optional[str] = None
     protheus_url: Optional[str] = None
     protheus_rest_prefix: Optional[str] = None

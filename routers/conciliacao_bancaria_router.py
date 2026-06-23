@@ -15,6 +15,7 @@ from schemas.conciliacao_bancaria_schema import (
 )
 from services.conciliacao_bancaria_service import ConciliacaoBancariaService
 from services.conciliacao_bancaria_efetivacao_service import ConciliacaoBancariaEfetivacaoService
+from services import balancete_service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
 from db import get_db
@@ -29,7 +30,7 @@ router = APIRouter(
 
 
 @router.post("/bancaria", response_model=None)
-def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria):
+def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria, db: Session = Depends(get_db)):
     """
     Processa conciliacao bancaria.
 
@@ -56,6 +57,38 @@ def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria):
     try:
         # Executar conciliacao
         resultado = service.executar(request)
+
+        # Validar saldo calculado contra balancete importado (se houver)
+        # Movimentos do periodo vem da ORIGEM (extrato bancario): entradas = debito, saidas = credito
+        resumo = resultado.get("resumo", {})
+        movimentos_periodo = float(resumo.get("total_entradas_extrato", 0) or 0) - float(
+            resumo.get("total_saidas_extrato", 0) or 0
+        )
+        validacao_balancete = balancete_service.validar_saldo_calculado(
+            db,
+            request.parametros.empresa_id,
+            request.base_razao.conta_contabil_id,
+            request.parametros.data_base,
+            movimentos_periodo,
+            saldo_final_origem=resumo.get("saldo_final_extrato"),
+        )
+        if validacao_balancete:
+            resumo.update(validacao_balancete)
+
+            # Saldo bate com o balancete (calculado ou pelo saldo final do proprio
+            # extrato) -> considerar tudo conciliado, mesmo com divergencias internas.
+            if validacao_balancete.get("balancete_bate") and resumo.get("situacao") != "CONCILIADO":
+                for dia_info in resultado.get("movimentos_por_dia", []):
+                    dia_info["status"] = "CONCILIADO"
+                resultado["dias_conciliados"] = resultado.get("movimentos_por_dia", [])
+                resultado["dias_divergentes"] = []
+                resultado["registros_so_extrato"] = []
+                resultado["registros_so_razao"] = []
+                resumo["situacao"] = "CONCILIADO"
+                resumo["qtd_conciliados"] = resumo.get("qtd_dias", 0)
+                resumo["qtd_divergentes"] = 0
+                resumo["percentual_conciliacao"] = 100.0
+
         logger.info("Conciliacao bancaria executada com sucesso")
         return resultado
 

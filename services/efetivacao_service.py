@@ -64,47 +64,21 @@ class EfetivacaoService:
     def _validate_no_divergencias(
         self, resultado: Dict[str, Any], permite_divergente: bool = False
     ) -> ValidacaoEfetivacaoResponse:
-        """Valida se nao ha divergencias antes de efetivar."""
+        """Divergencias nao bloqueiam mais a efetivacao - apenas reporta para os alertas."""
         resumo = resultado.get("resumo", {})
         situacao = resumo.get("situacao", "DIVERGENTE")
-        diferenca = abs(resumo.get("diferenca", 0) or 0)
 
         diferencas_origem = len(resultado.get("diferencas_origem_maior", []))
         diferencas_contabil = len(resultado.get("diferencas_contabilidade_maior", []))
         total_divergencias = diferencas_origem + diferencas_contabil
 
-        alertas = resultado.get("alertas", [])
-
-        # Verifica se pode efetivar
-        if situacao == "CONCILIADO" and total_divergencias == 0:
-            return ValidacaoEfetivacaoResponse(
-                pode_efetivar=True,
-                motivo=None,
-                divergencias=0,
-                alertas=alertas
-            )
-
-        # Ha divergencias - verificar se a empresa permite efetivar mesmo assim
-        if permite_divergente:
-            alertas = list(alertas)
-            alertas.append(f"Efetivada com divergencias (permitido pela configuracao da empresa)")
-            return ValidacaoEfetivacaoResponse(
-                pode_efetivar=True,
-                motivo=None,
-                divergencias=total_divergencias,
-                alertas=alertas
-            )
-
-        # Nao pode efetivar
-        motivos = []
-        if situacao != "CONCILIADO":
-            motivos.append(f"Situacao atual: {situacao}, diferenca de R$ {diferenca:.2f}")
-        if total_divergencias > 0:
-            motivos.append(f"{total_divergencias} divergencias encontradas")
+        alertas = list(resultado.get("alertas", []))
+        if situacao != "CONCILIADO" or total_divergencias > 0:
+            alertas.append("Efetivada com divergencias")
 
         return ValidacaoEfetivacaoResponse(
-            pode_efetivar=False,
-            motivo="; ".join(motivos),
+            pode_efetivar=True,
+            motivo=None,
             divergencias=total_divergencias,
             alertas=alertas
         )
@@ -229,9 +203,8 @@ class EfetivacaoService:
         resumo = request.resultado.get("resumo", {})
         saldo = resumo.get("diferenca", 0) or 0
 
-        # Ao efetivar, situacao e sempre CONCILIADO
-        resultado_para_salvar = {**request.resultado}
-        resultado_para_salvar["resumo"] = {**resumo, "situacao": "CONCILIADO"}
+        # Divergencias nao bloqueiam mais a efetivacao - mantem a situacao real calculada
+        resultado_para_salvar = request.resultado
 
         now = datetime.now(timezone.utc)
 
@@ -391,6 +364,29 @@ class EfetivacaoService:
             created_at=conciliacao.created_at,
             updated_at=conciliacao.updated_at
         )
+
+    def listar_periodos_disponiveis(
+        self,
+        db: Session,
+        empresa_id: int
+    ) -> List[Tuple[int, int]]:
+        """
+        Lista periodos (ano, mes) distintos que possuem ao menos uma
+        conciliacao efetivada para a empresa, mais recente primeiro.
+        """
+        periodos = db.query(Conciliacao.periodo).filter(
+            Conciliacao.empresa_id == empresa_id,
+            Conciliacao.status == StatusConciliacao.EFETIVADA.value
+        ).distinct().all()
+
+        resultado = set()
+        for (periodo,) in periodos:
+            try:
+                resultado.add(self._parse_periodo(periodo))
+            except (ValueError, IndexError):
+                continue
+
+        return sorted(resultado, reverse=True)
 
     def listar_contas_efetivadas(
         self,

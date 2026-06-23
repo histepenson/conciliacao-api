@@ -155,6 +155,18 @@ class AnaliseDiferencasService:
                 df_razao_geral_norm["itemconta_normalizado"] = df_razao_geral_norm[col_itemconta_geral].apply(
                     self._normalizar_item_conta_razao
                 )
+
+                # Segunda opção: se cod_cl_val existe e é coluna diferente da principal,
+                # normaliza também para uso como fallback por linha no matching.
+                col_codclval_geral = None
+                _candidatas_clval = ["cod_cl_val", "COD CL VAL", "COD_CL_VAL", "CODCLVAL"]
+                if col_itemconta_geral not in _candidatas_clval:
+                    col_codclval_geral = self._encontrar_coluna(df_razao_geral_norm, _candidatas_clval)
+                if col_codclval_geral:
+                    df_razao_geral_norm["codclval_normalizado"] = df_razao_geral_norm[col_codclval_geral].apply(
+                        self._normalizar_item_conta_razao
+                    )
+
                 lancamentos_razao_geral = (
                     df_razao_geral_norm.groupby("itemconta_normalizado").size().to_dict()
                 )
@@ -228,6 +240,10 @@ class AnaliseDiferencasService:
                     df_razao_geral_norm,
                     ["conta", "CONTA"],
                 )
+                col_ct5_desc_geral = self._encontrar_coluna(
+                    df_razao_geral_norm,
+                    ["ct5_desc", "CT5_DESC"],
+                )
 
         df_merge = fin_agg.merge(cont_agg, on="codigo", how="outer")
         if not razao_agg.empty:
@@ -279,6 +295,12 @@ class AnaliseDiferencasService:
                         financeiro_match_map.setdefault(key, []).append(val)
                         valor_fin_periodo_map[cod] = valor_fin_periodo_map.get(cod, 0.0) + val
 
+        # Snapshot imutavel do mapa financeiro (antes de qualquer pop) para determinar
+        # tem_correspondencia por entrada do razao (chave = codigo+data, independente do valor)
+        financeiro_match_map_snap: Dict[tuple, List[float]] = {
+            k: list(v) for k, v in financeiro_match_map.items()
+        }
+
         def _tem_match_financeiro(codigo: str, data_str: str, valor: float) -> bool:
             key = (codigo, data_str)
             valores = financeiro_match_map.get(key)
@@ -289,6 +311,23 @@ class AnaliseDiferencasService:
                     valores.pop(i)
                     return True
             return False
+
+        def _correspondencia_financeiro(codigo: str, data_str: str, valor: float):
+            """
+            Retorna (tem_correspondencia, valor_financeiro_match) usando o snapshot original.
+
+            Lancamentos do razao fora do periodo analisado nao tem como ter correspondencia
+            no financeiro do periodo (financeiro_match_map so cobre o periodo analisado) --
+            nesses casos retorna (None, None) para o frontend mostrar neutro (sem cor),
+            em vez de vermelho (mesma regra ja aplicada para os titulos do financeiro).
+            """
+            if periodo is not None and not self._data_no_periodo(data_str, periodo):
+                return None, None
+            valores_snap = financeiro_match_map_snap.get((codigo, data_str), [])
+            if not valores_snap:
+                return False, None
+            closest = min(valores_snap, key=lambda v: abs(v - valor))
+            return True, round(closest, 2)
 
         analises: List[Dict[str, Any]] = []
         for row in df_merge.to_dict("records"):
@@ -324,9 +363,7 @@ class AnaliseDiferencasService:
             matches_razao_count = 0
             matches_item_all = pd.DataFrame()
             if df_razao_geral_norm is not None and col_itemconta_geral:
-                matches_item_all = df_razao_geral_norm[
-                    df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado
-                ]
+                matches_item_all = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_normalizado)
                 matches_razao_count = int(len(matches_item_all))
                 lancamentos_razao = matches_razao_count
                 if (
@@ -370,7 +407,7 @@ class AnaliseDiferencasService:
                         else ""
                     )
                     data_lanc = self._formatar_data(
-                        r.get(col_data_geral, "") if col_data_geral else ""
+                        r.get(col_data_geral, "") if col_data_geral else "", periodo
                     )
                     nome_cliente = codigo_nome_map.get(codigo, "")
 
@@ -392,6 +429,7 @@ class AnaliseDiferencasService:
                             if col_historico_geral
                             else "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
+                            "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                         }
                     )
             if tipo == "SO_CONTABILIDADE" and lancamentos_razao_geral:
@@ -438,7 +476,10 @@ class AnaliseDiferencasService:
                             continue
 
                         data_lanc = self._formatar_data(
-                            r.get(col_data_geral, "") if col_data_geral else ""
+                            r.get(col_data_geral, "") if col_data_geral else "", periodo
+                        )
+                        tem_corr_det, vlr_fin_det = _correspondencia_financeiro(
+                            codigo, data_lanc, valor_lancamento
                         )
                         if _tem_match_financeiro(codigo, data_lanc, valor_lancamento):
                             continue
@@ -464,6 +505,9 @@ class AnaliseDiferencasService:
                                 if col_historico_geral
                                 else "",
                                 "tipo_movimento": "NAO_IDENTIFICADO",
+                                "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
+                                "tem_correspondencia": tem_corr_det,
+                                "valor_financeiro_match": vlr_fin_det,
                             }
                         )
 
@@ -478,15 +522,84 @@ class AnaliseDiferencasService:
                 )
                 lancamentos_razao_detalhes = _filtrados if _filtrados else lancamentos_razao_detalhes
 
+            if tipo == "DIVERGENTE_VALOR" and df_razao_geral_norm is not None and col_itemconta_geral:
+                codigo_norm_div = self._normalizar_codigo_numerico(codigo)
+                matches_div = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_norm_div)
+                logger.warning("[DIV_VALOR] codigo=%s norm=%s matches=%d", codigo, codigo_norm_div, len(matches_div))
+                _div_skipped = 0
+                for _, r in matches_div.iterrows():
+                    valor_debito = 0.0
+                    valor_credito = 0.0
+                    if col_debito_geral:
+                        try:
+                            val = r.get(col_debito_geral, 0)
+                            if pd.notna(val):
+                                valor_debito = self._parse_valor(val)
+                        except (ValueError, TypeError):
+                            valor_debito = 0.0
+                    if col_credito_geral:
+                        try:
+                            val = r.get(col_credito_geral, 0)
+                            if pd.notna(val):
+                                valor_credito = self._parse_valor(val)
+                        except (ValueError, TypeError):
+                            valor_credito = 0.0
+
+                    if abs(valor_debito) > 0:
+                        valor_lancamento = abs(valor_debito)
+                        tipo_lancamento = "D"
+                    elif abs(valor_credito) > 0:
+                        valor_lancamento = abs(valor_credito)
+                        tipo_lancamento = "C"
+                    else:
+                        continue
+
+                    if valor_lancamento <= 0:
+                        continue
+
+                    item_conta = (
+                        str(r.get(col_itemconta_geral, ""))
+                        if col_itemconta_geral
+                        else ""
+                    )
+                    data_lanc = self._formatar_data(
+                        r.get(col_data_geral, "") if col_data_geral else "", periodo
+                    )
+                    tem_corr_div, vlr_fin_div = _correspondencia_financeiro(
+                        codigo, data_lanc, valor_lancamento
+                    )
+                    if _tem_match_financeiro(codigo, data_lanc, valor_lancamento):
+                        _div_skipped += 1
+                        logger.warning("[DIV_VALOR] SKIP exact match: codigo=%s data=%s valor=%.2f", codigo, data_lanc, valor_lancamento)
+                        continue
+                    nome_cliente = codigo_nome_map.get(codigo, "")
+                    lancamentos_razao_detalhes.append({
+                        "conta_origem": item_conta,
+                        "descricao_conta": nome_cliente if nome_cliente else "",
+                        "valor": round(valor_lancamento, 2),
+                        "tipo_lancamento": tipo_lancamento,
+                        "debito": round(valor_debito, 2),
+                        "credito": round(valor_credito, 2),
+                        "xpartida": str(r.get(col_xpartida_geral, "")) if col_xpartida_geral else "",
+                        "conta": str(r.get(col_conta_razao_geral, "")) if col_conta_razao_geral else "",
+                        "data_lancamento": data_lanc,
+                        "documento": str(r.get(col_documento_geral, "")) if col_documento_geral else "",
+                        "historico": str(r.get(col_historico_geral, "")) if col_historico_geral else "",
+                        "tipo_movimento": "NAO_IDENTIFICADO",
+                        "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
+                        "tem_correspondencia": tem_corr_div,
+                        "valor_financeiro_match": vlr_fin_div,
+                    })
+                logger.warning("[DIV_VALOR] codigo=%s: %d adicionados, %d skipped (match exato), detalhes=%d", codigo, len(matches_div) - _div_skipped, _div_skipped, len(lancamentos_razao_detalhes))
+
             if (
                 valor_cont > valor_fin
+                and tipo != "DIVERGENTE_VALOR"
                 and df_razao_geral_norm is not None
                 and col_itemconta_geral
             ):
                 codigo_normalizado = self._normalizar_codigo_numerico(codigo)
-                matches_item = df_razao_geral_norm[
-                    df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado
-                ]
+                matches_item = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_normalizado)
                 for _, r in matches_item.iterrows():
                     valor_debito = 0.0
                     valor_credito = 0.0
@@ -518,7 +631,10 @@ class AnaliseDiferencasService:
                         continue
 
                     data_lanc = self._formatar_data(
-                        r.get(col_data_geral, "") if col_data_geral else ""
+                        r.get(col_data_geral, "") if col_data_geral else "", periodo
+                    )
+                    tem_corr_sf, vlr_fin_sf = _correspondencia_financeiro(
+                        codigo, data_lanc, valor_lancamento
                     )
                     if _tem_match_financeiro(codigo, data_lanc, valor_lancamento):
                         continue
@@ -549,13 +665,16 @@ class AnaliseDiferencasService:
                             if col_historico_geral
                             else "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
+                            "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
+                            "tem_correspondencia": tem_corr_sf,
+                            "valor_financeiro_match": vlr_fin_sf,
                         }
                     )
 
-                # Em divergencia contabilidade > financeiro, listar apenas o que explica a diferenca
-                lancamentos_razao_sem_financeiro = self._selecionar_por_diferenca(
-                    lancamentos_razao_sem_financeiro, diferenca, "D"
-                )
+                # Em divergencia contabilidade > financeiro, tenta selecionar subconjunto exato;
+                # se nao encontrar, exibe todos os lancamentos encontrados (comportamento igual ao bloco valor_cont < valor_fin)
+                _sel_sf = self._selecionar_por_diferenca(lancamentos_razao_sem_financeiro, diferenca, "D")
+                lancamentos_razao_sem_financeiro = _sel_sf if _sel_sf else lancamentos_razao_sem_financeiro
 
             # Lookup de NFs presentes no razao para este codigo (usado no bloco SO_FINANCEIRO)
             _NF_PAT = re.compile(r'\bNF\s*(\d+)', re.IGNORECASE)
@@ -616,7 +735,7 @@ class AnaliseDiferencasService:
 
                     # Entradas fora do periodo analisado nao tem correspondencia esperada no razao
                     # (o razao so cobre o periodo fechado). Nesses casos, nao marcar como vermelho.
-                    _data_emissao_fmt = self._formatar_data(data_emissao)
+                    _data_emissao_fmt = self._formatar_data(data_emissao, periodo)
                     if periodo and not self._data_no_periodo(_data_emissao_fmt, periodo):
                         tem_corr = None  # fora do periodo -> frontend: neutro (sem cor)
                     else:
@@ -631,7 +750,7 @@ class AnaliseDiferencasService:
                             "descricao_conta": cliente,
                             "valor": round(valor_fin_det, 2),
                             "tipo_lancamento": "",
-                            "data_lancamento": self._formatar_data(data_emissao),
+                            "data_lancamento": self._formatar_data(data_emissao, periodo),
                             "documento": documento,
                             "tipo_titulo": tp_str,
                             "historico": "",
@@ -646,9 +765,7 @@ class AnaliseDiferencasService:
                 and col_itemconta_geral
             ):
                 codigo_normalizado = self._normalizar_codigo_numerico(codigo)
-                matches_item = df_razao_geral_norm[
-                    df_razao_geral_norm["itemconta_normalizado"] == codigo_normalizado
-                ]
+                matches_item = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_normalizado)
                 lancamentos_razao_tmp: List[Dict[str, Any]] = []
                 for _, r in matches_item.iterrows():
                     valor_debito = 0.0
@@ -679,7 +796,10 @@ class AnaliseDiferencasService:
                         continue
 
                     data_lanc = self._formatar_data(
-                        r.get(col_data_geral, "") if col_data_geral else ""
+                        r.get(col_data_geral, "") if col_data_geral else "", periodo
+                    )
+                    tem_corr_tmp, vlr_fin_tmp = _correspondencia_financeiro(
+                        codigo, data_lanc, valor_lancamento
                     )
                     if _tem_match_financeiro(codigo, data_lanc, valor_lancamento):
                         continue
@@ -709,6 +829,9 @@ class AnaliseDiferencasService:
                             if col_historico_geral
                             else "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
+                            "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
+                            "tem_correspondencia": tem_corr_tmp,
+                            "valor_financeiro_match": vlr_fin_tmp,
                         }
                     )
 
@@ -734,9 +857,7 @@ class AnaliseDiferencasService:
                     razao_valores_pool: list = []
                     if tipo == "DIVERGENTE_VALOR" and df_razao_geral_norm is not None and col_itemconta_geral:
                         codigo_norm_match = self._normalizar_codigo_numerico(codigo)
-                        matches_razao_match = df_razao_geral_norm[
-                            df_razao_geral_norm["itemconta_normalizado"] == codigo_norm_match
-                        ]
+                        matches_razao_match = self._filtrar_razao_por_codigo(df_razao_geral_norm, codigo_norm_match)
                         for _, rz in matches_razao_match.iterrows():
                             v_d = 0.0
                             v_c = 0.0
@@ -775,9 +896,17 @@ class AnaliseDiferencasService:
 
                         valor_fin_rec = round(float(r.get("valor", 0) or 0), 2)
 
+                        # Titulo fora do periodo analisado: nao tem como ter correspondencia
+                        # esperada no razao do periodo -- deixa neutro (sem cor) em vez de
+                        # avaliar/marcar como divergente.
+                        _data_emissao_rec_fmt = self._formatar_data(r.get("data_emissao", ""), periodo)
+                        _fora_do_periodo_rec = periodo is not None and not self._data_no_periodo(
+                            _data_emissao_rec_fmt, periodo
+                        )
+
                         # Matching individual por valor (apenas para DIVERGENTE_VALOR)
                         tem_correspondencia: Optional[bool] = None
-                        if tipo == "DIVERGENTE_VALOR" and razao_valores_pool is not None:
+                        if not _fora_do_periodo_rec and tipo == "DIVERGENTE_VALOR" and razao_valores_pool is not None:
                             for i, rv in enumerate(razao_valores_pool):
                                 if abs(rv - valor_fin_rec) <= 0.01:
                                     razao_valores_pool.pop(i)
@@ -795,7 +924,7 @@ class AnaliseDiferencasService:
                         entry: Dict[str, Any] = {
                             "descricao": str(r.get("cliente", "")).strip(),
                             "valor": valor_fin_rec,
-                            "data_emissao": self._formatar_data(r.get("data_emissao", "")),
+                            "data_emissao": self._formatar_data(r.get("data_emissao", ""), periodo),
                             "documento": "-".join(doc_parts),
                             "tipo_titulo": tp_str2,
                             "status": status_rec,
@@ -901,7 +1030,17 @@ class AnaliseDiferencasService:
                     "documento": nf,
                     "historico": lanc.get("historico", ""),
                     "tipo_movimento": lanc.get("tipo_movimento", ""),
+                    "ct5_desc": lanc.get("ct5_desc", ""),
+                    # tem_correspondencia: True se qualquer entrada do grupo tiver codigo+data
+                    # no financeiro (mas valor diferente); False se nenhuma tiver.
+                    "tem_correspondencia": lanc.get("tem_correspondencia"),
+                    "valor_financeiro_match": lanc.get("valor_financeiro_match"),
                 }
+            else:
+                # Propagar tem_correspondencia: True tem prioridade sobre False/None
+                if lanc.get("tem_correspondencia") is True:
+                    agrupados[chave]["tem_correspondencia"] = True
+                    agrupados[chave]["valor_financeiro_match"] = lanc.get("valor_financeiro_match")
             agrupados[chave]["valor"] = round(
                 agrupados[chave]["valor"] + float(lanc.get("valor", 0) or 0), 2
             )
@@ -1032,8 +1171,14 @@ class AnaliseDiferencasService:
 
         return list(set(variacoes))
 
-    def _formatar_data(self, valor: object) -> str:
-        """Formata datas em dd/mm/aaaa, tratando serial do Excel e strings MM/DD/AAAA."""
+    def _formatar_data(self, valor: object, periodo: Optional[tuple] = None) -> str:
+        """Formata datas em dd/mm/aaaa, tratando serial do Excel e strings MM/DD/AAAA.
+
+        Quando `periodo` (mes, ano) e' informado, datas ambiguas (string onde
+        tanto dia quanto mes sao <=12) sao desambiguadas pela leitura
+        (MM/DD ou DD/MM) cujo mes/ano resultante bate com o periodo da
+        conciliacao -- em vez de assumir sempre o padrao americano.
+        """
         if pd.isna(valor):
             return ""
 
@@ -1063,6 +1208,19 @@ class AnaliseDiferencasService:
                         return dt.strftime("%d/%m/%Y")
                 except Exception:
                     pass
+
+            # Se sabemos o periodo da conciliacao, tenta desambiguar pelo mes/ano
+            # esperado antes de cair na ordem fixa abaixo -- evita assumir o
+            # padrao americano quando a base na verdade esta em DD/MM.
+            if periodo is not None:
+                mes_esperado, ano_esperado = periodo
+                for fmt in ("%m/%d/%Y", "%d/%m/%Y"):
+                    try:
+                        dt = datetime.strptime(valor_str, fmt)
+                    except ValueError:
+                        continue
+                    if dt.month == mes_esperado and dt.year == ano_esperado:
+                        return dt.strftime("%d/%m/%Y")
 
             # Tenta formatos explicitos em ordem de prioridade.
             # MM/DD/AAAA e tentado antes de DD/MM/AAAA para lidar com datas do razao
@@ -1122,6 +1280,17 @@ class AnaliseDiferencasService:
 
         return selecionados if abs(soma - alvo) <= 0.01 else []
 
+
+    def _filtrar_razao_por_codigo(
+        self,
+        df_razao_norm: pd.DataFrame,
+        codigo_normalizado: str,
+    ) -> pd.DataFrame:
+        """Filtra linhas do razão cujo itemconta_normalizado OR codclval_normalizado bata o código."""
+        mask = df_razao_norm["itemconta_normalizado"] == codigo_normalizado
+        if "codclval_normalizado" in df_razao_norm.columns:
+            mask = mask | (df_razao_norm["codclval_normalizado"] == codigo_normalizado)
+        return df_razao_norm[mask]
 
     def _encontrar_coluna(
         self, df: pd.DataFrame, candidatas: List[str]
@@ -1370,6 +1539,9 @@ class AnaliseDiferencasService:
         col_centro_custo = self._encontrar_coluna(
             df_razao_geral, ["CCUSTO", "ccusto", "c_custo", "C CUSTO", "centro_custo"]
         )
+        col_ct5_desc = self._encontrar_coluna(
+            df_razao_geral, ["ct5_desc", "CT5_DESC"]
+        )
 
         logger.info(
             "[ANALISE PROFUNDA] Colunas identificadas - codigo: %s, conta: %s, xpartida: %s, debito: %s, credito: %s",
@@ -1538,6 +1710,7 @@ class AnaliseDiferencasService:
                             "documento": documento,
                             "historico": historico,
                             "tipo_movimento": tipo_movimento,
+                            "ct5_desc": str(row.get(col_ct5_desc, "")) if col_ct5_desc else "",
                         }
                     )
 

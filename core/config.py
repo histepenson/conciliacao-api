@@ -1,10 +1,11 @@
 # core/config.py
-import os
+import json
 import secrets
 from functools import lru_cache
-from pathlib import Path
+from typing import Annotated
 
-from pydantic_settings import BaseSettings
+from pydantic import Field, AliasChoices, field_validator
+from pydantic_settings import BaseSettings, NoDecode
 
 
 class Settings(BaseSettings):
@@ -52,7 +53,7 @@ class Settings(BaseSettings):
     LOGIN_LOCKOUT_MINUTES: int = 15
 
     # CORS
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "https://dev.smartconciliacoes.com.br" ]
+    ALLOWED_ORIGINS: Annotated[list[str], NoDecode] = ["http://localhost:3000", "http://127.0.0.1:3000", "https://dev.smartconciliacoes.com.br" ]
 
     # Protheus
     PROTHEUS_URL: str = ""
@@ -66,11 +67,39 @@ class Settings(BaseSettings):
     # Redis / RQ
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Storage
-    STORAGE_DIR: str = "data"
+    # Storage (S3-compatible - Railway Bucket Storage)
+    # Aceita tanto STORAGE_* quanto os nomes gerados pelo plugin de bucket do Railway
+    STORAGE_ENDPOINT: str = Field(default="", validation_alias=AliasChoices("STORAGE_ENDPOINT", "ENDPOINT"))
+    STORAGE_ACCESS_KEY_ID: str = Field(default="", validation_alias=AliasChoices("STORAGE_ACCESS_KEY_ID", "ACCESS_KEY_ID"))
+    STORAGE_SECRET_ACCESS_KEY: str = Field(default="", validation_alias=AliasChoices("STORAGE_SECRET_ACCESS_KEY", "SECRET_ACCESS_KEY"))
+    STORAGE_REGION: str = Field(default="auto", validation_alias=AliasChoices("STORAGE_REGION", "REGION"))
+    STORAGE_BUCKET: str = Field(default="", validation_alias=AliasChoices("STORAGE_BUCKET", "BUCKET"))
 
     # Certificado Digital
     CERT_ENCRYPTION_KEY: str = ""
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, value):
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            if stripped.startswith("["):
+                return json.loads(stripped)
+            return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+        return value
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "production", "prod"}:
+                return False
+            if normalized in {"development", "dev"}:
+                return True
+        return value
 
     class Config:
         env_file = ".env"
@@ -85,21 +114,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-
-
-def resolve_storage_dir() -> Path:
-    """
-    Resolve diretorio de storage com fallback seguro para Railway.
-
-    Regras:
-    - Se STORAGE_DIR estiver definido e diferente de "data", usa valor informado.
-    - Se estiver em Railway e STORAGE_DIR estiver ausente ou "data", usa "/data".
-    - Caso contrario, usa "data" (desenvolvimento local).
-    """
-    configured = os.environ.get("STORAGE_DIR", settings.STORAGE_DIR).strip()
-    is_railway = os.environ.get("RAILWAY_ENVIRONMENT") is not None
-
-    if is_railway and (not configured or configured == "data"):
-        return Path("/data").resolve()
-
-    return Path(configured or "data").resolve()

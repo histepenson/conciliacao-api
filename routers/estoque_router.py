@@ -9,6 +9,7 @@ from middleware.tenant import EmpresaContext, resolve_empresa_id
 from schemas.estoque_schema import (
     SaldoOut,
     MovimentacaoOut,
+    KardexOut,
     AjusteRequest,
     ReprocessarRequest,
     FechamentoRequest,
@@ -56,6 +57,19 @@ def listar_movimentacoes(
 ):
     empresa_id_resolvido = resolve_empresa_id(context, empresa_id)
     return estoque_service.listar_movimentacoes(db, empresa_id_resolvido, produto_id, periodo)
+
+
+@router.get("/kardex", response_model=KardexOut)
+def gerar_kardex(
+    empresa_id: int | None = Query(None),
+    produto_id: int = Query(...),
+    data_inicio: date = Query(...),
+    data_fim: date = Query(...),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(require_permission(Permissions.ESTOQUE_READ)),
+):
+    empresa_id_resolvido = resolve_empresa_id(context, empresa_id)
+    return estoque_service.gerar_kardex(db, empresa_id_resolvido, produto_id, data_inicio, data_fim)
 
 
 @router.post("/ajuste", response_model=MovimentacaoOut)

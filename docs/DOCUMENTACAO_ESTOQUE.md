@@ -1,6 +1,8 @@
 # Smart Conciliações — Documentação do Módulo de Estoque
 
-> Última atualização: Maio 2026
+> Última atualização: Junho 2026
+>
+> Para a fórmula de cálculo de saldo e as regras de fechamento/reabertura de período, veja [REGRAS_NEGOCIO.md](REGRAS_NEGOCIO.md#8-módulo-de-estoque-saldos-e-fechamento).
 
 ---
 

@@ -1,6 +1,8 @@
 # Smart Conciliações — Documentação do Módulo de Conciliação
 
-> Última atualização: Maio 2026
+> Última atualização: Junho 2026
+>
+> Para as regras de cálculo, classificação e thresholds usados internamente, veja [REGRAS_NEGOCIO.md](REGRAS_NEGOCIO.md).
 
 ---
 
@@ -294,14 +296,14 @@ O resultado identifica lançamentos que estão no extrato mas não na contabilid
 
 **Onde:** `Conciliações > Estoque`
 
-Compara os saldos de estoque registrados no sistema com o que está nas NF-e importadas da SEFAZ.
+Compara o **Kardex físico-financeiro (MATR900)** com o **razão contábil de estoque (CTBR400)**, agrupando os movimentos por **código de movimento** (entradas DE0–DE7/PR0/DEV vs. saídas RE0–RE7) e fazendo matching individual por data, CF/CFOP e valor.
 
 O sistema verifica:
-- Se as entradas registradas pelo sistema batem com as NF-e de entrada
-- Se as saídas batem com as NF-e de saída
-- Se há divergências entre o Kardex (MATR900) e o saldo calculado
+- Se o total de cada grupo de movimento bate entre Kardex e Razão (entradas = débito, saídas = crédito)
+- Quais lançamentos existem só no Kardex ou só no Razão dentro de cada grupo
+- Se a soma das pendências dos dois lados se compensa (mesmo sem match individual exato)
 
-> Para que a conciliação de estoque funcione, é necessário ter as NF-e importadas via SEFAZ. Veja [DOCUMENTACAO_ESTOQUE.md](DOCUMENTACAO_ESTOQUE.md).
+> Esta conciliação **não** usa diretamente as NF-e da SEFAZ — ela compara o Kardex do Protheus com o razão contábil. As regras detalhadas estão em [REGRAS_NEGOCIO.md](REGRAS_NEGOCIO.md#7-conciliação-de-estoque-kardex--razão-ctbr400). Para o módulo de cadastro/saldos de estoque baseado em NF-e, veja [DOCUMENTACAO_ESTOQUE.md](DOCUMENTACAO_ESTOQUE.md).
 
 ---
 

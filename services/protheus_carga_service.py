@@ -8,10 +8,12 @@ from rq import Queue
 from rq.command import send_stop_job_command
 from rq.job import Job
 from rq.registry import DeferredJobRegistry, FailedJobRegistry, ScheduledJobRegistry, StartedJobRegistry
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core.rq import PROTHEUS_CARGA_QUEUE, enqueue_protheus_carga, job_esta_ativo
 from core.redis import get_redis_connection
+from models.empresa import Empresa
 from models.protheus_carga import ProtheusCarga, ProtheusCargaConfig, ProtheusCargaRegistro
 from schemas.protheus_carga_schema import ProtheusCargaConfigCreate, ProtheusCargaConfigUpdate, ProtheusCargaCreate
 
@@ -23,6 +25,10 @@ RELATORIOS_SUPORTADOS = {
     "CTBR480",
     "FINR470",
     "MATR900",
+    "SFTENT",
+    "CT2RAZCT5",
+    "SN3",
+    "SN4",
 }
 
 STATUS_REUTILIZAVEIS = {"concluido"}
@@ -130,6 +136,7 @@ def listar_cargas(
     data_base: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 100,
+    parametros_filtro: Optional[dict[str, Any]] = None,
 ) -> list[ProtheusCarga]:
     query = db.query(ProtheusCarga).filter(ProtheusCarga.empresa_id == empresa_id)
     if tipo_relatorio:
@@ -138,6 +145,11 @@ def listar_cargas(
         query = query.filter(ProtheusCarga.data_base == validar_data_base(data_base))
     if status:
         query = query.filter(ProtheusCarga.status == status)
+    if parametros_filtro:
+        # Containment JSONB: so retorna cargas cujo parametros_json contem (>=) o subconjunto informado
+        # (ex: {"banco": "341", "agencia": "0001", "conta": "440008"}), evitando reaproveitar
+        # o cache de outra conta/banco quando existe mais de uma carga concluida do mesmo tipo.
+        query = query.filter(ProtheusCarga.parametros_json.contains(parametros_filtro))
     return query.order_by(ProtheusCarga.created_at.desc()).limit(limit).all()
 
 
@@ -291,12 +303,68 @@ def obter_registros_carga_concluida(
     return carga, [registro.dados_json for registro in registros]
 
 
+def _empresa_usa_dados_locais(db: Session, empresa_id: int) -> bool:
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    return bool(empresa and empresa.dados_locais)
+
+
+def _obter_carga_local(
+    db: Session, empresa_id: int, tipo: str, data_base: str, parametros: Optional[dict[str, Any]] = None
+) -> Optional[ProtheusCarga]:
+    """
+    Para empresas com `dados_locais=True`, busca a carga local concluida mais
+    recente daquele tipo/periodo, ignorando parametros_hash (a carga local
+    cobre todas as contas/filtros de uma vez, ver scripts/importar_carga_manual.py)
+    -- EXCETO quando o pedido tras `conta_de`/`conta_ate` (CTBR140, CTBR400,
+    CTBR480, CT2RAZCT5): para esses tipos, a importacao manual grava UMA carga
+    POR CONTA (ver skill importar-csv-protheus), entao varias cargas concluidas
+    podem coexistir com o mesmo tipo/data_base -- sem filtrar por conta aqui,
+    a carga mais recente de QUALQUER conta venceria, devolvendo dados da conta
+    errada (caso real: CTBR140 da conta X devolvendo a carga da conta Y so
+    porque foi importada depois).
+    """
+    query = db.query(ProtheusCarga).filter(
+        ProtheusCarga.empresa_id == empresa_id,
+        ProtheusCarga.tipo_relatorio == tipo,
+        ProtheusCarga.data_base == data_base,
+        ProtheusCarga.status == "concluido",
+    )
+    conta_de = (parametros or {}).get("conta_de")
+    conta_ate = (parametros or {}).get("conta_ate")
+    if conta_de and conta_ate:
+        candidatas = query.order_by(ProtheusCarga.created_at.desc()).all()
+        for candidata in candidatas:
+            params_candidata = candidata.parametros_json or {}
+            if params_candidata.get("conta_de") == conta_de and params_candidata.get("conta_ate") == conta_ate:
+                return candidata
+        return None
+    return query.order_by(ProtheusCarga.created_at.desc()).first()
+
+
 def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCargaCreate) -> tuple[ProtheusCarga, bool]:
     tipo = normalizar_tipo_relatorio(payload.tipo_relatorio)
     data_base = validar_data_base(payload.data_base)
     parametros = dict(payload.parametros_json or {})
     parametros["data_base"] = parametros.get("data_base") or data_base
     parametros_hash = calcular_parametros_hash(parametros)
+
+    # Empresas sem acesso real ao Protheus (dados_locais=True): nunca tenta
+    # chamar a API/worker - so consulta a carga importada manualmente.
+    if _empresa_usa_dados_locais(db, empresa_id):
+        local = _obter_carga_local(db, empresa_id, tipo, data_base, parametros)
+        if local and (local.total_registros or 0) > 0:
+            return local, True
+        conta_de = parametros.get("conta_de")
+        conta_ate = parametros.get("conta_ate")
+        detalhe_conta = f" para a conta {conta_de}" if conta_de and conta_de == conta_ate else ""
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Empresa configurada para usar dados locais, mas nao existe carga local "
+                f"concluida de {tipo}{detalhe_conta} para a data-base {data_base}. Importe via "
+                f"scripts/importar_carga_manual.py antes de usar esta tela."
+            ),
+        )
 
     _filtro_base = [
         ProtheusCarga.empresa_id == empresa_id,
@@ -314,6 +382,16 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
     )
     if concluida and (concluida.total_registros or 0) > 0:
         return concluida, True
+    elif concluida:
+        # concluida mas sem registros: reprocessa em vez de tentar criar nova (violaria unique constraint)
+        concluida.status = "pendente"
+        concluida.erro = None
+        concluida.iniciado_em = None
+        concluida.finalizado_em = None
+        concluida.total_registros = 0
+        db.commit()
+        _tentar_enfileirar(db, concluida)
+        return concluida, False
 
     # 2. Existe uma carga ativa (pendente ou processando)? Reconecta.
     ativa = (
@@ -333,19 +411,55 @@ def criar_ou_enfileirar_carga(db: Session, empresa_id: int, payload: ProtheusCar
         _tentar_enfileirar(db, ativa)
         return ativa, False
 
-    # 3. Sem carga util: cria nova.
-    carga = ProtheusCarga(
-        config_id=payload.config_id,
-        empresa_id=empresa_id,
-        tipo_relatorio=tipo,
-        data_base=data_base,
-        parametros_hash=parametros_hash,
-        parametros_json=parametros,
-        status="pendente",
+    # 2.5. Existe uma carga com erro ou cancelada? Reprocessa para evitar violação de UniqueConstraint.
+    falha = (
+        db.query(ProtheusCarga)
+        .filter(*_filtro_base, ProtheusCarga.status.in_(["erro", "cancelado"]))
+        .order_by(ProtheusCarga.created_at.desc())
+        .first()
     )
-    db.add(carga)
-    db.commit()
-    db.refresh(carga)
+    if falha:
+        falha.status = "pendente"
+        falha.erro = None
+        falha.iniciado_em = None
+        falha.finalizado_em = None
+        falha.total_registros = 0
+        db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == falha.id).delete()
+        db.commit()
+        _tentar_enfileirar(db, falha)
+        return falha, False
+
+    # 3. Sem carga util: cria nova. Guard contra race condition com try/except.
+    try:
+        carga = ProtheusCarga(
+            config_id=payload.config_id,
+            empresa_id=empresa_id,
+            tipo_relatorio=tipo,
+            data_base=data_base,
+            parametros_hash=parametros_hash,
+            parametros_json=parametros,
+            status="pendente",
+        )
+        db.add(carga)
+        db.commit()
+        db.refresh(carga)
+    except IntegrityError:
+        db.rollback()
+        carga = (
+            db.query(ProtheusCarga)
+            .filter(*_filtro_base)
+            .order_by(ProtheusCarga.created_at.desc())
+            .first()
+        )
+        if not carga:
+            raise
+        carga.status = "pendente"
+        carga.erro = None
+        carga.iniciado_em = None
+        carga.finalizado_em = None
+        carga.total_registros = 0
+        db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
+        db.commit()
 
     _tentar_enfileirar(db, carga)
     return carga, False
@@ -386,6 +500,16 @@ def resolver_data_base_config(config: ProtheusCargaConfig, data_base: Optional[s
 
 def reprocessar_carga(db: Session, empresa_id: int, carga_id: int) -> ProtheusCarga:
     carga = obter_carga(db, empresa_id, carga_id)
+
+    if _empresa_usa_dados_locais(db, empresa_id):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Empresa configurada para usar dados locais - nao e possivel atualizar via "
+                "Protheus. Reimporte os dados localmente via scripts/importar_carga_manual.py."
+            ),
+        )
+
     carga.status = "pendente"
     carga.erro = None
     carga.iniciado_em = None

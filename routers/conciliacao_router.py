@@ -2,10 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 import logging
 
+from sqlalchemy.orm import Session
+
 from schemas.conciliacao_schema import RequestConciliacao
 from services.conciliacao_service import ConciliacaoService
 from services.ctbr140_service import Ctbr140Service
 from core.config import settings
+from core.protheus import ProtheusConfig, resolve_protheus_config
+from db import get_db
 from middleware.permission import Permissions, require_permission
 from middleware.tenant import EmpresaContext
 
@@ -13,7 +17,9 @@ router = APIRouter(prefix="/conciliacoes", tags=["Conciliacoes"])
 logger = logging.getLogger(__name__)
 
 
-async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConciliacao:
+async def _resolver_base_contabil(
+    request: RequestConciliacao, config: ProtheusConfig
+) -> RequestConciliacao:
     """
     Se base_contabil_filtrada.ctbr140_params estiver preenchido, busca os registros
     diretamente do Protheus (ZCTBR140API) e substitui registros no request.
@@ -23,20 +29,17 @@ async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConcili
     if not params:
         return request
 
-    url = params.protheus_url or getattr(settings, "PROTHEUS_URL", None)
+    url = params.protheus_url or config.url
     if not url:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
                 "ctbr140_params fornecido mas PROTHEUS_URL nao configurado. "
-                "Informe 'protheus_url' dentro de ctbr140_params ou defina PROTHEUS_URL no .env"
+                "Informe 'protheus_url' dentro de ctbr140_params ou configure a URL na empresa."
             ),
         )
 
-    user = getattr(settings, "PROTHEUS_USER", "")
-    password = getattr(settings, "PROTHEUS_PASSWORD", "")
-    tenant_id = getattr(settings, "PROTHEUS_TENANT", "02,0201")
-    ctbr140_svc = Ctbr140Service(url, user, password, tenant_id)
+    ctbr140_svc = Ctbr140Service(url, config.user, config.password, config.tenant, config.rest_prefix)
 
     logger.info(
         " Buscando CTBR140 do Protheus -- data_fim=%s  conta_de=%s  conta_ate=%s",
@@ -59,7 +62,8 @@ async def _resolver_base_contabil(request: RequestConciliacao) -> RequestConcili
 @router.post("/contabil")
 async def processar_conciliacao(
     request: RequestConciliacao,
-    _: EmpresaContext = Depends(require_permission(Permissions.CONCILIACAO_WRITE)),
+    ctx: EmpresaContext = Depends(require_permission(Permissions.CONCILIACAO_WRITE)),
+    db: Session = Depends(get_db),
 ):
     """
     Processa uma conciliacao contabil comparando origem vs contabilidade.
@@ -102,8 +106,17 @@ async def processar_conciliacao(
     try:
         logger.info(" Recebendo requisicao de conciliacao")
 
+        # So resolve credenciais Protheus quando a requisicao realmente precisa buscar
+        # algo de la (ctbr140_params/ctbr480_params) -- no fluxo manual (registros ja
+        # enviados pelo frontend) empresas sem URL Protheus configurada (ex: GENIX)
+        # nao devem ser bloqueadas por essa resolucao.
+        precisa_protheus = bool(request.base_contabil_filtrada.ctbr140_params) or bool(
+            request.base_contabil_geral and request.base_contabil_geral.ctbr480_params
+        )
+        protheus_config = resolve_protheus_config(ctx.empresa_id, db) if precisa_protheus else None
+
         # Resolve base contabil filtrada: busca do Protheus se ctbr140_params presente
-        request = await _resolver_base_contabil(request)
+        request = await _resolver_base_contabil(request, protheus_config)
 
         logger.info(" Origem: %s registros", len(request.base_origem.registros))
         logger.info(" Contabil: %s registros", len(request.base_contabil_filtrada.registros))
@@ -124,7 +137,7 @@ async def processar_conciliacao(
             )
 
         # Usa executar_async para suportar busca automatica do CTBR480
-        resultado = await service.executar_async(request)
+        resultado = await service.executar_async(request, protheus_config)
 
         logger.info(" Conciliacao processada com sucesso")
         logger.info(" Resultado: %s", resultado.get("resumo", {}))

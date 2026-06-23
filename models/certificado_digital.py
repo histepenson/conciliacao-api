@@ -23,6 +23,7 @@ class CertificadoDigital(Base):
     senha_criptografada = Column(String(500), nullable=False)
     validade = Column(Date, nullable=True)
     status = Column(Enum(StatusCertificado, schema="concilia"), nullable=False, default=StatusCertificado.valido)
+    ultimo_nsu = Column(String(15), nullable=False, server_default="000000000000000")
 
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)

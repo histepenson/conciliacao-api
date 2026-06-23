@@ -2,18 +2,18 @@
 #Include "restful.ch"
 #Include "APWEBSRV.ch"
 
-/*/{Protheus.doc} ZCT2RAZAPI
-API REST de razao contabil via consulta SQL direta na tabela CT2.
+/*/{Protheus.doc} ZCT2RAZCT5
+API REST de razao contabil via consulta SQL direta na tabela CT2,
+com JOIN na CT5 para retornar a descricao do lancamento padrao (CT5_DESC).
 
-Substitui o uso de CTBGerRaz() dos relatorios CTBR400 e CTBR480 para fins
-de conciliacao contabil, bancaria e de estoque, eliminando o principal
-gargalo de performance dessas cargas.
+Personalizacao especifica: inclui o campo CT5_DESC obtido via LEFT JOIN
+na CT5 pelo campo CT2_ORIGEM (primeiros 7 caracteres).
 
-Endpoint: GET /rest/zct2razapi/api/v1/ct2raz
+Endpoint: GET /rest/zct2razct5/api/v1/ct2razct5
 
 Parametros:
-  conta_de      = conta contabil inicial        (obrigatorio)
-  conta_ate     = conta contabil final          (obrigatorio)
+  conta_de      = conta contabil inicial        (default "")
+  conta_ate     = conta contabil final          (default "zzzzzzzzzzzzz")
   data_ini      = data inicial YYYYMMDD         (obrigatorio)
   data_fim      = data final   YYYYMMDD         (obrigatorio)
   moeda         = codigo da moeda (default "01")
@@ -23,9 +23,8 @@ Parametros:
   clvl_de       = classe de valor inicial
   clvl_ate      = classe de valor final
   vlr_zerado    = 1=Incluir zeros | 2=Excluir zeros (default "2")
-  consid_filiais= 1=Range filiais | 2=Filial corrente (default "2")
-  filial_de     = filial inicial (quando consid_filiais=1)
-  filial_ate    = filial final   (quando consid_filiais=1)
+  filial_de     = filial inicial (default "")
+  filial_ate    = filial final   (default "zzzzzzzzz")
   custo_de      = centro de custo inicial (aceito, nao filtra em CT2)
   custo_ate     = centro de custo final   (aceito, nao filtra em CT2)
   page          = pagina (default 1)
@@ -39,17 +38,18 @@ Retorno JSON:
   hasMore         = ha mais paginas
   linhas          = lancamentos da pagina
 
-Campos por linha (compativel com CTBR400 / CTBR480):
+Campos por linha (compativel com CTBR400 / CTBR480 + CT5_DESC):
   data, lote_sub_doc_linha, historico, xpartida,
   c_custo, item_conta, cod_cl_val,
-  debito, credito, saldo_atual, conta
+  debito, credito, saldo_atual, conta,
+  ct5_desc, ct2_key, ct2_lp, ct2_origem
 
 @author Equipe Desenvolvimento
-@since 21/05/2026
-@version 1.1
+@since 26/05/2026
+@version 1.0
 /*/
 
-wsrestful ZCT2RAZAPI description "CT2 - Razao Contabil SQL Direto"
+wsrestful ZCT2RAZCT5 description "CT2 - Razao Contabil SQL Direto com CT5_DESC"
 
     wsdata page          as string
     wsdata pageSize      as string
@@ -69,12 +69,13 @@ wsrestful ZCT2RAZAPI description "CT2 - Razao Contabil SQL Direto"
     wsdata filial_ate    as string
     wsdata custo_de      as string
     wsdata custo_ate     as string
+    wsdata lote          as string
 
-    wsmethod GET getRazao description "Razao contabil CT2 SQL direto" wssyntax "/api/v1/ct2raz" PATH "/api/v1/ct2raz"
+    wsmethod GET getRazaoCT5 description "Razao contabil CT2 SQL direto com CT5_DESC" wssyntax "/api/v1/ct2razct5" PATH "/api/v1/ct2razct5"
 
 EndwsRestFul
 
-wsmethod GET getRazao WSRESTFUL ZCT2RAZAPI
+wsmethod GET getRazaoCT5 WSRESTFUL ZCT2RAZCT5
 Local aArea      := GetArea()
 Local oResp      := JsonObject():New()
 Local oParams    := JsonObject():New()
@@ -86,6 +87,8 @@ Local cAlias     := GetNextAlias()
 Local cSql       := ""
 Local cWhere     := ""
 Local cTabela    := RetSqlName("CT2")
+Local cTabelaCT5 := RetSqlName("CT5")
+Local cErrMsg    := ""
 
 Local cContaDe      := AllTrim(Self:conta_de)
 Local cContaAte     := AllTrim(Self:conta_ate)
@@ -98,9 +101,9 @@ Local cItemAte      := AllTrim(Self:item_ate)
 Local cClvlDe       := AllTrim(Self:clvl_de)
 Local cClvlAte      := AllTrim(Self:clvl_ate)
 Local cVlrZerado    := AllTrim(Self:vlr_zerado)
-Local cConsidFil    := AllTrim(Self:consid_filiais)
 Local cFilialDe     := AllTrim(Self:filial_de)
 Local cFilialAte    := AllTrim(Self:filial_ate)
+Local cLote         := IIf(Empty(AllTrim(Self:lote)), "008810", AllTrim(Self:lote))
 Local nPage         := Max(1, Val(AllTrim(Self:page)))
 Local nPageSize     := Val(AllTrim(Self:pageSize))
 
@@ -111,21 +114,12 @@ Local nRecAtual   := 0
 Local lHasMore    := .F.
 Local lIncCred    := .T.
 Local lIncDeb     := .T.
-Local cFilialAtual := xFilial("CT2")
 
 Self:SetContentType("application/json")
 
 // --- Validacoes obrigatorias ---
-If Empty(cContaDe) .Or. Empty(cContaAte)
-    Self:SetResponse(CT2Raz_MontaErro("VALIDATION_ERROR", "Parametros conta_de e conta_ate sao obrigatorios", ""))
-    FreeObj(oResp)
-    FreeObj(oParams)
-    RestArea(aArea)
-Return .T.
-EndIf
-
 If Empty(cDataIni) .Or. Len(cDataIni) <> 8 .Or. Empty(cDataFim) .Or. Len(cDataFim) <> 8
-    Self:SetResponse(CT2Raz_MontaErro("VALIDATION_ERROR", "Parametros data_ini e data_fim sao obrigatorios no formato YYYYMMDD", ""))
+    Self:SetResponse(CT2RazCT5_MontaErro("VALIDATION_ERROR", "Parametros data_ini e data_fim sao obrigatorios no formato YYYYMMDD", ""))
     FreeObj(oResp)
     FreeObj(oParams)
     RestArea(aArea)
@@ -136,7 +130,10 @@ EndIf
 cMoeda     := IIf(Empty(cMoeda), "01", PadL(AllTrim(cMoeda), 2, "0"))
 cSaldo     := IIf(Empty(cSaldo),     "1",  cSaldo)
 cVlrZerado := IIf(Empty(cVlrZerado),"2",  cVlrZerado)
-cConsidFil := IIf(Empty(cConsidFil), "2",  cConsidFil)
+cContaDe   := IIf(Empty(cContaDe),  "",             cContaDe)
+cContaAte  := IIf(Empty(cContaAte), "zzzzzzzzzzzzz", cContaAte)
+cFilialDe  := IIf(Empty(cFilialDe),  "",          cFilialDe)
+cFilialAte := IIf(Empty(cFilialAte), "zzzzzzzzz", cFilialAte)
 nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset    := (nPage - 1) * nPageSize
 
@@ -144,18 +141,18 @@ nOffset    := (nPage - 1) * nPageSize
 lIncCred := (cSaldo != "2")
 lIncDeb  := (cSaldo != "3")
 
-ConOut("[ZCT2RAZ] conta_de=[" + cContaDe + "] conta_ate=[" + cContaAte + "]" + ;
+ConOut("[ZCT2RAZCT5] conta_de=[" + cContaDe + "] conta_ate=[" + cContaAte + "]" + ;
     " data=" + cDataIni + "/" + cDataFim + ;
     " moeda=" + cMoeda + " saldo=" + cSaldo + ;
     " item=" + cItemDe + "/" + cItemAte + ;
     " clvl=" + cClvlDe + "/" + cClvlAte + ;
-    " vlr_zerado=" + cVlrZerado + " consid_filiais=" + cConsidFil + ;
+    " vlr_zerado=" + cVlrZerado + ;
     " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
-    " filial_atual=" + cFilialAtual + ;
+    " lote=" + cLote + ;
     " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize))
 
-// --- WHERE comum (data, moeda, valor zerado, filial) ---
-cWhere := " D_E_L_E_T_ = ' '"
+// --- WHERE comum (CT2. prefixo em D_E_L_E_T_ para evitar ambiguidade com CT5) ---
+cWhere := " CT2.D_E_L_E_T_ = ' '"
 cWhere += " AND CT2_MOEDLC = '" + cMoeda + "'"
 cWhere += " AND CT2_DATA BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
 
@@ -163,14 +160,9 @@ If cVlrZerado == "2"
     cWhere += " AND CT2_VALOR <> 0"
 EndIf
 
-If cConsidFil == "1"
-    If !Empty(cFilialDe) .And. !Empty(cFilialAte)
-        cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
-    // consid_filiais=1 sem range = todas as filiais, sem filtro
-    EndIf
-Else
-    cWhere += " AND CT2_FILORI = '" + cFilialAtual + "'"
-EndIf
+cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
+
+cWhere += " AND CT2_LOTE = '" + cLote + "'"
 
 // --- Bloco CREDITO (DC=2 e DC=3) ---
 If lIncCred
@@ -183,8 +175,15 @@ If lIncCred
     cSql += "     CT2_CLVLCR AS cod_cl_val,"
     cSql += "     0          AS debito,"
     cSql += "     CT2_VALOR  AS credito,"
-    cSql += "     CT2_KEY"
-    cSql += " FROM " + cTabela
+    cSql += "     CT2_KEY,"
+    cSql += "     CT2.CT2_LP,"
+    cSql += "     CT2.CT2_ORIGEM,"
+    cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc,"
+    cSql += "     CT2_ITEMC  AS ct2_itemc"
+    cSql += " FROM " + cTabela + " CT2"
+    cSql += " LEFT JOIN " + cTabelaCT5 + " CT5"
+    cSql += "     ON CT5.D_E_L_E_T_ = ' '"
+    cSql += "    AND (RTRIM(CT5.CT5_LANPAD) + '-' + RTRIM(CT5.CT5_SEQUEN)) = SUBSTRING(CT2.CT2_ORIGEM,1,7)"
     cSql += " WHERE " + cWhere
     cSql += "   AND CT2_DC IN ('2','3')"
     cSql += "   AND CT2_CREDIT BETWEEN '" + cContaDe + "' AND '" + cContaAte + "'"
@@ -212,8 +211,15 @@ If lIncDeb
     cSql += "     CT2_CLVLDB AS cod_cl_val,"
     cSql += "     CT2_VALOR  AS debito,"
     cSql += "     0          AS credito,"
-    cSql += "     CT2_KEY"
-    cSql += " FROM " + cTabela
+    cSql += "     CT2_KEY,"
+    cSql += "     CT2.CT2_LP,"
+    cSql += "     CT2.CT2_ORIGEM,"
+    cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc,"
+    cSql += "     CT2_ITEMC  AS ct2_itemc"
+    cSql += " FROM " + cTabela + " CT2"
+    cSql += " LEFT JOIN " + cTabelaCT5 + " CT5"
+    cSql += "     ON CT5.D_E_L_E_T_ = ' '"
+    cSql += "    AND (RTRIM(CT5.CT5_LANPAD) + '-' + RTRIM(CT5.CT5_SEQUEN)) = SUBSTRING(CT2.CT2_ORIGEM,1,7)"
     cSql += " WHERE " + cWhere
     cSql += "   AND CT2_DC IN ('1','3')"
     cSql += "   AND CT2_DEBITO BETWEEN '" + cContaDe + "' AND '" + cContaAte + "'"
@@ -227,13 +233,17 @@ EndIf
 
 cSql += " ORDER BY CT2_DATA, CT2_LOTE, CT2_SBLOTE, CT2_DOC, CT2_LINHA, CT2_KEY"
 
-ConOut("[ZCT2RAZ] SQL montado | tabela=" + cTabela + " incCred=" + IIf(lIncCred,"S","N") + " incDeb=" + IIf(lIncDeb,"S","N"))
+ConOut("[ZCT2RAZCT5] SQL montado | tabela=" + cTabela + " incCred=" + IIf(lIncCred,"S","N") + " incDeb=" + IIf(lIncDeb,"S","N"))
 
 Begin Sequence
     dbUseArea(.T., "TOPCONN", TCGenQry(,, cSql), cAlias, .T., .F.)
-    TCSetField(cAlias, "CT2_DATA", "D",  8, 0)
-    TCSetField(cAlias, "debito",   "N", 18, 2)
-    TCSetField(cAlias, "credito",  "N", 18, 2)
+    TCSetField(cAlias, "CT2_DATA",   "D",  8, 0)
+    TCSetField(cAlias, "debito",     "N", 18, 2)
+    TCSetField(cAlias, "credito",    "N", 18, 2)
+    TCSetField(cAlias, "ct5_desc",   "C", 30, 0)
+    TCSetField(cAlias, "CT2_LP",     "C",  6, 0)
+    TCSetField(cAlias, "CT2_ORIGEM", "C", 60, 0)
+    TCSetField(cAlias, "ct2_itemc",  "C", 30, 0)
 
     (cAlias)->(DbGoTop())
     While !(cAlias)->(Eof())
@@ -252,6 +262,11 @@ Begin Sequence
         oLinha["credito"]            := Round((cAlias)->credito, 2)
         oLinha["saldo_atual"]        := 0
         oLinha["conta"]              := AllTrim((cAlias)->conta)
+        oLinha["ct5_desc"]           := AllTrim((cAlias)->ct5_desc)
+        oLinha["ct2_key"]            := AllTrim((cAlias)->CT2_KEY)
+        oLinha["ct2_lp"]             := AllTrim((cAlias)->CT2_LP)
+        oLinha["ct2_origem"]         := AllTrim((cAlias)->CT2_ORIGEM)
+        oLinha["ct2_itemc"]          := AllTrim((cAlias)->ct2_itemc)
         AAdd(aAllLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo
@@ -272,8 +287,12 @@ Recover Using oError
     If Select(cAlias) > 0
         (cAlias)->(DbCloseArea())
     EndIf
-    ConOut("[ZCT2RAZ] ERRO: " + oError:Description)
-    Self:SetResponse(CT2Raz_MontaErro("INTERNAL_ERROR", "Erro ao consultar CT2: " + oError:Description, ""))
+    cErrMsg := "Erro ao consultar CT2"
+    If ValType(oError) == "O"
+        cErrMsg += ": " + AllTrim(oError:Description)
+    EndIf
+    ConOut("[ZCT2RAZCT5] ERRO: " + cErrMsg)
+    Self:SetResponse(CT2RazCT5_MontaErro("INTERNAL_ERROR", cErrMsg, ""))
     FreeObj(oResp)
     FreeObj(oParams)
     AEval(aAllLinhas, {|o| FreeObj(o)})
@@ -281,7 +300,7 @@ Recover Using oError
 Return .T.
 End Sequence
 
-ConOut("[ZCT2RAZ] total=" + cValToChar(nTotalReg) + ;
+ConOut("[ZCT2RAZCT5] total=" + cValToChar(nTotalReg) + ;
     " pages=" + cValToChar(nTotalPages) + ;
     " page=" + cValToChar(nPage) + ;
     " linhas_pagina=" + cValToChar(Len(aLinhas)) + ;
@@ -298,9 +317,9 @@ oParams["item_ate"]       := cItemAte
 oParams["clvl_de"]        := cClvlDe
 oParams["clvl_ate"]       := cClvlAte
 oParams["vlr_zerado"]     := cVlrZerado
-oParams["consid_filiais"] := cConsidFil
 oParams["filial_de"]      := cFilialDe
 oParams["filial_ate"]     := cFilialAte
+oParams["lote"]           := cLote
 oParams["page"]           := nPage
 oParams["pageSize"]       := nPageSize
 
@@ -320,7 +339,7 @@ RestArea(aArea)
 
 Return .T.
 
-Static Function CT2Raz_MontaErro(cCode, cMessage, cDetails)
+Static Function CT2RazCT5_MontaErro(cCode, cMessage, cDetails)
 Local oErr  := JsonObject():New()
 Local cJson := ""
 

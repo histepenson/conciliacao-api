@@ -1,27 +1,16 @@
-# Build do Frontend
-FROM node:18-alpine as frontend-build
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-
-# Backend Python
+# Backend Python (FastAPI)
 FROM python:3.11-slim
 WORKDIR /app
 
-# Instalar dependências do backend
-COPY backend/requirements.txt ./
+# Instalar dependencias
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-DATABASE_URL
-# Copiar código do backend
-COPY backend/ ./backend/
 
-# Copiar build do frontend
-COPY --from=frontend-build /app/dist ./frontend/dist
+# Copiar codigo da API
+COPY . .
 
 # Expor porta
 EXPOSE 8000
 
-# Comando para iniciar
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Aplica migracoes pendentes e sobe o servidor
+CMD alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}

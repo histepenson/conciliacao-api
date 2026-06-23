@@ -14,13 +14,23 @@ Regras:
 
 import pandas as pd
 import logging
+import time
 from typing import Dict, Any
 from datetime import datetime
 import re
 
 logger = logging.getLogger(__name__)
 
-THRESHOLD_CONCILIACAO = 0.01
+THRESHOLD_CONCILIACAO = 1.0
+
+# Orcamento de tempo total (todas as chamadas somadas) para a decomposicao
+# exata por subset-sum em _selecionar_registros_para_total -- e' um recurso
+# de UI (mostrar quais lancamentos compoem uma diferenca), nao essencial pro
+# resultado da conciliacao (o chamador ja cai de volta pra lista completa de
+# registros quando a funcao retorna vazio). Sem esse teto, um Kardex grande
+# (milhares de movimentos, muitos buckets data+cf divergentes) pode disparar
+# a funcao centenas/milhares de vezes e travar a requisicao por minutos.
+_DECOMP_DEADLINE = {"value": 0.0}
 
 # Codigos de movimento que representam entradas (debito no razao)
 CODIGOS_ENTRADA = {
@@ -105,6 +115,9 @@ def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list
     if alvo_cent <= 0 or not registros:
         return []
 
+    if time.monotonic() > _DECOMP_DEADLINE["value"]:
+        return []
+
     itens = []
     for idx, reg in enumerate(registros):
         v_cent = int(round(abs(float(reg.get("valor", 0) or 0)) * 100))
@@ -114,31 +127,69 @@ def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list
     if not itens:
         return []
 
-    estados = {0: []}  # soma_cent -> lista de indices
-    max_estados = 60000
+    # Bucket grande demais: a busca exata por subconjunto (DP) fica cara
+    # (O(len(itens) * estados)) sem trazer beneficio proporcional -- o
+    # chamador ja cai de volta para a lista completa de registros quando
+    # isso retorna vazio (ver "composicao if composicao else regs_chave").
+    if len(itens) > 500:
+        return []
+
+    # soma_cent -> (idx_do_item_usado, soma_anterior) -- back-pointer em vez
+    # de guardar a lista completa de indices em cada estado. A versao antiga
+    # fazia "idxs + [idx]" (copia de lista, O(tamanho)) a cada transicao; com
+    # ate max_estados*len(itens) transicoes, isso explodia para buckets de
+    # centenas de itens. Guardar so' o passo anterior e' O(1) por transicao;
+    # a lista de indices so' e' reconstruida UMA vez, no final, para o
+    # candidato escolhido.
+    estados: dict[int, Any] = {0: None}
+    # 60000 estados tornava a poda (sort + rebuild) cara o suficiente para
+    # travar com buckets de centenas de itens (cada poda chama a key function
+    # uma vez por estado -- com poda disparando em quase toda iteracao do
+    # loop principal, o custo total explode). 2000 ja' cobre com folga os
+    # casos reais (poucas dezenas/centenas de lancamentos por bucket).
+    max_estados = 2000
 
     for idx, v_cent in itens:
-        novos = dict(estados)
-        for soma, idxs in estados.items():
+        # Checagem por iteracao (nao so' na entrada da funcao): uma unica
+        # chamada com itens proximos do limite (500) e muitos estados pode
+        # estourar o orcamento por conta propria antes de outra chamada
+        # nova ser bloqueada pela checagem inicial.
+        if time.monotonic() > _DECOMP_DEADLINE["value"]:
+            return []
+
+        # Itera sobre um snapshot das somas atuais e insere as novas somas
+        # diretamente em "estados" -- evita copiar o dict inteiro a cada
+        # item processado.
+        for soma in list(estados.keys()):
             ns = soma + v_cent
             if ns > alvo_cent + 1:
                 continue
-            if ns not in novos:
-                novos[ns] = idxs + [idx]
-        estados = novos
+            if ns not in estados:
+                estados[ns] = (idx, soma)
 
         if len(estados) > max_estados:
             # poda por proximidade ao alvo
             chaves = sorted(estados.keys(), key=lambda s: abs(alvo_cent - s))[: max_estados // 2]
             estados = {k: estados[k] for k in chaves}
 
+    def _reconstruir(soma_final: int) -> list:
+        idxs = []
+        soma = soma_final
+        passo = estados.get(soma)
+        while passo is not None:
+            idx_usado, soma_anterior = passo
+            idxs.append(idx_usado)
+            soma = soma_anterior
+            passo = estados.get(soma)
+        return idxs
+
     for candidato in (alvo_cent, alvo_cent - 1, alvo_cent + 1):
         if candidato in estados:
-            return [registros[i] for i in estados[candidato]]
+            return [registros[i] for i in _reconstruir(candidato)]
 
     # fallback: melhor aproximacao
     melhor = min(estados.keys(), key=lambda s: abs(alvo_cent - s))
-    return [registros[i] for i in estados[melhor]]
+    return [registros[i] for i in _reconstruir(melhor)]
 
 
 def calcular_diferencas_estoque(
@@ -170,6 +221,8 @@ def calcular_diferencas_estoque(
         - 'registros_so_razao': Registros individuais do Razao sem match no Kardex
     """
     logger.info("[CALC DIFERENCAS ESTOQUE] Iniciando calculo")
+
+    _DECOMP_DEADLINE["value"] = time.monotonic() + 5.0
 
     df_k = df_kardex.copy()
     df_r = df_razao.copy()
@@ -272,7 +325,10 @@ def calcular_diferencas_estoque(
     def _normalizar_razao_para_matching(df_razao_grupo, is_entrada):
         """Normaliza registros do Razao para formato comparavel com Kardex."""
         registros = []
-        for idx, (_, reg) in enumerate(df_razao_grupo.iterrows()):
+        # to_dict("records") em vez de iterrows() -- iterrows() reconstroi uma
+        # Series por linha (custoso em DataFrame com colunas de tipos mistos),
+        # e esse grupo pode ter milhares de linhas num Kardex/Razao grandes.
+        for idx, reg in enumerate(df_razao_grupo.to_dict("records")):
             valor = float(reg.get("debito", 0)) if is_entrada else float(reg.get("credito", 0))
             data_mov = reg.get("data_movimento", "") or reg.get("data_lancamento", "")
             cm = _normalizar_codigo_movimento(reg.get("codigo_movimento", ""))
@@ -286,6 +342,7 @@ def calcular_diferencas_estoque(
                 "debito": round(float(reg.get("debito", 0)), 2),
                 "credito": round(float(reg.get("credito", 0)), 2),
                 "codigo_movimento": cm,
+                "ct2_key": str(reg.get("ct2_key", "") or "").strip(),
                 "_origem": "razao",
             })
         return registros
@@ -293,7 +350,7 @@ def calcular_diferencas_estoque(
     def _normalizar_kardex_para_matching(df_kardex_grupo):
         """Normaliza registros do Kardex para formato comparavel."""
         registros = []
-        for idx, (_, reg) in enumerate(df_kardex_grupo.iterrows()):
+        for idx, reg in enumerate(df_kardex_grupo.to_dict("records")):
             cm = _normalizar_codigo_movimento(reg.get("codigo_movimento", ""))
             registros.append({
                 "_idx": idx,
@@ -304,6 +361,7 @@ def calcular_diferencas_estoque(
                 "descricao": str(reg.get("descricao", "")),
                 "codigo_produto": str(reg.get("codigo_produto", "")),
                 "codigo_movimento": cm,
+                "ct2_key": str(reg.get("ct2_key", "") or "").strip(),
                 "_origem": "kardex",
             })
         return registros
@@ -337,13 +395,57 @@ def calcular_diferencas_estoque(
     def _skip_cf_match(codigo_movimento):
         return codigo_movimento in {"CPV", "DEV"}
 
+    def _matching_por_ct2_key(regs_kardex, regs_razao):
+        """
+        Passada 0 (antes do matching agregado por data+cf): casa Kardex x
+        Razao pelo ct2_key -- mesma chave que o Protheus grava na CT2 ao
+        gerar o lancamento contabil a partir do movimento de estoque
+        (Codigo+ARM+Data+Documento no Kardex; CT2_KEY nativo no Razao).
+        So' consome o par quando chave E valor batem (tolerancia de R$ 0,01)
+        -- sem fallback global, mesmo principio de tools/fiscal/match_ct2_sft.py
+        (evita falso positivo por colisao de chave). O que nao casar aqui
+        (sem ct2_key de um dos lados, ou chave sem par) segue no fluxo
+        existente de matching por (data, cf).
+        """
+        por_chave_razao: dict = {}
+        for idx, reg in enumerate(regs_razao):
+            chave = reg.get("ct2_key") or ""
+            if chave:
+                por_chave_razao.setdefault(chave, []).append(idx)
+
+        usados_kardex = set()
+        usados_razao = set()
+        for idx_k, reg_k in enumerate(regs_kardex):
+            chave = reg_k.get("ct2_key") or ""
+            if not chave:
+                continue
+            candidatos = [i for i in por_chave_razao.get(chave, []) if i not in usados_razao]
+            if not candidatos:
+                continue
+            valor_k = float(reg_k.get("valor", 0) or 0)
+            for idx_r in candidatos:
+                valor_r = float(regs_razao[idx_r].get("valor", 0) or 0)
+                if abs(valor_k - valor_r) <= THRESHOLD_CONCILIACAO:
+                    usados_kardex.add(idx_k)
+                    usados_razao.add(idx_r)
+                    break
+
+        if not usados_kardex and not usados_razao:
+            return regs_kardex, regs_razao
+
+        regs_kardex_restantes = [r for i, r in enumerate(regs_kardex) if i not in usados_kardex]
+        regs_razao_restantes = [r for i, r in enumerate(regs_razao) if i not in usados_razao]
+        return regs_kardex_restantes, regs_razao_restantes
+
     def _matching_registros(regs_kardex, regs_razao, match_cf=True):
         """
         Matching aglutinado:
+        - passada 0: chave exata por ct2_key (quando disponivel)
         - por (data, cf_normalizado) quando match_cf=True
         - por (data) quando match_cf=False
         Compara soma de valor por chave.
         """
+        regs_kardex, regs_razao = _matching_por_ct2_key(regs_kardex, regs_razao)
         k_ag = _agrupar_para_matching(regs_kardex, usar_cf=match_cf)
         r_ag = _agrupar_para_matching(regs_razao, usar_cf=match_cf)
 
@@ -513,6 +615,29 @@ def calcular_diferencas_estoque(
             grupos_conciliados.append(grupo_info)
 
     # ===========================
+    # 7.5 SALDO FINAL DO RAZAO (ultima linha, igual ao banco)
+    # ===========================
+    total_debito_razao = df_r["debito"].sum() if "debito" in df_r.columns else 0.0
+    total_credito_razao = df_r["credito"].sum() if "credito" in df_r.columns else 0.0
+    saldo_final_razao = (
+        float(df_r.iloc[-1]["saldo_atual"])
+        if len(df_r) > 0 and "saldo_atual" in df_r.columns
+        else None
+    )
+
+    # Movimentos da ORIGEM (Kardex): entradas = debito, saidas = credito
+    total_entradas_kardex = (
+        df_k.loc[df_k["tipo_movimento"] == "ENTRADA", "valor"].sum()
+        if "valor" in df_k.columns and "tipo_movimento" in df_k.columns
+        else 0.0
+    )
+    total_saidas_kardex = (
+        df_k.loc[df_k["tipo_movimento"] == "SAIDA", "valor"].sum()
+        if "valor" in df_k.columns and "tipo_movimento" in df_k.columns
+        else 0.0
+    )
+
+    # ===========================
     # 8. RESUMO
     # ===========================
     total_kardex = df_merge["valor_kardex"].sum()
@@ -539,6 +664,11 @@ def calcular_diferencas_estoque(
         "qtd_so_kardex": qtd_so_kardex,
         "qtd_so_razao": qtd_so_razao,
         "percentual_conciliacao": round(percentual_conciliacao, 2),
+        "total_debito_razao": round(float(total_debito_razao), 2),
+        "total_credito_razao": round(float(total_credito_razao), 2),
+        "saldo_final_razao": round(saldo_final_razao, 2) if saldo_final_razao is not None else None,
+        "total_entradas_kardex": round(float(total_entradas_kardex), 2),
+        "total_saidas_kardex": round(float(total_saidas_kardex), 2),
         "data_processamento": datetime.now().isoformat(),
     }
 

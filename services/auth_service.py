@@ -8,6 +8,7 @@ from core.config import settings
 from core.security import (
     verify_password,
     hash_password,
+    hash_token,
     validate_password_strength,
     create_access_token,
     create_refresh_token,
@@ -144,7 +145,7 @@ def login(
     expires_at = _now_utc() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     session = UserSession(
         usuario_id=user.id,
-        token_hash=hash_password(refresh_token),
+        token_hash=hash_token(refresh_token),
         empresa_id=None,
         expires_at=expires_at,
     )
@@ -177,20 +178,17 @@ def refresh_access_token(db: Session, refresh_token: str) -> Dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario invalido")
 
     # Validar sessao
-    valid_session = None
-    sessions = (
+    valid_session = (
         db.query(UserSession)
-        .filter(UserSession.usuario_id == user.id, UserSession.revoked_at.is_(None))
-        .all()
+        .filter(
+            UserSession.usuario_id == user.id,
+            UserSession.token_hash == hash_token(refresh_token),
+            UserSession.revoked_at.is_(None),
+        )
+        .first()
     )
-    for sess in sessions:
-        if sess.is_expired:
-            continue
-        if verify_password(refresh_token, sess.token_hash):
-            valid_session = sess
-            break
 
-    if valid_session is None:
+    if valid_session is None or valid_session.is_expired:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token invalido")
 
     access_token = create_access_token(user_id=user.id, empresa_id=None, is_admin=user.is_admin)
@@ -213,17 +211,19 @@ def logout(db: Session, refresh_token: Optional[str]) -> Dict[str, Any]:
     if not user_id:
         return {"message": "Logout realizado"}
 
-    sessions = (
+    sess = (
         db.query(UserSession)
-        .filter(UserSession.usuario_id == int(user_id), UserSession.revoked_at.is_(None))
-        .all()
+        .filter(
+            UserSession.usuario_id == int(user_id),
+            UserSession.token_hash == hash_token(refresh_token),
+            UserSession.revoked_at.is_(None),
+        )
+        .first()
     )
-    for sess in sessions:
-        if verify_password(refresh_token, sess.token_hash):
-            sess.revoked_at = _now_utc()
-            _log_audit(db, int(user_id), None, AuditAction.LOGOUT, "usuario", int(user_id))
-            db.commit()
-            break
+    if sess:
+        sess.revoked_at = _now_utc()
+        _log_audit(db, int(user_id), None, AuditAction.LOGOUT, "usuario", int(user_id))
+        db.commit()
 
     return {"message": "Logout realizado"}
 

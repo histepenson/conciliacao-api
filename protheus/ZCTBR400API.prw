@@ -29,6 +29,9 @@ Campos principais por linha:
   conta
   desc_conta
   normal_cta
+  ct2_key (CT2_KEY do lancamento de origem na CT2, via MsSeek -- mesmo
+           padrao usado em ZCTBR480API::CTB480HistCompl. Linha "TOTAL DO
+           DIA" nao tem CT2 unica correspondente, fica em branco)
 
 @author Equipe Desenvolvimento
 @since 26/03/2026
@@ -355,6 +358,7 @@ Begin Sequence
 				oLinha["conta"]              := cContaAnt
 				oLinha["desc_conta"]         := cDescConta
 				oLinha["normal_cta"]         := cNormalCta
+				oLinha["ct2_key"]            := ""
 				nTotalReg++
 				If nTotalReg > (nOffset + nPageSize)
 					lHasMore := .T.
@@ -575,8 +579,35 @@ oLinha["normal_cta"]         := cNormalCta
 oLinha["filial"]             := (cAlias)->FILIAL
 oLinha["filial_origem"]      := (cAlias)->FILORI
 oLinha["emp_origem"]         := (cAlias)->EMPORI
+oLinha["ct2_key"]            := CTB400Ct2Key(cAlias)
 
 Return Nil
+
+/*/{Protheus.doc} CTB400Ct2Key
+Busca o CT2_KEY do lancamento de origem na CT2 a partir da linha do
+relatorio (gerada por CTBGerRaz, sem CT2_KEY nativo). Mesmo padrao de
+MsSeek (ordem 10, por filial+data+lote+sublote+doc+linha+empresa/filial
+origem) usado em ZCTBR480API::CTB480HistCompl - so troca o campo lido
+(CT2_KEY no lugar de CT2_HIST). Nome encurtado (sem "Api") para nao
+colidir com CTB400ApiContaDesc nos 10 primeiros caracteres do identificador.
+/*/
+Static Function CTB400Ct2Key(cAlias)
+Local aArea  := GetArea()
+Local cRet   := ""
+
+If Select("CT2") <= 0
+	RestArea(aArea)
+	Return cRet
+EndIf
+
+DbSelectArea("CT2")
+dbSetOrder(10)
+If MsSeek(xFilial("CT2") + (cAlias)->(DTOS(DATAL) + LOTE + SUBLOTE + DOC + LINHA + EMPORI + FILORI), .F.)
+	cRet := AllTrim(CT2->CT2_KEY)
+EndIf
+
+RestArea(aArea)
+Return cRet
 
 Static Function CTB400ApiMontaErro(cCode, cMessage, cDetails)
 Local oErr  := JsonObject():New()

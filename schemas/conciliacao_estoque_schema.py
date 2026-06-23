@@ -21,6 +21,7 @@ class BaseRazaoEstoque(BaseModel):
     """Base contabil - CTBR400 (razao contabil de estoque)."""
     registros: List[Dict[str, Any]]
     conta_contabil: str
+    conta_contabil_id: Optional[int] = None
 
 
 class ParametrosConciliacaoEstoque(BaseModel):

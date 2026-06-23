@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Optional
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -14,7 +14,12 @@ from services.finr130_service import FinR130Service
 from services.finr150_service import FinR150Service
 from services.finr470_service import FinR470Service
 from services.matr900_service import Matr900Service
+from services.sft_ent_service import SftEntService
+from services.ct2raz_ct5_service import Ct2RazCt5Service
+from services.sn3_service import Sn3Service
+from services.sn4_service import Sn4Service
 from services.protheus_carga_service import marcar_concluido, marcar_erro, marcar_processando
+from services.lancamento_padrao_service import upsert_de_carga as lp_upsert_de_carga
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -24,6 +29,7 @@ _PAGE_SIZE_POR_TIPO: dict[str, int] = {
     "CTBR140": 3000,
 }
 _INSERT_CHUNK_SIZE = 1000
+_MAX_PARALLEL_PAGES = 5  # paginas simultâneas por carga
 
 
 def executar_carga_protheus(carga_id: int) -> None:
@@ -61,40 +67,43 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
         db.commit()
 
-        total = 0
-        sequencia = 1
+        todos_registros = await _buscar_todas_paginas(carga, config, params)
 
-        async for registros_pagina in _iterar_paginas(carga, config, params):
-            if not registros_pagina:
-                continue
+        # Verificar cancelamento antes de gravar
+        db.refresh(carga)
+        if carga.status == "cancelado":
+            logger.info("Carga Protheus %s cancelada antes de gravar", carga.id)
+            print(f"[PROTHEUS_CARGA] cancelada carga_id={carga.id}", flush=True)
+            return
 
-            rows = [
-                {"carga_id": carga.id, "sequencia": sequencia + i, "dados_json": r}
-                for i, r in enumerate(registros_pagina)
-            ]
-            sequencia += len(registros_pagina)
-            total += len(registros_pagina)
+        total = len(todos_registros)
+        rows = [
+            {"carga_id": carga.id, "sequencia": i + 1, "dados_json": r}
+            for i, r in enumerate(todos_registros)
+        ]
+        for start in range(0, len(rows), _INSERT_CHUNK_SIZE):
+            db.execute(pg_insert(ProtheusCargaRegistro), rows[start:start + _INSERT_CHUNK_SIZE])
 
-            for start in range(0, len(rows), _INSERT_CHUNK_SIZE):
-                db.execute(pg_insert(ProtheusCargaRegistro), rows[start:start + _INSERT_CHUNK_SIZE])
-
-            carga.total_registros = total
-            db.commit()
-            logger.info("Carga Protheus %s: %s registros gravados", carga.id, total)
-            print(f"[PROTHEUS_CARGA] gravados {total} registros carga_id={carga.id}", flush=True)
-
-            db.refresh(carga)
-            if carga.status == "cancelado":
-                logger.info("Carga Protheus %s cancelada durante processamento", carga.id)
-                print(f"[PROTHEUS_CARGA] cancelada carga_id={carga.id}", flush=True)
-                db.query(ProtheusCargaRegistro).filter(ProtheusCargaRegistro.carga_id == carga.id).delete()
-                carga.total_registros = 0
-                db.commit()
-                return
+        carga.total_registros = total
+        db.commit()
+        logger.info("Carga Protheus %s: %s registros gravados", carga.id, total)
+        print(f"[PROTHEUS_CARGA] gravados {total} registros carga_id={carga.id}", flush=True)
 
         marcar_concluido(db, carga, total)
         logger.info("Carga Protheus %s concluida com %s registros", carga.id, total)
         print(f"[PROTHEUS_CARGA] concluida carga_id={carga.id} total={total}", flush=True)
+
+        if tipo_upper == "CT2RAZCT5":
+            try:
+                registros_all = (
+                    db.query(ProtheusCargaRegistro)
+                    .filter_by(carga_id=carga.id)
+                    .all()
+                )
+                lp_upsert_de_carga(db, carga.empresa_id, [r.dados_json for r in registros_all])
+                print(f"[PROTHEUS_CARGA] lancamentos_padrao atualizados empresa={carga.empresa_id}", flush=True)
+            except Exception as exc_lp:
+                logger.warning("Falha ao popular lancamentos_padrao carga=%s: %s", carga.id, exc_lp)
 
     except Exception as exc:
         print(f"[PROTHEUS_CARGA] erro carga_id={carga_id}: {exc}", flush=True)
@@ -106,6 +115,69 @@ async def _executar_carga_protheus(carga_id: int) -> None:
         raise
     finally:
         db.close()
+
+
+async def _buscar_todas_paginas(
+    carga: ProtheusCarga,
+    config: Any,
+    params: dict[str, Any],
+) -> list[dict]:
+    """Busca todas as páginas do Protheus em paralelo (até _MAX_PARALLEL_PAGES simultâneas)."""
+    tipo = carga.tipo_relatorio.upper()
+    service_args = (config.url, config.user, config.password, config.tenant, config.rest_prefix)
+
+    services = {
+        "FINR130": FinR130Service, "FINR150": FinR150Service,
+        "CTBR140": Ctbr140Service, "CTBR400": Ctbr400Service,
+        "CTBR480": Ctbr480Service, "FINR470": FinR470Service,
+        "MATR900": Matr900Service, "SFTENT": SftEntService,
+        "CT2RAZCT5": Ct2RazCt5Service,
+        "SN3": Sn3Service, "SN4": Sn4Service,
+    }
+    if tipo not in services:
+        raise RuntimeError(f"Relatorio {carga.tipo_relatorio} nao suportado")
+
+    def make_service():
+        return services[tipo](*service_args)
+
+    async def _buscar_pagina(page: int) -> list[dict]:
+        p = dict(params)
+        p["page"] = page
+        print(f"[PROTHEUS_CARGA] buscando pagina={page} relatorio={tipo} carga_id={carga.id}", flush=True)
+        svc = make_service()
+        if tipo == "FINR130":
+            resultado = await svc.buscar_pagina(p)
+            return resultado.get("titulos", []), resultado
+        else:
+            resultado = await svc.buscar_como_registros_pagina(p)
+            return resultado.get("registros", []), resultado
+
+    # Busca página 1 para descobrir total_pages
+    registros_p1, resultado_p1 = await _buscar_pagina(1)
+    total_pages = int(resultado_p1.get("total_pages") or resultado_p1.get("totalPages") or 1)
+    has_more = bool(resultado_p1.get("hasMore", 1 < total_pages))
+
+    todos = list(registros_p1)
+
+    if not has_more or total_pages <= 1:
+        return todos
+
+    # Busca páginas restantes em lotes paralelos
+    semaphore = asyncio.Semaphore(_MAX_PARALLEL_PAGES)
+    pages_restantes = list(range(2, total_pages + 1))
+
+    async def _buscar_com_semaphore(page: int) -> tuple[int, list[dict]]:
+        async with semaphore:
+            regs, _ = await _buscar_pagina(page)
+            return page, regs
+
+    resultados = await asyncio.gather(*[_buscar_com_semaphore(p) for p in pages_restantes])
+
+    # Ordenar por página para manter sequência correta
+    for _, regs in sorted(resultados, key=lambda x: x[0]):
+        todos.extend(regs)
+
+    return todos
 
 
 async def _iterar_paginas(
@@ -124,6 +196,10 @@ async def _iterar_paginas(
         "CTBR480": Ctbr480Service,
         "FINR470": FinR470Service,
         "MATR900": Matr900Service,
+        "SFTENT":    SftEntService,
+        "CT2RAZCT5": Ct2RazCt5Service,
+        "SN3":       Sn3Service,
+        "SN4":       Sn4Service,
     }
 
     if tipo not in services:

@@ -86,8 +86,8 @@ class NfeItemVinculoRequest(BaseModel):
 class NfeImportarRequest(BaseModel):
     empresa_id: Optional[int] = None
     cnpj_certificado: str
-    data_inicio: date
-    data_fim: date
+    data_inicio: Optional[date] = None
+    data_fim: Optional[date] = None
 
 
 class TaskStatusOut(BaseModel):

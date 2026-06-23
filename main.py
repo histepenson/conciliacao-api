@@ -3,8 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-from core.config import settings, resolve_storage_dir
-import os
+from core.config import settings
 import logging
 import traceback
 from routers.empresa_router import router as empresa_router
@@ -19,6 +18,7 @@ from routers.efetivacao_router import router as efetivacao_router
 from routers.dashboard_router import router as dashboard_router
 from routers.conciliacao_bancaria_router import router as conciliacao_bancaria_router
 from routers.conciliacao_estoque_router import router as conciliacao_estoque_router
+from routers.conciliacao_impostos_router import router as conciliacao_impostos_router
 from routers.finr130_router import router as finr130_router
 from routers.ctbr140_router import router as ctbr140_router
 from routers.ctbr480_router import router as ctbr480_router
@@ -32,6 +32,10 @@ from routers.produto_fornecedor_router import router as produto_fornecedor_route
 from routers.certificado_router import router as certificado_router
 from routers.nfe_router import router as nfe_router
 from routers.estoque_router import router as estoque_router
+from routers.pre_conferencia_router import router as pre_conferencia_router
+from routers.lancamento_padrao_router import router as lancamento_padrao_router
+from routers.ativo_fixo_router import router as ativo_fixo_router
+from routers.balancete_router import router as balancete_router
 
 
 @asynccontextmanager
@@ -83,6 +87,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -98,10 +103,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Log de storage ao iniciar
-_storage_dir = resolve_storage_dir()
-_is_railway = os.environ.get("RAILWAY_ENVIRONMENT") is not None
 logging.getLogger(__name__).info(
-    f"STORAGE_DIR resolvido: {_storage_dir} (existe: {_storage_dir.exists()}, railway: {_is_railway})"
+    f"Storage S3 configurado: bucket={settings.STORAGE_BUCKET or '(nao definido)'} "
+    f"endpoint={settings.STORAGE_ENDPOINT or '(nao definido)'}"
 )
 
 app.include_router(empresa_router, prefix="/api")
@@ -116,6 +120,7 @@ app.include_router(efetivacao_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(conciliacao_bancaria_router, prefix="/api")
 app.include_router(conciliacao_estoque_router, prefix="/api")
+app.include_router(conciliacao_impostos_router, prefix="/api")
 app.include_router(finr130_router, prefix="/api")
 app.include_router(ctbr140_router, prefix="/api")
 app.include_router(ctbr480_router, prefix="/api")
@@ -129,3 +134,7 @@ app.include_router(produto_fornecedor_router, prefix="/api")
 app.include_router(certificado_router, prefix="/api")
 app.include_router(nfe_router, prefix="/api")
 app.include_router(estoque_router)
+app.include_router(pre_conferencia_router, prefix="/api")
+app.include_router(ativo_fixo_router, prefix="/api")
+app.include_router(lancamento_padrao_router, prefix="/api")
+app.include_router(balancete_router, prefix="/api")

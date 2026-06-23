@@ -119,6 +119,7 @@ class OrigemLancamento(BaseModel):
     documento: str = ""
     historico: str = ""
     tipo_movimento: str  # TRANSFERENCIA | ALOCACAO | RECLASSIFICACAO | LANCAMENTO_AUTOMATICO | NAO_IDENTIFICADO
+    ct5_desc: str = ""  # Descricao do lancamento padrao (CT5), presente quando origem e ZCT2RAZCT5
 
 
 class AnaliseContabilProfunda(BaseModel):
