@@ -8,9 +8,11 @@ do SFT diferente de valcont, ex: valicm, valpis, valcof).
 import re
 from typing import Optional
 
-# Extrai o numero da NF de historicos como "PIS CREDITADO NFE 61" -- usado so
-# como fallback (fase 3) quando o lancamento nao tem CT2_KEY.
-_NF_HISTORICO_RE = re.compile(r"NFE?\.?\s*(\d+)", re.IGNORECASE)
+# Extrai o numero do documento (NF ou CT-e) de historicos como "PIS CREDITADO
+# NFE 61" ou "COFINS AQUISICAO FRETE CTE 124" -- usado so' como fallback
+# (fase 3) quando o lancamento nao tem CT2_KEY. O SFT guarda o numero do CT-e
+# no mesmo campo "nf" (especie="CTE"), por isso o numero extraido casa direto.
+_NF_HISTORICO_RE = re.compile(r"(?:NFE?|CTE)\.?\s*(\d+)", re.IGNORECASE)
 
 
 def match_ct2_sft(
@@ -42,13 +44,15 @@ def match_ct2_sft(
        principal que bate perfeitamente.
     3. Fallback por historico (so' para CT2 SEM CT2_KEY): extrai o numero da
        NF do texto do historico (ex.: "PIS CREDITADO NFE 61" -> NF 61) e
-       agrupa pelas notas do SFT que ainda sobraram com essa MESMA NF.
-       Sem CT2_KEY nao ha filial/fornecedor pra validar a chave inteira,
-       entao so' segue se todas as notas do SFT daquela NF forem do MESMO
-       fornecedor (senao e' ambiguo -- NF repetida entre fornecedores
+       agrupa pelas notas do SFT que ainda sobraram com essa MESMA NF -- por
+       (filial, NF) quando o CT2 tiver o campo "filial" (chave mais forte),
+       ou so' por NF quando nao tiver (cargas antigas, antes do campo
+       existir no CT2RAZCT5). Sem fornecedor no CT2 pra validar a chave
+       inteira, so' segue se todas as notas do SFT daquele grupo forem do
+       MESMO fornecedor (senao e' ambiguo -- NF repetida entre fornecedores
        diferentes -- e fica como diferenca). Com fornecedor unico, soma o
        grupo igual a fase 2 (cobre NF dividida em varios itens no SFT) e,
-       se a soma nao bater, tenta cobertura greedy dentro da mesma NF.
+       se a soma nao bater, tenta cobertura greedy dentro do mesmo grupo.
 
     Propositalmente NAO ha fallback global (cruzando todo o dataset por
     valor, sem respeitar NF): isso ja causou falsos positivos reais --
@@ -194,27 +198,41 @@ def match_ct2_sft(
         sft_matched.update(sft_cob_grupo)
 
     # ==========================================================
-    # Fase 3: fallback por NF do historico (so' para CT2 sem CT2_KEY)
+    # Fase 3: fallback por (filial)+NF do historico (so' para CT2 sem CT2_KEY)
     # ==========================================================
+    # Indice por NF sozinha (fallback quando o CT2 nao tem filial) e por
+    # (filial, NF) quando o CT2 tiver o campo "filial" -- chave mais forte,
+    # reduz a chance de colisao de NF entre fornecedores/filiais diferentes.
     sft_pendente_por_nf: dict = {}
+    sft_pendente_por_filial_nf: dict = {}
     for i in range(len(sft_recs)):
         if i in sft_matched:
             continue
         nf = str(sft_recs[i].get("nf") or "").strip()
         if not nf:
             continue
-        sft_pendente_por_nf.setdefault(_norm_nf(nf), []).append(i)
+        nf_norm = _norm_nf(nf)
+        sft_pendente_por_nf.setdefault(nf_norm, []).append(i)
+        filial = str(sft_recs[i].get("filial") or "").strip()
+        if filial:
+            sft_pendente_por_filial_nf.setdefault((_norm_filial(filial), nf_norm), []).append(i)
 
-    ct2_sem_chave_por_nf: dict = {}
+    ct2_sem_chave_por_grupo: dict = {}
     for i in ct2_sem_chave:
         nf = _extrair_nf_historico(ct2_recs[i].get("historico"))
-        if nf is not None:
-            ct2_sem_chave_por_nf.setdefault(nf, []).append(i)
+        if nf is None:
+            continue
+        filial_ct2 = str(ct2_recs[i].get("filial") or "").strip()
+        grupo = (_norm_filial(filial_ct2), nf) if filial_ct2 else nf
+        ct2_sem_chave_por_grupo.setdefault(grupo, []).append(i)
 
-    for nf, ct2_idxs in ct2_sem_chave_por_nf.items():
-        candidatos = sft_pendente_por_nf.get(nf, [])
+    for grupo, ct2_idxs in ct2_sem_chave_por_grupo.items():
+        if isinstance(grupo, tuple):
+            candidatos = sft_pendente_por_filial_nf.get(grupo, [])
+        else:
+            candidatos = sft_pendente_por_nf.get(grupo, [])
         if not candidatos:
-            continue  # nenhuma nota com essa NF sobrou no SFT -- fica como diferenca
+            continue  # nenhuma nota com essa (filial+)NF sobrou no SFT -- fica como diferenca
 
         fornecedores = {str(sft_recs[idx].get("cliefor") or "").strip() for idx in candidatos}
         if len(fornecedores) > 1:

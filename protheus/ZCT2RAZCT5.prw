@@ -39,14 +39,14 @@ Retorno JSON:
   linhas          = lancamentos da pagina
 
 Campos por linha (compativel com CTBR400 / CTBR480 + CT5_DESC):
-  data, lote_sub_doc_linha, historico, xpartida,
+  data, filial, lote_sub_doc_linha, historico, xpartida,
   c_custo, item_conta, cod_cl_val,
   debito, credito, saldo_atual, conta,
   ct5_desc, ct2_key, ct2_lp, ct2_origem
 
 @author Equipe Desenvolvimento
 @since 26/05/2026
-@version 1.0
+@version 1.1
 /*/
 
 wsrestful ZCT2RAZCT5 description "CT2 - Razao Contabil SQL Direto com CT5_DESC"
@@ -168,6 +168,7 @@ cWhere += " AND CT2_LOTE = '" + cLote + "'"
 If lIncCred
     cSql += " SELECT"
     cSql += "     CT2_DATA, CT2_LOTE, CT2_SBLOTE, CT2_DOC, CT2_LINHA,"
+    cSql += "     CT2_FILORI,"
     cSql += "     CT2_CREDIT AS conta,"
     cSql += "     CT2_DEBITO AS xpartida,"
     cSql += "     CT2_HIST   AS historico,"
@@ -204,6 +205,7 @@ EndIf
 If lIncDeb
     cSql += " SELECT"
     cSql += "     CT2_DATA, CT2_LOTE, CT2_SBLOTE, CT2_DOC, CT2_LINHA,"
+    cSql += "     CT2_FILORI,"
     cSql += "     CT2_DEBITO AS conta,"
     cSql += "     CT2_CREDIT AS xpartida,"
     cSql += "     CT2_HIST   AS historico,"
@@ -249,6 +251,7 @@ Begin Sequence
     While !(cAlias)->(Eof())
         oLinha := JsonObject():New()
         oLinha["data"]               := DtoC((cAlias)->CT2_DATA)
+        oLinha["filial"]             := AllTrim((cAlias)->CT2_FILORI)
         oLinha["lote_sub_doc_linha"] := AllTrim((cAlias)->CT2_LOTE)  + ;
                                         AllTrim((cAlias)->CT2_SBLOTE) + ;
                                         AllTrim((cAlias)->CT2_DOC)    + ;
