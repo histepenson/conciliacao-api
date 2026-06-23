@@ -5,7 +5,12 @@ Extraido de services/pre_conferencia_service.py para ser reutilizado tambem pela
 conciliacao de impostos (mesma logica, mas comparando contra uma coluna de valor
 do SFT diferente de valcont, ex: valicm, valpis, valcof).
 """
+import re
 from typing import Optional
+
+# Extrai o numero da NF de historicos como "PIS CREDITADO NFE 61" -- usado so
+# como fallback (fase 3) quando o lancamento nao tem CT2_KEY.
+_NF_HISTORICO_RE = re.compile(r"NFE?\.?\s*(\d+)", re.IGNORECASE)
 
 
 def match_ct2_sft(
@@ -35,13 +40,22 @@ def match_ct2_sft(
        cobre o caso de a nota ter um lancamento extra sem correspondencia no
        SFT (ex.: complemento de importacao) ao lado de um lancamento
        principal que bate perfeitamente.
+    3. Fallback por historico (so' para CT2 SEM CT2_KEY): extrai o numero da
+       NF do texto do historico (ex.: "PIS CREDITADO NFE 61" -> NF 61) e
+       procura, entre as notas do SFT que ainda sobraram, as que tem essa
+       MESMA NF com valor dentro da tolerancia. Sem CT2_KEY nao ha
+       filial/fornecedor para validar a chave inteira, entao so' casa
+       quando existir exatamente UMA candidata (NF + valor) -- se houver
+       0 ou mais de 1 candidata (ambiguo, ja que numero de NF nao e' unico
+       entre fornecedores), fica como diferenca.
 
     Propositalmente NAO ha fallback global (cruzando todo o dataset por
     valor, sem respeitar NF): isso ja causou falsos positivos reais --
     lancamentos sem nenhuma relacao com nota fiscal (ex.: credito de PIS
     sobre aluguel) "casando" so' porque a soma batia por coincidencia com
-    sobras de outras notas. CT2 sem CT2_KEY (ou cujo grupo de NF nao
-    reconciliou nem parcialmente na fase 2) fica como diferenca -- mais
+    sobras de outras notas. CT2 sem CT2_KEY cujo numero de NF (via
+    historico) nao for unico entre as sobras do SFT, ou cujo grupo de NF
+    nao reconciliou nem parcialmente na fase 2, fica como diferenca -- mais
     seguro deixar para revisao manual do que arriscar um match errado.
 
     Returns:
@@ -79,6 +93,12 @@ def match_ct2_sft(
             return None
         return (_norm_filial(filial), _norm_nf(nf), _norm_cliefor(cliefor))
 
+    def _extrair_nf_historico(historico: str) -> Optional[str]:
+        m = _NF_HISTORICO_RE.search(historico or "")
+        if not m:
+            return None
+        return _norm_nf(m.group(1))
+
     def _cobrir_greedy(indices, recs, chave_v, budget):
         ordered = sorted(indices, key=lambda i: -round(float(recs[i].get(chave_v) or 0), 2))
         cobertos: set = set()
@@ -108,6 +128,7 @@ def match_ct2_sft(
     sft_matched: set = set()
     ct2_matched_set: set = set()
     ct2_pendente_com_chave: list = []  # tem ct2_key valida mas nao casou 1:1
+    ct2_sem_chave: list = []  # sem ct2_key -- candidato ao fallback por historico (fase 3)
 
     for i, rec in enumerate(ct2_recs):
         valor_ct2 = round(float(rec.get(campo_valor_ct2) or 0), 2)
@@ -116,7 +137,8 @@ def match_ct2_sft(
             continue
         chave = _extrair_chave_ct2(rec)
         if chave is None:
-            # Sem CT2_KEY valida -- sem fallback global, fica como diferenca.
+            # Sem CT2_KEY valida -- tentativa de recuperacao via historico na fase 3.
+            ct2_sem_chave.append(i)
             continue
 
         matched = False
@@ -169,6 +191,37 @@ def match_ct2_sft(
         sft_cob_grupo = _cobrir_greedy(sft_idxs, sft_recs, campo_valor_sft, total_ct2)
         ct2_matched_set.update(ct2_cob_grupo)
         sft_matched.update(sft_cob_grupo)
+
+    # ==========================================================
+    # Fase 3: fallback por NF do historico (so' para CT2 sem CT2_KEY)
+    # ==========================================================
+    sft_pendente_por_nf: dict = {}
+    for i in range(len(sft_recs)):
+        if i in sft_matched:
+            continue
+        nf = str(sft_recs[i].get("nf") or "").strip()
+        if not nf:
+            continue
+        sft_pendente_por_nf.setdefault(_norm_nf(nf), []).append(i)
+
+    for i in ct2_sem_chave:
+        nf = _extrair_nf_historico(ct2_recs[i].get("historico"))
+        if nf is None:
+            continue
+        candidatos = sft_pendente_por_nf.get(nf, [])
+        valor_ct2 = round(float(ct2_recs[i].get(campo_valor_ct2) or 0), 2)
+        candidatos_no_valor = [
+            idx for idx in candidatos
+            if abs(round(float(sft_recs[idx].get(campo_valor_sft) or 0), 2) - valor_ct2) <= tolerancia
+        ]
+        if len(candidatos_no_valor) != 1:
+            # Ambiguo (0 ou mais de 1 candidata) -- NF nao e' unica entre
+            # fornecedores, sem CT2_KEY nao ha como confirmar. Fica como diferenca.
+            continue
+        idx_sft = candidatos_no_valor[0]
+        ct2_matched_set.add(i)
+        sft_matched.add(idx_sft)
+        sft_pendente_por_nf[nf].remove(idx_sft)
 
     ct2_resultado = [
         {**rec, "matched": i in ct2_matched_set}
