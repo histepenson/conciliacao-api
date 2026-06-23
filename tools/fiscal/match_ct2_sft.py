@@ -42,12 +42,13 @@ def match_ct2_sft(
        principal que bate perfeitamente.
     3. Fallback por historico (so' para CT2 SEM CT2_KEY): extrai o numero da
        NF do texto do historico (ex.: "PIS CREDITADO NFE 61" -> NF 61) e
-       procura, entre as notas do SFT que ainda sobraram, as que tem essa
-       MESMA NF com valor dentro da tolerancia. Sem CT2_KEY nao ha
-       filial/fornecedor para validar a chave inteira, entao so' casa
-       quando existir exatamente UMA candidata (NF + valor) -- se houver
-       0 ou mais de 1 candidata (ambiguo, ja que numero de NF nao e' unico
-       entre fornecedores), fica como diferenca.
+       agrupa pelas notas do SFT que ainda sobraram com essa MESMA NF.
+       Sem CT2_KEY nao ha filial/fornecedor pra validar a chave inteira,
+       entao so' segue se todas as notas do SFT daquela NF forem do MESMO
+       fornecedor (senao e' ambiguo -- NF repetida entre fornecedores
+       diferentes -- e fica como diferenca). Com fornecedor unico, soma o
+       grupo igual a fase 2 (cobre NF dividida em varios itens no SFT) e,
+       se a soma nao bater, tenta cobertura greedy dentro da mesma NF.
 
     Propositalmente NAO ha fallback global (cruzando todo o dataset por
     valor, sem respeitar NF): isso ja causou falsos positivos reais --
@@ -204,24 +205,38 @@ def match_ct2_sft(
             continue
         sft_pendente_por_nf.setdefault(_norm_nf(nf), []).append(i)
 
+    ct2_sem_chave_por_nf: dict = {}
     for i in ct2_sem_chave:
         nf = _extrair_nf_historico(ct2_recs[i].get("historico"))
-        if nf is None:
-            continue
+        if nf is not None:
+            ct2_sem_chave_por_nf.setdefault(nf, []).append(i)
+
+    for nf, ct2_idxs in ct2_sem_chave_por_nf.items():
         candidatos = sft_pendente_por_nf.get(nf, [])
-        valor_ct2 = round(float(ct2_recs[i].get(campo_valor_ct2) or 0), 2)
-        candidatos_no_valor = [
-            idx for idx in candidatos
-            if abs(round(float(sft_recs[idx].get(campo_valor_sft) or 0), 2) - valor_ct2) <= tolerancia
-        ]
-        if len(candidatos_no_valor) != 1:
-            # Ambiguo (0 ou mais de 1 candidata) -- NF nao e' unica entre
-            # fornecedores, sem CT2_KEY nao ha como confirmar. Fica como diferenca.
+        if not candidatos:
+            continue  # nenhuma nota com essa NF sobrou no SFT -- fica como diferenca
+
+        fornecedores = {str(sft_recs[idx].get("cliefor") or "").strip() for idx in candidatos}
+        if len(fornecedores) > 1:
+            # NF repetida entre fornecedores diferentes -- sem CT2_KEY nao ha
+            # como confirmar de qual fornecedor e', ambiguo. Fica como diferenca.
             continue
-        idx_sft = candidatos_no_valor[0]
-        ct2_matched_set.add(i)
-        sft_matched.add(idx_sft)
-        sft_pendente_por_nf[nf].remove(idx_sft)
+
+        total_ct2 = round(sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in ct2_idxs), 2)
+        total_sft = round(sum(float(sft_recs[idx].get(campo_valor_sft) or 0) for idx in candidatos), 2)
+        if abs(total_ct2 - total_sft) <= tolerancia:
+            # Cobre tanto o 1:1 quanto a NF dividida em varios itens no SFT
+            # (ou varios lancamentos do CT2 sem chave para a mesma NF).
+            ct2_matched_set.update(ct2_idxs)
+            sft_matched.update(candidatos)
+            continue
+
+        # Soma nao bate exatamente -- tenta cobertura greedy so' dentro da
+        # mesma NF, mesma logica da fase 2.
+        ct2_cob = _cobrir_greedy(ct2_idxs, ct2_recs, campo_valor_ct2, total_sft)
+        sft_cob = _cobrir_greedy(candidatos, sft_recs, campo_valor_sft, total_ct2)
+        ct2_matched_set.update(ct2_cob)
+        sft_matched.update(sft_cob)
 
     ct2_resultado = [
         {**rec, "matched": i in ct2_matched_set}
