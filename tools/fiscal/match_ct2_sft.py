@@ -124,6 +124,39 @@ def match_ct2_sft(
                 restante = round(restante - v, 2)
         return cobertos
 
+    def _soma(indices, recs, chave_v):
+        return round(sum(float(recs[i].get(chave_v) or 0) for i in indices), 2)
+
+    def _reconciliar_grupo(ct2_idxs_grupo, sft_idxs_grupo):
+        """
+        Soma os dois lados de um grupo (mesma nota/chave) e, se nao bater
+        exatamente, tenta achar -- so' no lado com o total MAIOR -- um
+        subconjunto cuja soma reconstrua o total INTEIRO do lado menor
+        (cobertura greedy). So' confirma o match se essa soma coberta
+        realmente bater com o total do outro lado (dentro da tolerancia);
+        senao, ninguem casa -- mais seguro que arriscar um match parcial sem
+        relacao real (ex.: 1 item de cada lado com valores bem diferentes,
+        onde "caber no orcamento" do lado maior nao significa correspondencia).
+        Usada pela fase 2 (chave completa) e pela fase 3 (NF/CT-e do historico).
+        """
+        total_ct2 = _soma(ct2_idxs_grupo, ct2_recs, campo_valor_ct2)
+        total_sft = _soma(sft_idxs_grupo, sft_recs, campo_valor_sft)
+        if abs(total_ct2 - total_sft) <= tolerancia:
+            ct2_matched_set.update(ct2_idxs_grupo)
+            sft_matched.update(sft_idxs_grupo)
+            return
+
+        if total_ct2 >= total_sft:
+            cobertos = _cobrir_greedy(ct2_idxs_grupo, ct2_recs, campo_valor_ct2, total_sft)
+            if abs(_soma(cobertos, ct2_recs, campo_valor_ct2) - total_sft) <= tolerancia:
+                ct2_matched_set.update(cobertos)
+                sft_matched.update(sft_idxs_grupo)
+        else:
+            cobertos = _cobrir_greedy(sft_idxs_grupo, sft_recs, campo_valor_sft, total_ct2)
+            if abs(_soma(cobertos, sft_recs, campo_valor_sft) - total_ct2) <= tolerancia:
+                sft_matched.update(cobertos)
+                ct2_matched_set.update(ct2_idxs_grupo)
+
     # Indice SFT por (filial, nf, fornece) -> lista de indices
     sft_por_doc: dict = {}
     for i, s in enumerate(sft_recs):
@@ -183,23 +216,7 @@ def match_ct2_sft(
         sft_idxs = sft_pendente_por_chave.get(chave, [])
         if not sft_idxs:
             continue  # nenhuma nota correspondente sobrou -- fica como diferenca
-        total_ct2 = round(sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in ct2_idxs), 2)
-        total_sft = round(sum(float(sft_recs[i].get(campo_valor_sft) or 0) for i in sft_idxs), 2)
-        if abs(total_ct2 - total_sft) <= tolerancia:
-            ct2_matched_set.update(ct2_idxs)
-            sft_matched.update(sft_idxs)
-            continue
-
-        # Soma do grupo nao bate exatamente -- comum quando a NF tem um
-        # lancamento "extra" sem correspondencia no SFT (ex.: complemento de
-        # importacao) ao lado do lancamento principal que bate perfeitamente.
-        # Tenta cobertura greedy por valor so' dentro da MESMA nota -- nunca
-        # mistura com outras NFs do dataset. O que nao for coberto fica como
-        # diferenca (sem fallback global, ver docstring).
-        ct2_cob_grupo = _cobrir_greedy(ct2_idxs, ct2_recs, campo_valor_ct2, total_sft)
-        sft_cob_grupo = _cobrir_greedy(sft_idxs, sft_recs, campo_valor_sft, total_ct2)
-        ct2_matched_set.update(ct2_cob_grupo)
-        sft_matched.update(sft_cob_grupo)
+        _reconciliar_grupo(ct2_idxs, sft_idxs)
 
     # ==========================================================
     # Fase 3: fallback por (filial)+NF do historico (so' para CT2 sem CT2_KEY)
@@ -230,20 +247,6 @@ def match_ct2_sft(
         grupo = (_norm_filial(filial_ct2), nf) if filial_ct2 else nf
         ct2_sem_chave_por_grupo.setdefault(grupo, []).append(i)
 
-    def _reconciliar_subgrupo(ct2_idxs_sub, sft_idxs_sub):
-        """Soma (fase 2) + cobertura greedy entre um subconjunto de CT2 e SFT
-        ja' confirmados do MESMO fornecedor -- preenche os sets de matched."""
-        total_ct2 = round(sum(float(ct2_recs[i].get(campo_valor_ct2) or 0) for i in ct2_idxs_sub), 2)
-        total_sft = round(sum(float(sft_recs[i].get(campo_valor_sft) or 0) for i in sft_idxs_sub), 2)
-        if abs(total_ct2 - total_sft) <= tolerancia:
-            ct2_matched_set.update(ct2_idxs_sub)
-            sft_matched.update(sft_idxs_sub)
-            return
-        ct2_cob = _cobrir_greedy(ct2_idxs_sub, ct2_recs, campo_valor_ct2, total_sft)
-        sft_cob = _cobrir_greedy(sft_idxs_sub, sft_recs, campo_valor_sft, total_ct2)
-        ct2_matched_set.update(ct2_cob)
-        sft_matched.update(sft_cob)
-
     for grupo, ct2_idxs in ct2_sem_chave_por_grupo.items():
         if isinstance(grupo, tuple):
             candidatos = sft_pendente_por_filial_nf.get(grupo, [])
@@ -252,10 +255,20 @@ def match_ct2_sft(
         if not candidatos:
             continue  # nenhuma nota com essa (filial+)NF sobrou no SFT -- fica como diferenca
 
+        # Candidatas com valor zero na coluna de imposto sao' ruido -- nunca
+        # podem ser a contrapartida real (o CT2 so' chega aqui com valor != 0,
+        # ver fase 1) e so' serviriam pra falsear ambiguidade de fornecedor.
+        candidatos = [
+            idx for idx in candidatos
+            if round(float(sft_recs[idx].get(campo_valor_sft) or 0), 2) != 0
+        ]
+        if not candidatos:
+            continue
+
         fornecedores = {str(sft_recs[idx].get("cliefor") or "").strip() for idx in candidatos}
         if len(fornecedores) <= 1:
             # Fornecedor unico no grupo inteiro -- caso simples, soma tudo de uma vez.
-            _reconciliar_subgrupo(ct2_idxs, candidatos)
+            _reconciliar_grupo(ct2_idxs, candidatos)
             continue
 
         # Fornecedor ambiguo no grupo inteiro -- comum quando o numero do
@@ -285,7 +298,7 @@ def match_ct2_sft(
                 # Ainda ambiguo mesmo dentro do mesmo dia -- sem CT2_KEY nao
                 # ha como confirmar de qual fornecedor e'. Fica como diferenca.
                 continue
-            _reconciliar_subgrupo(ct2_idxs_data, sft_idxs_data)
+            _reconciliar_grupo(ct2_idxs_data, sft_idxs_data)
 
     ct2_resultado = [
         {**rec, "matched": i in ct2_matched_set}
