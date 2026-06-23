@@ -1,9 +1,11 @@
 # core/config.py
+import json
 import secrets
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field, AliasChoices, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, NoDecode
 
 
 class Settings(BaseSettings):
@@ -51,7 +53,7 @@ class Settings(BaseSettings):
     LOGIN_LOCKOUT_MINUTES: int = 15
 
     # CORS
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "https://dev.smartconciliacoes.com.br" ]
+    ALLOWED_ORIGINS: Annotated[list[str], NoDecode] = ["http://localhost:3000", "http://127.0.0.1:3000", "https://dev.smartconciliacoes.com.br" ]
 
     # Protheus
     PROTHEUS_URL: str = ""
@@ -75,6 +77,18 @@ class Settings(BaseSettings):
 
     # Certificado Digital
     CERT_ENCRYPTION_KEY: str = ""
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, value):
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            if stripped.startswith("["):
+                return json.loads(stripped)
+            return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+        return value
 
     @field_validator("DEBUG", mode="before")
     @classmethod

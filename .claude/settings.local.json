@@ -234,7 +234,12 @@
       "Bash(xargs -I{} sh -c 'echo \"{}\"; stat -c \"%y\" \"{}\"')",
       "Bash(sed -i 's/CARGA_RAZAO = 188.*/CARGA_RAZAO = 189  # conta 113010002 \\(maior\\)/' scripts/_debug_estoque.py)",
       "Bash(sed -i 's/conta_contabil=\"113010001\"/conta_contabil=\"113010002\"/' scripts/_debug_estoque.py)",
-      "Bash(timeout 60 python -u scripts/_debug_estoque.py)"
+      "Bash(timeout 60 python -u scripts/_debug_estoque.py)",
+      "Bash(ALLOWED_ORIGINS=https://app.smartconciliacoes.com.br,https://dev.smartconciliacoes.com.br python -c ' *)",
+      "Bash(ALLOWED_ORIGINS='[\\\\\"https://app.smartconciliacoes.com.br\\\\\"]' python -c ' *)",
+      "Bash(ALLOWED_ORIGINS='[\\\\\"https://app.smartconciliacoes.com.br\\\\\",\\\\\"https://dev.smartconciliacoes.com.br\\\\\"]' python -c ' *)",
+      "Bash(export ALLOWED_ORIGINS)",
+      "Bash(unset ALLOWED_ORIGINS)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
