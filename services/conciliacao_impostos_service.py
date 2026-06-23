@@ -31,11 +31,12 @@ COLUNAS_IMPOSTO_SFT = {
 def _classificar_tipo_mov(registro: Dict[str, Any]) -> str:
     """
     Classifica um registro do SFT como "ENTRADA" ou "SAIDA" pela natureza
-    fiscal da nota (campo "tipo_mov" se preenchido, senao 1o digito do CFOP:
-    1/2/3 = Entrada, 5/6/7 = Saida). Essa classificacao nunca muda -- veja
-    _eh_entrada_tambem_saida_icms para o caso especial do ICMS.
+    fiscal da nota (campo "tipomov" - FT_TIPOMOV do Protheus - se preenchido,
+    senao 1o digito do CFOP: 1/2/3 = Entrada, 5/6/7 = Saida). Essa
+    classificacao nunca muda -- veja _eh_entrada_tambem_saida_icms para o
+    caso especial do ICMS.
     """
-    valor = str(registro.get("tipo_mov") or "").strip().upper()
+    valor = str(registro.get("tipomov") or registro.get("tipo_mov") or "").strip().upper()
     if valor in ("ENTRADA", "E", "1"):
         return "ENTRADA"
     if valor in ("SAIDA", "SAÍDA", "S", "2"):

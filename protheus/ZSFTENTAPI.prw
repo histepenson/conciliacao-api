@@ -27,11 +27,11 @@ Campos por linha:
   filial, nf, tes, emissao, entrada, cliefor, estado, cfop, especie, quant,
   valcont, aliqicm, baseicm, valicm, isenicm, outricm,
   icmscom, icmsdif, difal, icmsret,
-  produto, cstpis, codbcc, valpis, valcof, valipi
+  produto, cstpis, codbcc, valpis, valcof, valipi, tipomov
 
 @author Equipe Desenvolvimento
 @since 27/05/2026
-@version 1.3
+@version 1.4
 /*/
 
 wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
@@ -128,7 +128,8 @@ cSql += "     FT_CSTPIS,"
 cSql += "     FT_CODBCC,"
 cSql += "     FT_VALPIS,"
 cSql += "     FT_VALCOF,"
-cSql += "     FT_VALIPI"
+cSql += "     FT_VALIPI,"
+cSql += "     FT_TIPOMOV"
 cSql += " FROM " + cTabela
 cSql += " WHERE " + cWhere
 cSql += " ORDER BY FT_ENTRADA, FT_FILIAL, FT_NFISCAL"
@@ -183,6 +184,7 @@ Begin Sequence
         oLinha["valpis"]   := Round((cAlias)->FT_VALPIS,  2)
         oLinha["valcof"]   := Round((cAlias)->FT_VALCOF,  2)
         oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
+        oLinha["tipomov"]  := AllTrim((cAlias)->FT_TIPOMOV)
         AAdd(aAllLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo
