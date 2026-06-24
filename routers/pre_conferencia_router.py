@@ -25,8 +25,9 @@ def get_conferencia(
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     carga_id_ct2: Optional[int] = Query(None, description="ID da carga CT2RAZCT5 (usa a ultima concluida se omitido)"),
     carga_id_sft: Optional[int] = Query(None, description="ID da carga SFTENT (usa a ultima concluida se omitido)"),
+    tipo_mov: Optional[str] = Query(None, description="ENTRADA (so LP 650) ou SAIDA (so LP 610), independente da sequencia"),
     db: Session = Depends(get_db),
     context: EmpresaContext = Depends(get_empresa_context),
 ):
     resolved_id = resolve_empresa_id(context, empresa_id)
-    return service.conferir(db, resolved_id, carga_id_ct2, carga_id_sft)
+    return service.conferir(db, resolved_id, carga_id_ct2, carga_id_sft, tipo_mov)
