@@ -18,6 +18,8 @@ class LancamentoPadrao(Base):
     descricao = Column(String(200), nullable=False, server_default="")
     grupo = Column(String(100))  # nome do grupo para agregação na pré-conferência
     cfops = Column(JSON)        # ["1101", "2101", "3101"]
+    cfops_excluir = Column(JSON)        # CFOPs rejeitados na pre-conferencia
+    tes_codes_excluir = Column(JSON)    # TES rejeitadas na pre-conferencia
     tes_codes = Column(JSON)    # ["001", "002"] — filtro de TES no SFT
     colunas_sft = Column(JSON)  # ["filial", "nf", "cliefor"]
     ativo = Column(Boolean, default=True, nullable=False)

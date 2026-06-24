@@ -12,6 +12,14 @@ Parametros:
   data_fim      = data final   YYYYMMDD  (obrigatorio) - filtra por FT_ENTRADA
   filial_de     = filial inicial (default "")
   filial_ate    = filial final   (default "zzzzzzzzz")
+  cfop_inc      = CFOPs a incluir, separados por virgula (default "" = sem filtro)
+                  Mantem apenas linhas cujo FT_CFOP CONTENHA (substring) algum dos codigos informados.
+  cfop_exc      = CFOPs a excluir, separados por virgula (default "" = sem filtro)
+                  Remove linhas cujo FT_CFOP CONTENHA (substring) algum dos codigos informados.
+  tes_inc       = TES a incluir, separados por virgula (default "" = sem filtro)
+                  Mantem apenas linhas cujo FT_TES CONTENHA (substring) algum dos codigos informados.
+  tes_exc       = TES a excluir, separados por virgula (default "" = sem filtro)
+                  Remove linhas cujo FT_TES CONTENHA (substring) algum dos codigos informados.
   page          = pagina (default 1)
   pageSize      = registros por pagina (default 5000, max 5000)
 
@@ -31,7 +39,7 @@ Campos por linha:
 
 @author Equipe Desenvolvimento
 @since 27/05/2026
-@version 1.4
+@version 1.5
 /*/
 
 wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
@@ -42,6 +50,10 @@ wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
     wsdata data_fim       as string
     wsdata filial_de      as string
     wsdata filial_ate     as string
+    wsdata cfop_inc       as string
+    wsdata cfop_exc       as string
+    wsdata tes_inc        as string
+    wsdata tes_exc        as string
 
     wsmethod GET getSftEnt description "Livro Fiscal SFT SQL direto" wssyntax "/api/v1/sftent" PATH "/api/v1/sftent"
 
@@ -65,6 +77,15 @@ Local cDataIni   := AllTrim(Self:data_ini)
 Local cDataFim   := AllTrim(Self:data_fim)
 Local cFilialDe  := AllTrim(Self:filial_de)
 Local cFilialAte := AllTrim(Self:filial_ate)
+Local cCfopInc   := AllTrim(Self:cfop_inc)
+Local cCfopExc   := AllTrim(Self:cfop_exc)
+Local cTesInc    := AllTrim(Self:tes_inc)
+Local cTesExc    := AllTrim(Self:tes_exc)
+Local aCfopInc   := {}
+Local aCfopExc   := {}
+Local aTesInc    := {}
+Local aTesExc    := {}
+Local lFiltraCfopTes := .F.
 Local nPage      := Max(1, Val(AllTrim(Self:page)))
 Local nPageSize  := Val(AllTrim(Self:pageSize))
 
@@ -91,8 +112,17 @@ cFilialAte := IIf(Empty(cFilialAte), "zzzzzzzzz", cFilialAte)
 nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset    := (nPage - 1) * nPageSize
 
+// --- Parse de listas CFOP/TES (contem/nao contem) ---
+aCfopInc := SftEnt_ParseLista(cCfopInc)
+aCfopExc := SftEnt_ParseLista(cCfopExc)
+aTesInc  := SftEnt_ParseLista(cTesInc)
+aTesExc  := SftEnt_ParseLista(cTesExc)
+lFiltraCfopTes := (Len(aCfopInc) > 0 .Or. Len(aCfopExc) > 0 .Or. Len(aTesInc) > 0 .Or. Len(aTesExc) > 0)
+
 ConOut("[ZSFTENTAPI] data=" + cDataIni + "/" + cDataFim + ;
     " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
+    " cfop_inc=" + cCfopInc + " cfop_exc=" + cCfopExc + ;
+    " tes_inc=" + cTesInc + " tes_exc=" + cTesExc + ;
     " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize))
 
 // --- WHERE ---
@@ -185,7 +215,12 @@ Begin Sequence
         oLinha["valcof"]   := Round((cAlias)->FT_VALCOF,  2)
         oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
         oLinha["tipomov"]  := AllTrim((cAlias)->FT_TIPOMOV)
-        AAdd(aAllLinhas, oLinha)
+
+        If !lFiltraCfopTes .Or. SftEnt_PassaFiltro(AllTrim((cAlias)->FT_CFOP), AllTrim((cAlias)->FT_TES), aCfopInc, aCfopExc, aTesInc, aTesExc)
+            AAdd(aAllLinhas, oLinha)
+        Else
+            FreeObj(oLinha)
+        EndIf
         (cAlias)->(DbSkip())
     EndDo
 
@@ -228,6 +263,10 @@ oParams["data_ini"]   := cDataIni
 oParams["data_fim"]   := cDataFim
 oParams["filial_de"]  := cFilialDe
 oParams["filial_ate"] := cFilialAte
+oParams["cfop_inc"]   := cCfopInc
+oParams["cfop_exc"]   := cCfopExc
+oParams["tes_inc"]    := cTesInc
+oParams["tes_exc"]    := cTesExc
 oParams["page"]       := nPage
 oParams["pageSize"]   := nPageSize
 
@@ -262,3 +301,69 @@ cJson := oErr:ToJson()
 FreeObj(oErr)
 
 Return cJson
+
+/*/{Protheus.doc} SftEnt_ParseLista
+Converte string "1101, 2101,3102" em array de strings trim+upper:
+{"1101","2101","3102"}. Retorna array vazio se a string for vazia.
+/*/
+Static Function SftEnt_ParseLista(cTexto)
+Local aRet   := {}
+Local aSplit := {}
+Local nI     := 0
+Local cItem  := ""
+
+If Empty(cTexto)
+Return aRet
+EndIf
+
+aSplit := StrTokArr(cTexto, ",")
+For nI := 1 To Len(aSplit)
+    cItem := Upper(AllTrim(aSplit[nI]))
+    If !Empty(cItem)
+        AAdd(aRet, cItem)
+    EndIf
+Next nI
+
+Return aRet
+
+/*/{Protheus.doc} SftEnt_Contem
+Retorna .T. se cValor contiver (substring) algum dos itens de aLista.
+/*/
+Static Function SftEnt_Contem(cValor, aLista)
+Local nI     := 0
+Local cValUp := Upper(cValor)
+
+For nI := 1 To Len(aLista)
+    If aLista[nI] $ cValUp
+        Return .T.
+    EndIf
+Next nI
+
+Return .F.
+
+/*/{Protheus.doc} SftEnt_PassaFiltro
+Combina os 4 filtros (cfop_inc, cfop_exc, tes_inc, tes_exc):
+  - Se aCfopInc nao vazio: cCfop deve conter ALGUM item de aCfopInc, senao reprova.
+  - Se aCfopExc nao vazio: cCfop NAO PODE conter NENHUM item de aCfopExc, senao reprova.
+  - Mesma logica para TES com cTes/aTesInc/aTesExc.
+Retorna .T. somente se passar em todos os criterios ativos.
+/*/
+Static Function SftEnt_PassaFiltro(cCfop, cTes, aCfopInc, aCfopExc, aTesInc, aTesExc)
+
+If Len(aCfopInc) > 0 .And. !SftEnt_Contem(cCfop, aCfopInc)
+Return .F.
+EndIf
+
+If Len(aCfopExc) > 0 .And. SftEnt_Contem(cCfop, aCfopExc)
+Return .F.
+EndIf
+
+If Len(aTesInc) > 0 .And. !SftEnt_Contem(cTes, aTesInc)
+Return .F.
+EndIf
+
+If Len(aTesExc) > 0 .And. SftEnt_Contem(cTes, aTesExc)
+Return .F.
+EndIf
+
+Return .T.
