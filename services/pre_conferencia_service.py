@@ -47,11 +47,17 @@ def _carregar_dados_carga(db: Session, carga_id: int) -> list[dict]:
     ]
 
 
+# LP que concentra as notas de Entrada (650) ou Saida (610) -- usado quando
+# tipo_mov e informado, independente da sequencia do LP.
+_LP_CODIGO_POR_TIPO_MOV = {"ENTRADA": "650", "SAIDA": "610"}
+
+
 def conferir(
     db: Session,
     empresa_id: int,
     carga_id_ct2: int | None = None,
     carga_id_sft: int | None = None,
+    tipo_mov: str | None = None,
 ) -> dict:
     # ── Resolucao das cargas ─────────────────────────────────────────────────
     if carga_id_ct2 is None:
@@ -80,6 +86,16 @@ def conferir(
         .filter(LancamentoPadrao.empresa_id == empresa_id, LancamentoPadrao.ativo.is_(True))
         .all()
     )
+
+    # ── Filtro Entrada/Saida: restringe ao LP 650 (entrada) ou 610 (saida), ──
+    # independente da sequencia. Aplicado aqui, antes de qualquer indexacao do
+    # SFT ou processamento de grupo/individual, para que o SFT considerado na
+    # conferencia ja saia restrito aos CFOPs/TES desse LP.
+    tipo_mov_norm = (tipo_mov or "").strip().upper()
+    lp_codigo_filtro = _LP_CODIGO_POR_TIPO_MOV.get(tipo_mov_norm)
+    if lp_codigo_filtro:
+        todos_lps = [lp for lp in todos_lps if lp.lp_codigo == lp_codigo_filtro]
+
     lp_configs: dict[tuple[str, str], LancamentoPadrao] = {
         (lp.lp_codigo, lp.descricao or ""): lp for lp in todos_lps
     }
@@ -93,6 +109,12 @@ def conferir(
     # ── Dados das cargas ─────────────────────────────────────────────────────
     ct2_data = _carregar_dados_carga(db, carga_id_ct2)
     sft_data = _carregar_dados_carga(db, carga_id_sft)
+
+    # Com o filtro Entrada/Saida ativo, descarta do CT2 qualquer lancamento de
+    # outro LP -- sem isso eles cairiam como "sem_mapeamento" (LP sem config
+    # carregada) em vez de simplesmente nao entrar na conferencia.
+    if lp_codigo_filtro:
+        ct2_data = [r for r in ct2_data if str(r.get("ct2_lp") or "").strip() == lp_codigo_filtro]
 
     logger.info(
         "Pre-conferencia empresa=%s: ct2=%s registros (carga %s), sft=%s registros (carga %s)",

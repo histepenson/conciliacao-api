@@ -243,7 +243,10 @@
       "Bash(APP_ENV=prodtemp alembic current)",
       "Bash(APP_ENV=prodtemp alembic upgrade head)",
       "Bash(alembic heads *)",
-      "Bash(APP_ENV=prodtemp python -c ' *)"
+      "Bash(APP_ENV=prodtemp python -c ' *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(git merge *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
