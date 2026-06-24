@@ -65,31 +65,38 @@ def upsert_de_carga(db: Session, empresa_id: int, registros: list[dict]) -> int:
     """
     Chamado após carga CT2RAZCT5 concluída.
     Agrupa por (ct2_lp, ct5_desc) — um LP pode ter múltiplas descrições (sequências 001, 002...).
-    Insere novos pares sem sobrescrever configurações existentes (cfops/colunas_sft).
+    Insere novos pares sem sobrescrever configurações existentes (cfops/colunas_sft) e faz
+    backfill da sequencia em LPs já cadastrados que ainda não tinham esse campo (sem tocar
+    em nenhuma outra configuração já feita pelo usuário).
     Retorna quantidade de novos registros criados.
     """
-    pares_vistos: set[tuple[str, str]] = set()
+    sequencia_por_par: dict[tuple[str, str], str] = {}
     for r in registros:
         lp = str(r.get("ct2_lp") or "").strip()
         desc = str(r.get("ct5_desc") or "").strip()
-        if lp:
-            pares_vistos.add((lp, desc))
+        sequencia = str(r.get("ct2_sequen") or "").strip()
+        if lp and (lp, desc) not in sequencia_por_par:
+            sequencia_por_par[(lp, desc)] = sequencia
 
-    existentes: set[tuple[str, str]] = {
-        (row.lp_codigo, row.descricao or "")
+    existentes: dict[tuple[str, str], LancamentoPadrao] = {
+        (row.lp_codigo, row.descricao or ""): row
         for row in db.query(LancamentoPadrao).filter(LancamentoPadrao.empresa_id == empresa_id).all()
     }
 
     novos = 0
-    for lp_codigo, descricao in sorted(pares_vistos):
-        if (lp_codigo, descricao) not in existentes:
+    for (lp_codigo, descricao), sequencia in sorted(sequencia_por_par.items()):
+        existente = existentes.get((lp_codigo, descricao))
+        if existente is None:
             db.add(LancamentoPadrao(
                 empresa_id=empresa_id,
                 lp_codigo=lp_codigo,
                 descricao=descricao,
+                sequencia=sequencia or None,
             ))
             novos += 1
+        elif not existente.sequencia and sequencia:
+            existente.sequencia = sequencia
 
     db.commit()
-    logger.info("upsert_de_carga empresa=%s: %s novos de %s pares únicos", empresa_id, novos, len(pares_vistos))
+    logger.info("upsert_de_carga empresa=%s: %s novos de %s pares únicos", empresa_id, novos, len(sequencia_por_par))
     return novos

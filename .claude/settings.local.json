@@ -239,7 +239,11 @@
       "Bash(ALLOWED_ORIGINS='[\\\\\"https://app.smartconciliacoes.com.br\\\\\"]' python -c ' *)",
       "Bash(ALLOWED_ORIGINS='[\\\\\"https://app.smartconciliacoes.com.br\\\\\",\\\\\"https://dev.smartconciliacoes.com.br\\\\\"]' python -c ' *)",
       "Bash(export ALLOWED_ORIGINS)",
-      "Bash(unset ALLOWED_ORIGINS)"
+      "Bash(unset ALLOWED_ORIGINS)",
+      "Bash(APP_ENV=prodtemp alembic current)",
+      "Bash(APP_ENV=prodtemp alembic upgrade head)",
+      "Bash(alembic heads *)",
+      "Bash(APP_ENV=prodtemp python -c ' *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
