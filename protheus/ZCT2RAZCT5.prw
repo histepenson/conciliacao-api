@@ -6,8 +6,8 @@
 API REST de razao contabil via consulta SQL direta na tabela CT2,
 com JOIN na CT5 para retornar a descricao do lancamento padrao (CT5_DESC).
 
-Personalizacao especifica: inclui o campo CT5_DESC obtido via LEFT JOIN
-na CT5 pelo campo CT2_ORIGEM (primeiros 7 caracteres).
+Personalizacao especifica: inclui o campo CT5_DESC e CT5_SEQUEN obtidos via
+LEFT JOIN na CT5 pelo campo CT2_ORIGEM (primeiros 7 caracteres).
 
 Endpoint: GET /rest/zct2razct5/api/v1/ct2razct5
 
@@ -42,11 +42,11 @@ Campos por linha (compativel com CTBR400 / CTBR480 + CT5_DESC):
   data, filial, lote_sub_doc_linha, historico, xpartida,
   c_custo, item_conta, cod_cl_val,
   debito, credito, saldo_atual, conta,
-  ct5_desc, ct2_key, ct2_lp, ct2_origem
+  ct5_desc, ct2_key, ct2_lp, ct2_origem, ct2_sequen
 
 @author Equipe Desenvolvimento
 @since 26/05/2026
-@version 1.1
+@version 1.2
 /*/
 
 wsrestful ZCT2RAZCT5 description "CT2 - Razao Contabil SQL Direto com CT5_DESC"
@@ -180,6 +180,7 @@ If lIncCred
     cSql += "     CT2.CT2_LP,"
     cSql += "     CT2.CT2_ORIGEM,"
     cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc,"
+    cSql += "     ISNULL(CT5.CT5_SEQUEN, '') AS ct2_sequen,"
     cSql += "     CT2_ITEMC  AS ct2_itemc"
     cSql += " FROM " + cTabela + " CT2"
     cSql += " LEFT JOIN " + cTabelaCT5 + " CT5"
@@ -217,6 +218,7 @@ If lIncDeb
     cSql += "     CT2.CT2_LP,"
     cSql += "     CT2.CT2_ORIGEM,"
     cSql += "     ISNULL(CT5.CT5_DESC, '') AS ct5_desc,"
+    cSql += "     ISNULL(CT5.CT5_SEQUEN, '') AS ct2_sequen,"
     cSql += "     CT2_ITEMC  AS ct2_itemc"
     cSql += " FROM " + cTabela + " CT2"
     cSql += " LEFT JOIN " + cTabelaCT5 + " CT5"
@@ -245,6 +247,7 @@ Begin Sequence
     TCSetField(cAlias, "ct5_desc",   "C", 30, 0)
     TCSetField(cAlias, "CT2_LP",     "C",  6, 0)
     TCSetField(cAlias, "CT2_ORIGEM", "C", 60, 0)
+    TCSetField(cAlias, "ct2_sequen", "C",  6, 0)
     TCSetField(cAlias, "ct2_itemc",  "C", 30, 0)
 
     (cAlias)->(DbGoTop())
@@ -269,6 +272,7 @@ Begin Sequence
         oLinha["ct2_key"]            := AllTrim((cAlias)->CT2_KEY)
         oLinha["ct2_lp"]             := AllTrim((cAlias)->CT2_LP)
         oLinha["ct2_origem"]         := AllTrim((cAlias)->CT2_ORIGEM)
+        oLinha["ct2_sequen"]         := AllTrim((cAlias)->ct2_sequen)
         oLinha["ct2_itemc"]          := AllTrim((cAlias)->ct2_itemc)
         AAdd(aAllLinhas, oLinha)
         (cAlias)->(DbSkip())

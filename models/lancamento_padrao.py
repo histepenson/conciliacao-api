@@ -15,6 +15,7 @@ class LancamentoPadrao(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     empresa_id = Column(Integer, ForeignKey("concilia.empresa.id", ondelete="CASCADE"), nullable=False, index=True)
     lp_codigo = Column(String(10), nullable=False)
+    sequencia = Column(String(10))  # CT5_SEQUEN — distingue varios LPs com o mesmo lp_codigo
     descricao = Column(String(200), nullable=False, server_default="")
     grupo = Column(String(100))  # nome do grupo para agregação na pré-conferência
     cfops = Column(JSON)        # ["1101", "2101", "3101"]
