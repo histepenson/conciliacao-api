@@ -23,7 +23,7 @@ COLUNAS_IMPOSTO_SFT = {
     "valipi": "Valor IPI",
     "valpis": "Valor PIS",
     "valcof": "Valor COFINS",
-    "icmsret": "ICMS Retido",
+    "icmsret": "Icms Diferencial de Alíquota",
     "difal": "Difal ICMS",
 }
 
