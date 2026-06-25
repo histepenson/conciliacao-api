@@ -30,7 +30,7 @@ class ParametrosConciliacaoImpostos(BaseModel):
     """Parametros adicionais para a conciliacao de impostos."""
     data_base: str
     empresa_id: Optional[int] = None
-    campo_imposto: str  # ex: valicm, valpis, valcof, valipi, icmsret, difal
+    campo_imposto: str  # ex: valicm, valpis, valcof, valipi, icmsret, icmscom, difal
     tipo_mov: Optional[str] = None  # "ENTRADA" ou "SAIDA" - filtra a coluna Tipo Mov do SFT
     considerar_exportacao: Optional[str] = None  # "SIM": mantem tudo; "NAO": remove notas Estado Ref "EX"; "APENAS_EXPORTACAO": mantem so' as notas Estado Ref "EX"
 

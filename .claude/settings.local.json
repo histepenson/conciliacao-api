@@ -246,7 +246,8 @@
       "Bash(APP_ENV=prodtemp python -c ' *)",
       "Bash(git checkout *)",
       "Bash(git pull *)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(git fetch *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
