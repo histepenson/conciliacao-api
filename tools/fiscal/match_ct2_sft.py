@@ -252,9 +252,17 @@ def match_ct2_sft(
     # ==========================================================
     # Fase 2: reconciliacao por nota (soma do que restou, por chave)
     # ==========================================================
+    # Sempre por nota (filial+nf+fornece, SEM produto) mesmo quando a fase 1
+    # amarrou por produto (Saida): cobre lancamentos que somam a NF inteira
+    # numa unica linha do razao (ex.: "VENDA PROD NFE..." na receita de
+    # vendas, valor = soma de todos os itens) -- ai' o produto que sobra no
+    # CT2_KEY e' so' resquicio da ultima linha processada pela rotina nativa
+    # do Protheus, nao representa o valor lancado, e nunca bateria 1:1 na
+    # fase 1. Lancamento por item (ex.: PIS/COFINS/ICMS DEBITADO) ja' casou
+    # na fase 1 por produto e nao chega aqui.
     ct2_por_chave: dict = {}
     for i in ct2_pendente_com_chave:
-        chave = _extrair_chave_ct2(ct2_recs[i], eh_saida)
+        chave = _extrair_chave_ct2(ct2_recs[i], eh_saida)[:3]
         ct2_por_chave.setdefault(chave, []).append(i)
 
     sft_pendente_por_chave: dict = {}
@@ -263,7 +271,7 @@ def match_ct2_sft(
             continue
         chave = _chave_sft(sft_recs[i], eh_saida)
         if chave:
-            sft_pendente_por_chave.setdefault(chave, []).append(i)
+            sft_pendente_por_chave.setdefault(chave[:3], []).append(i)
 
     for chave, ct2_idxs in ct2_por_chave.items():
         sft_idxs = sft_pendente_por_chave.get(chave, [])

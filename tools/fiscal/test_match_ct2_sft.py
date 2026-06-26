@@ -235,16 +235,46 @@ class SaidaAmarraPorProduto(unittest.TestCase):
         self.assertTrue(sft_res[0]["matched"])
         self.assertTrue(sft_res[1]["matched"])
 
-    def test_produto_diferente_nao_casa_mesmo_com_filial_nf_cliente_iguais(self):
+    def test_produto_diferente_so_casa_se_a_soma_da_nota_bater(self):
+        # Produto da chave diverge do produto no SFT (sintoma normal de
+        # lancamento de NF inteira -- ver test_nf_inteira_numa_linha_so...),
+        # entao a fase 1 (exata, por produto) nao bate. Cai na fase 2 (por
+        # nota, sem produto): so' casa se a soma do que restou daquela nota
+        # reconciliar; aqui sobra UM item do SFT sem par nenhum (soma nao
+        # bate com o valor do CT2), entao tem que ficar como diferenca.
         chave = self._chave_saida("0113", "71463", "1", "023462", "01", "BIRA47000006", "01")
         ct2 = [{"ct2_key": chave, "debito": 82.00}]
-        sft = [{
-            "filial": "0113", "nf": "000071463", "cliefor": "023462",
-            "produto": "BIRA52000002", "cfop": "5910", "valcont": 82.00,
-        }]
+        sft = [
+            {"filial": "0113", "nf": "000071463", "cliefor": "023462",
+             "produto": "BIRA52000002", "cfop": "5910", "valcont": 40.00},
+            {"filial": "0113", "nf": "000071463", "cliefor": "023462",
+             "produto": "BIRA60000005", "cfop": "5910", "valcont": 15.00},
+        ]
         ct2_res, sft_res = match_ct2_sft(ct2, sft)
         self.assertFalse(ct2_res[0]["matched"])
-        self.assertFalse(sft_res[0]["matched"])
+        self.assertFalse(any(r["matched"] for r in sft_res))
+
+    def test_nf_inteira_numa_linha_so_cai_na_fase_2_sem_produto(self):
+        # Caso real: grupo "VENDAS PROD/REVENDA" (LP 610, descricao "VENDAS
+        # PRODUCAO VALOR RECEITA") lanca a NF inteira numa unica linha do
+        # razao (valor = soma de todos os itens), mas o CT2_KEY nativo do
+        # Protheus grava o produto/item da ULTIMA linha processada da NF --
+        # nao representa o valor lancado, entao a fase 1 (exata, por
+        # produto) nunca bate. Tem que cair na fase 2 (por nota, sem
+        # produto) e reconciliar pela soma dos itens do SFT.
+        chave = self._chave_saida("0103", "55868", "2", "000001", "01", "ALM143057", "06")
+        ct2 = [{"ct2_key": chave, "debito": 127.85}]
+        sft = [
+            {"filial": "0103", "nf": "000055868", "cliefor": "000001", "produto": "CFRA0202", "cfop": "5102", "valcont": 37.49},
+            {"filial": "0103", "nf": "000055868", "cliefor": "000001", "produto": "BIRA52000004", "cfop": "5102", "valcont": 4.47},
+            {"filial": "0103", "nf": "000055868", "cliefor": "000001", "produto": "BIRA52000003", "cfop": "5102", "valcont": 4.47},
+            {"filial": "0103", "nf": "000055868", "cliefor": "000001", "produto": "BIRA52000001", "cfop": "5102", "valcont": 4.47},
+            {"filial": "0103", "nf": "000055868", "cliefor": "000001", "produto": "BIRA55000004", "cfop": "5102", "valcont": 7.96},
+            {"filial": "0103", "nf": "000055868", "cliefor": "000001", "produto": "ALM143057", "cfop": "5102", "valcont": 68.99},
+        ]
+        ct2_res, sft_res = match_ct2_sft(ct2, sft)
+        self.assertTrue(ct2_res[0]["matched"])
+        self.assertTrue(all(r["matched"] for r in sft_res))
 
 
 if __name__ == "__main__":
