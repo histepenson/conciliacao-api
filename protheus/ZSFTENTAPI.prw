@@ -38,12 +38,12 @@ Retorno JSON:
 Campos por linha:
   filial, nf, tes, emissao, entrada, cliefor, estado, cfop, especie, quant,
   valcont, aliqicm, baseicm, valicm, isenicm, outricm,
-  icmscom, icmsdif, difal, icmsret,
+  icmscom, icmsdif, difal, vfcpdif, icmsret,
   produto, cstpis, codbcc, valpis, valcof, valipi, tipomov
 
 @author Equipe Desenvolvimento
 @since 27/05/2026
-@version 1.6
+@version 1.7
 /*/
 
 wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
@@ -166,6 +166,7 @@ cSql += "     FT_OUTRICM,"
 cSql += "     FT_ICMSCOM,"
 cSql += "     FT_ICMSDIF,"
 cSql += "     FT_DIFAL,"
+cSql += "     FT_VFCPDIF,"
 cSql += "     FT_ICMSRET,"
 cSql += "     FT_PRODUTO,"
 cSql += "     FT_CSTPIS,"
@@ -194,6 +195,7 @@ Begin Sequence
     TCSetField(cAlias, "FT_ICMSCOM", "N", 16, 2)
     TCSetField(cAlias, "FT_ICMSDIF", "N", 16, 2)
     TCSetField(cAlias, "FT_DIFAL",   "N", 16, 2)
+    TCSetField(cAlias, "FT_VFCPDIF", "N", 16, 2)
     TCSetField(cAlias, "FT_ICMSRET", "N", 16, 2)
     TCSetField(cAlias, "FT_VALPIS",  "N", 16, 2)
     TCSetField(cAlias, "FT_VALCOF",  "N", 16, 2)
@@ -221,6 +223,7 @@ Begin Sequence
         oLinha["icmscom"]  := Round((cAlias)->FT_ICMSCOM, 2)
         oLinha["icmsdif"]  := Round((cAlias)->FT_ICMSDIF, 2)
         oLinha["difal"]    := Round((cAlias)->FT_DIFAL,   2)
+        oLinha["vfcpdif"]  := Round((cAlias)->FT_VFCPDIF, 2)
         oLinha["icmsret"]  := Round((cAlias)->FT_ICMSRET, 2)
         oLinha["produto"]  := AllTrim((cAlias)->FT_PRODUTO)
         oLinha["cstpis"]   := AllTrim((cAlias)->FT_CSTPIS)

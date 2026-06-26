@@ -25,6 +25,9 @@ class LancamentoPadrao(Base):
     especies = Column(JSON)         # ["NFE", "CTE"] — filtro de Especie da NF no SFT
     especies_excluir = Column(JSON)     # Especies rejeitadas na pre-conferencia
     colunas_sft = Column(JSON)  # ["filial", "nf", "cliefor"]
+    colunas_valor_sft = Column(JSON)  # ["difal", "vfcpdif"] — colunas somadas p/
+                                       # "valor do SFT" na pre-conferencia;
+                                       # null/vazio = usa valcont (padrao)
     ativo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
