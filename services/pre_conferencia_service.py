@@ -201,6 +201,11 @@ def conferir(
         _HIST_RE_COM_FILIAL = re.compile(r'^NF\s+(\d+)\s+.*\s(\d{2,4})/', re.IGNORECASE)
         # Regex 2: só NF — "NF <nf> ..."
         _HIST_RE_NF = re.compile(r'^NF\s+(\d+)', re.IGNORECASE)
+        # Regex 3: historico de Saida (ex.: "VENDA PROD NFE12064 RM 001778",
+        # "ICMS DEBITADO NFE 12064") nao comeca com "NF " -- mesmo padrao
+        # tolerante usado em tools/fiscal/match_ct2_sft.py, busca em qualquer
+        # posicao da string. Sem filial embutido, mesma resolucao do regex 2.
+        _HIST_RE_NF_TOLERANTE = re.compile(r"(?:NFE?|CTE)\.?\s*(\d+)", re.IGNORECASE)
 
         def _norm_filial(v: str) -> str:
             return v.strip().zfill(4)
@@ -276,7 +281,7 @@ def conferir(
                 return None
 
             # Sem filial no historico: usa nf + ct2_itemc + SFT para filial
-            m_nf = _HIST_RE_NF.match(hist)
+            m_nf = _HIST_RE_NF.match(hist) or _HIST_RE_NF_TOLERANTE.search(hist)
             if m_nf:
                 nf_norm = _norm_nf(m_nf.group(1))
                 if cliefor_itemc:
