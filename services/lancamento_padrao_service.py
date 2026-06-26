@@ -52,6 +52,7 @@ def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> Lancamen
         "especies",
         "especies_excluir",
         "colunas_sft",
+        "colunas_valor_sft",
         "ativo",
     )
     for campo in campos:

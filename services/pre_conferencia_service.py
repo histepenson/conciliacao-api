@@ -150,6 +150,17 @@ def conferir(
     resultados: list[dict] = []
     lps_sem_cfop: list[str] = []
 
+    # ── Helper para calcular o "valor do SFT" usado na comparacao/matching ──
+    # Por padrao soma FT_VALCONT; se o LP tiver colunas_valor_sft configurado,
+    # soma essas colunas no lugar (ex.: ["difal", "vfcpdif"]).
+    def _valor_sft(registro: dict, colunas: list[str] | None) -> float:
+        if not colunas:
+            return float(registro.get("valcont") or 0)
+        return sum(float(registro.get(c) or 0) for c in colunas)
+
+    def _aplicar_valor_calc(sft_lp: list[dict], colunas: list[str] | None) -> list[dict]:
+        return [{**s, "_valor_calc": _valor_sft(s, colunas)} for s in sft_lp]
+
     # ── Helper para filtrar SFT dado cfops_set e tes_set ────────────────────
     def _limpar_set(valores):
         cleaned = {str(v).strip() for v in (valores or []) if str(v).strip()}
@@ -217,7 +228,7 @@ def conferir(
             if not filial or not nf:
                 continue
             chave = _norm(filial, nf, cliefor)
-            valcont = round(float(s.get("valcont") or 0), 2)
+            valcont = round(float(s.get("_valor_calc", s.get("valcont")) or 0), 2)
             emissao = str(s.get("entrada") or s.get("emissao") or "").strip()
             if chave not in sft_nfs:
                 sft_nfs[chave] = {"total": 0.0, "emissao": emissao}
@@ -352,7 +363,7 @@ def conferir(
     # ── Matching CT2 ↔ SFT por (filial, nf, fornece) extraído de CT2_KEY ──────
     # Logica compartilhada com a conciliacao de impostos (tools/fiscal/match_ct2_sft.py)
     def _match_ct2_sft(ct2_recs: list, sft_recs: list) -> tuple:
-        return _match_ct2_sft_impl(ct2_recs, sft_recs, campo_valor_sft="valcont", tolerancia=0.10)
+        return _match_ct2_sft_impl(ct2_recs, sft_recs, campo_valor_sft="_valor_calc", tolerancia=0.10)
 
     # ── Processar GRUPOS ─────────────────────────────────────────────────────
     grupos_configs: dict[str, list[LancamentoPadrao]] = {}
@@ -372,6 +383,7 @@ def conferir(
         tes_excluir_parts: list[str] = []
         especies_parts: list[str] = []
         especies_excluir_parts: list[str] = []
+        colunas_valor_set: set[str] = set()
         has_cfops = False
         for m in members:
             if m.cfops:
@@ -387,11 +399,14 @@ def conferir(
                 especies_parts.extend(str(e).strip() for e in m.especies)
             if m.especies_excluir:
                 especies_excluir_parts.extend(str(e).strip() for e in m.especies_excluir)
+            if m.colunas_valor_sft:
+                colunas_valor_set.update(str(c).strip() for c in m.colunas_valor_sft)
         tes_set = set(tes_parts) if tes_parts else None
         cfops_excluir_set = set(cfops_excluir_parts) if cfops_excluir_parts else None
         tes_excluir_set = set(tes_excluir_parts) if tes_excluir_parts else None
         especies_set = set(especies_parts) if especies_parts else None
         especies_excluir_set = set(especies_excluir_parts) if especies_excluir_parts else None
+        colunas_valor_grupo = sorted(colunas_valor_set) if colunas_valor_set else None
 
         if not has_cfops:
             ct2_detalhes = sorted(
@@ -413,7 +428,8 @@ def conferir(
             continue
 
         sft_lp = _filtrar_sft(cfops_set, tes_set, cfops_excluir_set, tes_excluir_set, especies_set, especies_excluir_set)
-        total_sft = round(sum(float(s.get("valcont") or 0) for s in sft_lp), 2)
+        sft_lp = _aplicar_valor_calc(sft_lp, colunas_valor_grupo)
+        total_sft = round(sum(s["_valor_calc"] for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)
 
         ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
@@ -431,7 +447,9 @@ def conferir(
             [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
               "emissao": str(s.get("entrada") or s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
               "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
-              "valcont": round(float(s.get("valcont") or 0), 2), "matched": s["matched"]}
+              "valcont": round(float(s.get("valcont") or 0), 2),
+              "valor_calculado": round(float(s.get("_valor_calc", s.get("valcont")) or 0), 2),
+              "matched": s["matched"]}
              for s in sft_matched],
             key=lambda x: (x["filial"], x["nf"]),
         )
@@ -484,9 +502,11 @@ def conferir(
         tes_excluir_set = {str(t).strip() for t in config.tes_codes_excluir} if config.tes_codes_excluir else None
         especies_set = {str(e).strip() for e in config.especies} if config.especies else None
         especies_excluir_set = {str(e).strip() for e in config.especies_excluir} if config.especies_excluir else None
+        colunas_valor_lp = [str(c).strip() for c in config.colunas_valor_sft] if config.colunas_valor_sft else None
         sft_lp = _filtrar_sft(cfops_set, tes_set, cfops_excluir_set, tes_excluir_set, especies_set, especies_excluir_set)
+        sft_lp = _aplicar_valor_calc(sft_lp, colunas_valor_lp)
 
-        total_sft = round(sum(float(s.get("valcont") or 0) for s in sft_lp), 2)
+        total_sft = round(sum(s["_valor_calc"] for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)
         lp_status = "ok" if abs(diferenca) <= 0.01 else "diferente"
 
@@ -505,7 +525,9 @@ def conferir(
             [{"filial": str(s.get("filial") or ""), "nf": str(s.get("nf") or ""),
               "emissao": str(s.get("entrada") or s.get("emissao") or ""), "cliefor": str(s.get("cliefor") or ""),
               "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
-              "valcont": round(float(s.get("valcont") or 0), 2), "matched": s["matched"]}
+              "valcont": round(float(s.get("valcont") or 0), 2),
+              "valor_calculado": round(float(s.get("_valor_calc", s.get("valcont")) or 0), 2),
+              "matched": s["matched"]}
              for s in sft_matched],
             key=lambda x: (x["filial"], x["nf"]),
         )
