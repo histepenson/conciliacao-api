@@ -22,6 +22,8 @@ class LancamentoPadrao(Base):
     cfops_excluir = Column(JSON)        # CFOPs rejeitados na pre-conferencia
     tes_codes_excluir = Column(JSON)    # TES rejeitadas na pre-conferencia
     tes_codes = Column(JSON)    # ["001", "002"] — filtro de TES no SFT
+    especies = Column(JSON)         # ["NFE", "CTE"] — filtro de Especie da NF no SFT
+    especies_excluir = Column(JSON)     # Especies rejeitadas na pre-conferencia
     colunas_sft = Column(JSON)  # ["filial", "nf", "cliefor"]
     ativo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

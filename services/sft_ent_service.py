@@ -13,6 +13,7 @@ _PARAMS_SFT = [
     "filial_de", "filial_ate",
     "cfop_inc", "cfop_exc",
     "tes_inc", "tes_exc",
+    "especie_inc", "especie_exc",
     "page", "pageSize",
 ]
 

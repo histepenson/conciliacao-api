@@ -9,6 +9,18 @@ from models.lancamento_padrao import LancamentoPadrao
 logger = logging.getLogger(__name__)
 
 
+def _sequencia_do_origem(origem) -> str:
+    """
+    Fallback para extrair a sequencia quando ct2_sequen vem vazio - acontece em
+    cargas CT2RAZCT5 carregadas antes do campo ct2_sequen existir no
+    ZCT2RAZCT5.prw (ou em ambientes cujo .prw ainda nao foi atualizado).
+    ct2_origem guarda "LP-SEQUENCIA" nos primeiros 7 caracteres, mesma logica
+    do JOIN feito no .prw: SUBSTRING(CT2.CT2_ORIGEM,1,7).
+    """
+    partes = str(origem or "").strip()[:7].split("-")
+    return partes[1].strip() if len(partes) == 2 else ""
+
+
 def listar(db: Session, empresa_id: int) -> list[LancamentoPadrao]:
     return (
         db.query(LancamentoPadrao)
@@ -37,6 +49,8 @@ def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> Lancamen
         "tes_codes",
         "cfops_excluir",
         "tes_codes_excluir",
+        "especies",
+        "especies_excluir",
         "colunas_sft",
         "ativo",
     )
@@ -74,7 +88,7 @@ def upsert_de_carga(db: Session, empresa_id: int, registros: list[dict]) -> int:
     for r in registros:
         lp = str(r.get("ct2_lp") or "").strip()
         desc = str(r.get("ct5_desc") or "").strip()
-        sequencia = str(r.get("ct2_sequen") or "").strip()
+        sequencia = str(r.get("ct2_sequen") or "").strip() or _sequencia_do_origem(r.get("ct2_origem"))
         if lp and (lp, desc) not in sequencia_por_par:
             sequencia_por_par[(lp, desc)] = sequencia
 
