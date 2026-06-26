@@ -20,6 +20,10 @@ Parametros:
                   Mantem apenas linhas cujo FT_TES CONTENHA (substring) algum dos codigos informados.
   tes_exc       = TES a excluir, separados por virgula (default "" = sem filtro)
                   Remove linhas cujo FT_TES CONTENHA (substring) algum dos codigos informados.
+  especie_inc   = Especies a incluir, separadas por virgula (default "" = sem filtro)
+                  Mantem apenas linhas cujo FT_ESPECIE CONTENHA (substring) algum dos codigos informados.
+  especie_exc   = Especies a excluir, separadas por virgula (default "" = sem filtro)
+                  Remove linhas cujo FT_ESPECIE CONTENHA (substring) algum dos codigos informados.
   page          = pagina (default 1)
   pageSize      = registros por pagina (default 5000, max 5000)
 
@@ -39,7 +43,7 @@ Campos por linha:
 
 @author Equipe Desenvolvimento
 @since 27/05/2026
-@version 1.5
+@version 1.6
 /*/
 
 wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
@@ -54,6 +58,8 @@ wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
     wsdata cfop_exc       as string
     wsdata tes_inc        as string
     wsdata tes_exc        as string
+    wsdata especie_inc    as string
+    wsdata especie_exc    as string
 
     wsmethod GET getSftEnt description "Livro Fiscal SFT SQL direto" wssyntax "/api/v1/sftent" PATH "/api/v1/sftent"
 
@@ -81,11 +87,15 @@ Local cCfopInc   := AllTrim(Self:cfop_inc)
 Local cCfopExc   := AllTrim(Self:cfop_exc)
 Local cTesInc    := AllTrim(Self:tes_inc)
 Local cTesExc    := AllTrim(Self:tes_exc)
+Local cEspecieInc := AllTrim(Self:especie_inc)
+Local cEspecieExc := AllTrim(Self:especie_exc)
 Local aCfopInc   := {}
 Local aCfopExc   := {}
 Local aTesInc    := {}
 Local aTesExc    := {}
-Local lFiltraCfopTes := .F.
+Local aEspecieInc := {}
+Local aEspecieExc := {}
+Local lFiltraLista := .F.
 Local nPage      := Max(1, Val(AllTrim(Self:page)))
 Local nPageSize  := Val(AllTrim(Self:pageSize))
 
@@ -112,17 +122,21 @@ cFilialAte := IIf(Empty(cFilialAte), "zzzzzzzzz", cFilialAte)
 nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset    := (nPage - 1) * nPageSize
 
-// --- Parse de listas CFOP/TES (contem/nao contem) ---
+// --- Parse de listas CFOP/TES/Especie (contem/nao contem) ---
 aCfopInc := SftEnt_ParseLista(cCfopInc)
 aCfopExc := SftEnt_ParseLista(cCfopExc)
 aTesInc  := SftEnt_ParseLista(cTesInc)
 aTesExc  := SftEnt_ParseLista(cTesExc)
-lFiltraCfopTes := (Len(aCfopInc) > 0 .Or. Len(aCfopExc) > 0 .Or. Len(aTesInc) > 0 .Or. Len(aTesExc) > 0)
+aEspecieInc := SftEnt_ParseLista(cEspecieInc)
+aEspecieExc := SftEnt_ParseLista(cEspecieExc)
+lFiltraLista := (Len(aCfopInc) > 0 .Or. Len(aCfopExc) > 0 .Or. Len(aTesInc) > 0 .Or. Len(aTesExc) > 0 .Or. ;
+    Len(aEspecieInc) > 0 .Or. Len(aEspecieExc) > 0)
 
 ConOut("[ZSFTENTAPI] data=" + cDataIni + "/" + cDataFim + ;
     " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
     " cfop_inc=" + cCfopInc + " cfop_exc=" + cCfopExc + ;
     " tes_inc=" + cTesInc + " tes_exc=" + cTesExc + ;
+    " especie_inc=" + cEspecieInc + " especie_exc=" + cEspecieExc + ;
     " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize))
 
 // --- WHERE ---
@@ -216,7 +230,8 @@ Begin Sequence
         oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
         oLinha["tipomov"]  := AllTrim((cAlias)->FT_TIPOMOV)
 
-        If !lFiltraCfopTes .Or. SftEnt_PassaFiltro(AllTrim((cAlias)->FT_CFOP), AllTrim((cAlias)->FT_TES), aCfopInc, aCfopExc, aTesInc, aTesExc)
+        If !lFiltraLista .Or. SftEnt_PassaFiltro(AllTrim((cAlias)->FT_CFOP), AllTrim((cAlias)->FT_TES), AllTrim((cAlias)->FT_ESPECIE), ;
+                aCfopInc, aCfopExc, aTesInc, aTesExc, aEspecieInc, aEspecieExc)
             AAdd(aAllLinhas, oLinha)
         Else
             FreeObj(oLinha)
@@ -267,6 +282,8 @@ oParams["cfop_inc"]   := cCfopInc
 oParams["cfop_exc"]   := cCfopExc
 oParams["tes_inc"]    := cTesInc
 oParams["tes_exc"]    := cTesExc
+oParams["especie_inc"] := cEspecieInc
+oParams["especie_exc"] := cEspecieExc
 oParams["page"]       := nPage
 oParams["pageSize"]   := nPageSize
 
@@ -342,13 +359,14 @@ Next nI
 Return .F.
 
 /*/{Protheus.doc} SftEnt_PassaFiltro
-Combina os 4 filtros (cfop_inc, cfop_exc, tes_inc, tes_exc):
+Combina os 6 filtros (cfop_inc, cfop_exc, tes_inc, tes_exc, especie_inc, especie_exc):
   - Se aCfopInc nao vazio: cCfop deve conter ALGUM item de aCfopInc, senao reprova.
   - Se aCfopExc nao vazio: cCfop NAO PODE conter NENHUM item de aCfopExc, senao reprova.
   - Mesma logica para TES com cTes/aTesInc/aTesExc.
+  - Mesma logica para Especie com cEspecie/aEspecieInc/aEspecieExc.
 Retorna .T. somente se passar em todos os criterios ativos.
 /*/
-Static Function SftEnt_PassaFiltro(cCfop, cTes, aCfopInc, aCfopExc, aTesInc, aTesExc)
+Static Function SftEnt_PassaFiltro(cCfop, cTes, cEspecie, aCfopInc, aCfopExc, aTesInc, aTesExc, aEspecieInc, aEspecieExc)
 
 If Len(aCfopInc) > 0 .And. !SftEnt_Contem(cCfop, aCfopInc)
 Return .F.
@@ -363,6 +381,14 @@ Return .F.
 EndIf
 
 If Len(aTesExc) > 0 .And. SftEnt_Contem(cTes, aTesExc)
+Return .F.
+EndIf
+
+If Len(aEspecieInc) > 0 .And. !SftEnt_Contem(cEspecie, aEspecieInc)
+Return .F.
+EndIf
+
+If Len(aEspecieExc) > 0 .And. SftEnt_Contem(cEspecie, aEspecieExc)
 Return .F.
 EndIf
 
