@@ -24,16 +24,24 @@ def match_ct2_sft(
 ) -> tuple[list[dict], list[dict]]:
     """
     Casa lancamentos do CT2 (via CT2_KEY) com notas do SFT por
-    (filial, nf, fornece) + valor (campo_valor_sft) dentro da tolerancia.
+    (filial, nf, fornece[, produto]) + valor (campo_valor_sft) dentro da
+    tolerancia. A direcao (Entrada/Saida) e' detectada automaticamente pelo
+    CFOP predominante em sft_recs (1/2/3 = Entrada, 5/6/7 = Saida) -- cada
+    chamada processa um lote homogeneo (mesmo LP/grupo de imposto ou mesmo
+    filtro Entrada/Saida), entao a maioria decide com seguranca. Para Saida
+    a chave tambem amarra por produto (D2_COD embutido no CT2_KEY, posicoes
+    24:54 -- ver _extrair_chave_ct2), porque o lancamento contabil de Saida
+    e' por item da NF; Entrada continua so' por filial+nf+fornece, como
+    sempre foi.
 
     campo_valor_ct2 indica qual coluna do CT2 usar como valor do lancamento
     ("debito" para notas de Entrada, "credito" para notas de Saida).
 
     Fases:
-    1. Matching exato 1:1 por chave (filial+nf+fornece) + valor dentro da
-       tolerancia.
+    1. Matching exato 1:1 por chave (filial+nf+fornece[+produto]) + valor
+       dentro da tolerancia.
     2. Reconciliacao por nota: para o que sobrou da fase 1 mas ainda tem
-       chave valida, agrupa por (filial, nf, fornece). Se a soma do que
+       chave valida, agrupa por (filial, nf, fornece[, produto]). Se a soma do que
        restou do CT2 bater com a soma do que restou do SFT para aquela
        MESMA nota, marca tudo daquele grupo como casado (cobre o caso comum
        de o razao lancar a nota inteira em uma linha so enquanto o SFT lista
@@ -82,7 +90,36 @@ def match_ct2_sft(
         s = str(v or "").strip()
         return s[:6].zfill(6) if len(s) >= 6 else s.zfill(6)
 
-    def _extrair_chave_ct2(rec: dict):
+    # Layout do CT2_KEY (campo nativo do Protheus, gerado pela integracao
+    # contabil a partir do SD1/SD2 de origem) apos filial+nf+serie+cliefor
+    # (posicoes 0:22, iguais para Entrada e Saida): Entrada (SD1) termina ali
+    # mesmo (resto e' lixo/PADR nao usado); Saida (SD2) emenda D2_LOJA (2,
+    # ignorado) + D2_COD (30, com o produto alinhado a esquerda e preenchido
+    # com espacos) + D2_ITEM (2). Confirmado com dados reais de producao
+    # (LP 610 = Saida -- ver pre_conferencia_service._LP_CODIGO_POR_TIPO_MOV):
+    # ct2_key="...0234620 1BIRA47000006[espacos]01" onde "023462" e' o
+    # cliente (cliefor) e "BIRA47000006" e' exatamente o campo "produto" do
+    # SFT para aquela NF.
+    _POS_PRODUTO_INI = 24
+    _LEN_PRODUTO = 30
+
+    def _eh_saida(sft_recs: list) -> bool:
+        """
+        Detecta se o lote de notas do SFT recebido e' de Saida (CFOP 5/6/7)
+        ou Entrada (CFOP 1/2/3) -- maioria simples. Cada chamada de
+        match_ct2_sft processa um lote homogeneo (mesmo LP/grupo de imposto
+        ou mesmo filtro Entrada/Saida), entao a maioria decide com seguranca.
+        """
+        saida = entrada = 0
+        for r in sft_recs:
+            cfop = str(r.get("cfop") or "").strip()
+            if cfop[:1] in ("5", "6", "7"):
+                saida += 1
+            elif cfop[:1] in ("1", "2", "3"):
+                entrada += 1
+        return saida > entrada
+
+    def _extrair_chave_ct2(rec: dict, eh_saida: bool):
         key = str(rec.get("ct2_key") or "").strip()
         if len(key) < 22:
             return None
@@ -92,15 +129,27 @@ def match_ct2_sft(
         # direita em vez de zeros a esquerda (ex.: "00005439 ", "001447   ").
         # _norm_nf (strip + zfill(9)) recanonicaliza para o mesmo formato do
         # SFT independente da largura original.
-        return (_norm_filial(key[0:4]), _norm_nf(key[4:13]), _norm_cliefor(key[16:22]))
+        filial = _norm_filial(key[0:4])
+        nf = _norm_nf(key[4:13])
+        cliefor = _norm_cliefor(key[16:22])
+        if not eh_saida:
+            return (filial, nf, cliefor)
+        fim_produto = _POS_PRODUTO_INI + _LEN_PRODUTO
+        if len(key) < fim_produto:
+            return None
+        produto = key[_POS_PRODUTO_INI:fim_produto].strip()
+        return (filial, nf, cliefor, produto)
 
-    def _chave_sft(rec: dict):
+    def _chave_sft(rec: dict, eh_saida: bool):
         filial = str(rec.get("filial") or "").strip()
         nf = str(rec.get("nf") or "").strip()
         cliefor = str(rec.get("cliefor") or "").strip()
         if not filial or not nf:
             return None
-        return (_norm_filial(filial), _norm_nf(nf), _norm_cliefor(cliefor))
+        if not eh_saida:
+            return (_norm_filial(filial), _norm_nf(nf), _norm_cliefor(cliefor))
+        produto = str(rec.get("produto") or "").strip()
+        return (_norm_filial(filial), _norm_nf(nf), _norm_cliefor(cliefor), produto)
 
     def _extrair_nf_historico(historico: str) -> Optional[str]:
         m = _NF_HISTORICO_RE.search(historico or "")
@@ -157,10 +206,14 @@ def match_ct2_sft(
                 sft_matched.update(cobertos)
                 ct2_matched_set.update(ct2_idxs_grupo)
 
-    # Indice SFT por (filial, nf, fornece) -> lista de indices
+    # Saida amarra tambem por produto (CT2_KEY traz D2_COD); Entrada continua
+    # so' por filial+nf+fornece, como sempre foi.
+    eh_saida = _eh_saida(sft_recs)
+
+    # Indice SFT por (filial, nf, fornece[, produto]) -> lista de indices
     sft_por_doc: dict = {}
     for i, s in enumerate(sft_recs):
-        chave = _chave_sft(s)
+        chave = _chave_sft(s, eh_saida)
         if chave:
             sft_por_doc.setdefault(chave, []).append(i)
 
@@ -177,7 +230,7 @@ def match_ct2_sft(
         if valor_ct2 == 0:
             ct2_matched_set.add(i)
             continue
-        chave = _extrair_chave_ct2(rec)
+        chave = _extrair_chave_ct2(rec, eh_saida)
         if chave is None:
             # Sem CT2_KEY valida -- tentativa de recuperacao via historico na fase 3.
             ct2_sem_chave.append(i)
@@ -201,14 +254,14 @@ def match_ct2_sft(
     # ==========================================================
     ct2_por_chave: dict = {}
     for i in ct2_pendente_com_chave:
-        chave = _extrair_chave_ct2(ct2_recs[i])
+        chave = _extrair_chave_ct2(ct2_recs[i], eh_saida)
         ct2_por_chave.setdefault(chave, []).append(i)
 
     sft_pendente_por_chave: dict = {}
     for i in range(len(sft_recs)):
         if i in sft_matched:
             continue
-        chave = _chave_sft(sft_recs[i])
+        chave = _chave_sft(sft_recs[i], eh_saida)
         if chave:
             sft_pendente_por_chave.setdefault(chave, []).append(i)
 

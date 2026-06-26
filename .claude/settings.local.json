@@ -256,7 +256,11 @@
       "Bash(APP_ENV=develop alembic upgrade head)",
       "Bash(APP_ENV=develop alembic current)",
       "Bash(./venv/Scripts/python.exe -m alembic heads)",
-      "Bash(./venv/Scripts/python.exe -m alembic history)"
+      "Bash(./venv/Scripts/python.exe -m alembic history)",
+      "PowerShell(Test-NetConnection -ComputerName thomas.proxy.rlwy.net -Port 15093 -WarningAction SilentlyContinue)",
+      "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" \"c:\\\\tmp\\\\check_prod.py\")",
+      "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" \"c:\\\\tmp\\\\check_8820b.py\")",
+      "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" \"c:\\\\tmp\\\\check_8820c.py\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

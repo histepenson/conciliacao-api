@@ -186,5 +186,66 @@ class Fase3FallbackPorHistorico(unittest.TestCase):
         self.assertFalse(sft_res[0]["matched"])
 
 
+class SaidaAmarraPorProduto(unittest.TestCase):
+    """
+    CT2_KEY de Saida (SD2) emenda D2_COD (produto, 30 chars alinhado a
+    esquerda) + D2_ITEM apos o trecho filial+nf+serie+cliente+loja (0:22) --
+    layout confirmado com dados reais de producao (LP 610 = Saida). A
+    direcao e' detectada pelo CFOP do SFT (5/6/7 = Saida), por isso todo
+    registro do SFT aqui precisa do campo "cfop".
+    """
+
+    @staticmethod
+    def _chave_saida(filial, nf, serie, cliente, loja, produto, item):
+        return (
+            filial.zfill(4) + nf.zfill(9) + serie.ljust(3)
+            + cliente.zfill(6) + loja.zfill(2) + produto.ljust(30) + item.zfill(2)
+        )
+
+    def test_casa_por_filial_nf_cliente_e_produto(self):
+        chave = self._chave_saida("0113", "71463", "1", "023462", "01", "BIRA47000006", "01")
+        ct2 = [{"ct2_key": chave, "debito": 82.00}]
+        sft = [{
+            "filial": "0113", "nf": "000071463", "cliefor": "023462",
+            "produto": "BIRA47000006", "cfop": "5910", "valcont": 82.00,
+        }]
+        ct2_res, sft_res = match_ct2_sft(ct2, sft)
+        self.assertTrue(ct2_res[0]["matched"])
+        self.assertTrue(sft_res[0]["matched"])
+
+    def test_mesma_nf_e_cliente_com_produtos_diferentes_nao_se_confundem(self):
+        # Caso real: NF dividida por produto, cada um com seu proprio lancamento
+        # no razao -- sem produto na chave, a soma bateria "por coincidencia"
+        # mesmo cruzando o lancamento errado.
+        chave_a = self._chave_saida("0113", "71464", "1", "059046", "01", "BIRA52000002", "01")
+        chave_b = self._chave_saida("0113", "71464", "1", "059046", "01", "BIRA47000006", "03")
+        ct2 = [
+            {"ct2_key": chave_a, "debito": 10.00},
+            {"ct2_key": chave_b, "debito": 36.40},
+        ]
+        sft = [
+            {"filial": "0113", "nf": "000071464", "cliefor": "059046",
+             "produto": "BIRA52000002", "cfop": "5910", "valcont": 10.00},
+            {"filial": "0113", "nf": "000071464", "cliefor": "059046",
+             "produto": "BIRA47000006", "cfop": "5910", "valcont": 36.40},
+        ]
+        ct2_res, sft_res = match_ct2_sft(ct2, sft)
+        self.assertTrue(ct2_res[0]["matched"])
+        self.assertTrue(ct2_res[1]["matched"])
+        self.assertTrue(sft_res[0]["matched"])
+        self.assertTrue(sft_res[1]["matched"])
+
+    def test_produto_diferente_nao_casa_mesmo_com_filial_nf_cliente_iguais(self):
+        chave = self._chave_saida("0113", "71463", "1", "023462", "01", "BIRA47000006", "01")
+        ct2 = [{"ct2_key": chave, "debito": 82.00}]
+        sft = [{
+            "filial": "0113", "nf": "000071463", "cliefor": "023462",
+            "produto": "BIRA52000002", "cfop": "5910", "valcont": 82.00,
+        }]
+        ct2_res, sft_res = match_ct2_sft(ct2, sft)
+        self.assertFalse(ct2_res[0]["matched"])
+        self.assertFalse(sft_res[0]["matched"])
+
+
 if __name__ == "__main__":
     unittest.main()
