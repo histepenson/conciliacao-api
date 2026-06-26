@@ -168,12 +168,13 @@ def conferir(
 
     def _filtrar_sft(
         cfops_set, tes_set, cfops_excluir_set=None, tes_excluir_set=None,
-        especies_set=None, especies_excluir_set=None,
+        especies_set=None, especies_excluir_set=None, series_set=None,
     ):
         cfops_rejeitados = _limpar_set(cfops_excluir_set)
         tes_rejeitadas = _limpar_set(tes_excluir_set)
         especies_aceitas = _limpar_set(especies_set)
         especies_rejeitadas = _limpar_set(especies_excluir_set)
+        series_aceitas = _limpar_set(series_set)
         return [
             s for cfop, lst in sft_por_cfop.items()
             if any(c in cfop for c in cfops_set)
@@ -183,6 +184,7 @@ def conferir(
             if tes_rejeitadas is None or not any(t in str(s.get("tes") or "").strip() for t in tes_rejeitadas)
             if especies_aceitas is None or any(e in str(s.get("especie") or "").strip() for e in especies_aceitas)
             if especies_rejeitadas is None or not any(e in str(s.get("especie") or "").strip() for e in especies_rejeitadas)
+            if series_aceitas is None or any(sr in str(s.get("serie") or "").strip() for sr in series_aceitas)
         ]
 
     # ── Cruzamento NF: outer join CT2 × SFT agregados por NF ────────────────────
@@ -383,6 +385,7 @@ def conferir(
         tes_excluir_parts: list[str] = []
         especies_parts: list[str] = []
         especies_excluir_parts: list[str] = []
+        series_parts: list[str] = []
         colunas_valor_set: set[str] = set()
         has_cfops = False
         for m in members:
@@ -399,6 +402,8 @@ def conferir(
                 especies_parts.extend(str(e).strip() for e in m.especies)
             if m.especies_excluir:
                 especies_excluir_parts.extend(str(e).strip() for e in m.especies_excluir)
+            if m.series:
+                series_parts.extend(str(sr).strip() for sr in m.series)
             if m.colunas_valor_sft:
                 colunas_valor_set.update(str(c).strip() for c in m.colunas_valor_sft)
         tes_set = set(tes_parts) if tes_parts else None
@@ -406,6 +411,7 @@ def conferir(
         tes_excluir_set = set(tes_excluir_parts) if tes_excluir_parts else None
         especies_set = set(especies_parts) if especies_parts else None
         especies_excluir_set = set(especies_excluir_parts) if especies_excluir_parts else None
+        series_set = set(series_parts) if series_parts else None
         colunas_valor_grupo = sorted(colunas_valor_set) if colunas_valor_set else None
 
         if not has_cfops:
@@ -427,7 +433,7 @@ def conferir(
             })
             continue
 
-        sft_lp = _filtrar_sft(cfops_set, tes_set, cfops_excluir_set, tes_excluir_set, especies_set, especies_excluir_set)
+        sft_lp = _filtrar_sft(cfops_set, tes_set, cfops_excluir_set, tes_excluir_set, especies_set, especies_excluir_set, series_set)
         sft_lp = _aplicar_valor_calc(sft_lp, colunas_valor_grupo)
         total_sft = round(sum(s["_valor_calc"] for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)
@@ -502,8 +508,9 @@ def conferir(
         tes_excluir_set = {str(t).strip() for t in config.tes_codes_excluir} if config.tes_codes_excluir else None
         especies_set = {str(e).strip() for e in config.especies} if config.especies else None
         especies_excluir_set = {str(e).strip() for e in config.especies_excluir} if config.especies_excluir else None
+        series_set = {str(sr).strip() for sr in config.series} if config.series else None
         colunas_valor_lp = [str(c).strip() for c in config.colunas_valor_sft] if config.colunas_valor_sft else None
-        sft_lp = _filtrar_sft(cfops_set, tes_set, cfops_excluir_set, tes_excluir_set, especies_set, especies_excluir_set)
+        sft_lp = _filtrar_sft(cfops_set, tes_set, cfops_excluir_set, tes_excluir_set, especies_set, especies_excluir_set, series_set)
         sft_lp = _aplicar_valor_calc(sft_lp, colunas_valor_lp)
 
         total_sft = round(sum(s["_valor_calc"] for s in sft_lp), 2)
