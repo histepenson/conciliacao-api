@@ -254,7 +254,9 @@
       "PowerShell(Test-NetConnection -ComputerName shinkansen.proxy.rlwy.net -Port 54745 -WarningAction SilentlyContinue)",
       "Bash(git ls-tree *)",
       "Bash(APP_ENV=develop alembic upgrade head)",
-      "Bash(APP_ENV=develop alembic current)"
+      "Bash(APP_ENV=develop alembic current)",
+      "Bash(./venv/Scripts/python.exe -m alembic heads)",
+      "Bash(./venv/Scripts/python.exe -m alembic history)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

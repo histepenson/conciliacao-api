@@ -36,14 +36,14 @@ Retorno JSON:
   linhas          = registros da pagina
 
 Campos por linha:
-  filial, nf, tes, emissao, entrada, cliefor, estado, cfop, especie, quant,
+  filial, nf, serie, tes, emissao, entrada, cliefor, estado, cfop, especie, quant,
   valcont, aliqicm, baseicm, valicm, isenicm, outricm,
   icmscom, icmsdif, difal, vfcpdif, icmsret,
   produto, cstpis, codbcc, valpis, valcof, valipi, tipomov
 
 @author Equipe Desenvolvimento
 @since 27/05/2026
-@version 1.7
+@version 1.8
 /*/
 
 wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
@@ -149,6 +149,7 @@ cWhere += " AND FT_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 cSql := " SELECT"
 cSql += "     FT_FILIAL,"
 cSql += "     FT_NFISCAL,"
+cSql += "     FT_SERIE,"
 cSql += "     FT_TES,"
 cSql += "     FT_EMISSAO,"
 cSql += "     FT_ENTRADA,"
@@ -206,6 +207,7 @@ Begin Sequence
         oLinha := JsonObject():New()
         oLinha["filial"]   := AllTrim((cAlias)->FT_FILIAL)
         oLinha["nf"]       := AllTrim((cAlias)->FT_NFISCAL)
+        oLinha["serie"]    := AllTrim((cAlias)->FT_SERIE)
         oLinha["tes"]      := AllTrim((cAlias)->FT_TES)
         oLinha["emissao"]  := DtoC((cAlias)->FT_EMISSAO)
         oLinha["entrada"]  := DtoC((cAlias)->FT_ENTRADA)

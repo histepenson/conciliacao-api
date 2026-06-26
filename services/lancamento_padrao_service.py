@@ -49,6 +49,7 @@ def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> Lancamen
         "tes_codes",
         "cfops_excluir",
         "tes_codes_excluir",
+        "series",
         "especies",
         "especies_excluir",
         "colunas_sft",
