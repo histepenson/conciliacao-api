@@ -33,6 +33,7 @@ from routers.certificado_router import router as certificado_router
 from routers.nfe_router import router as nfe_router
 from routers.estoque_router import router as estoque_router
 from routers.pre_conferencia_router import router as pre_conferencia_router
+from routers.analise_ia_router import router as analise_ia_router
 from routers.lancamento_padrao_router import router as lancamento_padrao_router
 from routers.ativo_fixo_router import router as ativo_fixo_router
 from routers.balancete_router import router as balancete_router
@@ -135,6 +136,7 @@ app.include_router(certificado_router, prefix="/api")
 app.include_router(nfe_router, prefix="/api")
 app.include_router(estoque_router)
 app.include_router(pre_conferencia_router, prefix="/api")
+app.include_router(analise_ia_router, prefix="/api")
 app.include_router(ativo_fixo_router, prefix="/api")
 app.include_router(lancamento_padrao_router, prefix="/api")
 app.include_router(balancete_router, prefix="/api")
