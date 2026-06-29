@@ -14,14 +14,24 @@ import logging
 import re
 from typing import Any
 
+import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from core.config import settings
 from models.protheus_carga import ProtheusCarga, ProtheusCargaRegistro
 from models.lancamento_padrao import LancamentoPadrao
 from tools.fiscal.match_ct2_sft import match_ct2_sft as _match_ct2_sft_impl
 
 logger = logging.getLogger(__name__)
+
+# Mesmo padrao usado em tools/fiscal/match_ct2_sft.py para extrair o numero
+# da NF/CT-e de historicos de razao como "DEVOLUCAO COMPRA NFE 2202566".
+_NF_HISTORICO_RE = re.compile(r"(?:NFE?|CTE)\.?\s*(\d+)", re.IGNORECASE)
+
+
+def _nf_normalizada(valor) -> str:
+    return re.sub(r"^0+(?=\d)", "", str(valor or "").strip())
 
 
 def _ultima_carga(db: Session, empresa_id: int, tipo: str) -> ProtheusCarga | None:
@@ -420,22 +430,9 @@ def conferir(
         colunas_valor_grupo = sorted(colunas_valor_set) if colunas_valor_set else None
 
         if not has_cfops:
-            ct2_detalhes = sorted(
-                [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
-                  "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
-                  "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
-                  "matched": False}
-                 for r in ct2_recs],
-                key=lambda x: x["data"],
-            )
+            # LP/grupo sem CFOP configurado -- nao aparece na pre-conferencia
+            # (so' entra no resumo "sem_mapeamento" via lps_sem_cfop).
             lps_sem_cfop.append(grupo_nome)
-            resultados.append({
-                "lp_codigo": lp_codigo_display, "descricao": grupo_nome, "is_grupo": True,
-                "status": "sem_mapeamento", "total_ct2": total_ct2, "total_sft": None,
-                "diferenca": None, "qt_ct2": len(ct2_recs), "qt_sft": 0,
-                "ct2_detalhes": ct2_detalhes, "sft_detalhes": [],
-                "nf_cruzamento": [],
-            })
             continue
 
         sft_lp = _filtrar_sft(cfops_set, tes_set, cfops_excluir_set, tes_excluir_set, especies_set, especies_excluir_set, series_set)
@@ -483,28 +480,9 @@ def conferir(
             descricao = config.descricao
 
         if not config or not config.cfops:
-            ct2_detalhes = sorted(
-                [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
-                  "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
-                  "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
-                  "matched": False}
-                 for r in ct2_recs],
-                key=lambda x: x["data"],
-            )
+            # LP sem CFOP configurado -- nao aparece na pre-conferencia (so'
+            # entra no resumo "sem_mapeamento" via lps_sem_cfop).
             lps_sem_cfop.append(f"{lp_codigo} {descricao}".strip())
-            resultados.append({
-                "lp_codigo":    lp_codigo,
-                "descricao":    descricao,
-                "status":       "sem_mapeamento",
-                "total_ct2":    total_ct2,
-                "total_sft":    None,
-                "diferenca":    None,
-                "qt_ct2":       len(ct2_recs),
-                "qt_sft":       0,
-                "ct2_detalhes": ct2_detalhes,
-                "sft_detalhes": [],
-                "nf_cruzamento": [],
-            })
             continue
 
         cfops_set = {str(c).strip() for c in config.cfops}
@@ -561,7 +539,7 @@ def conferir(
     # ── Resumo ───────────────────────────────────────────────────────────────
     total_ok  = sum(1 for r in resultados if r["status"] == "ok")
     total_dif = sum(1 for r in resultados if r["status"] == "diferente")
-    total_sem = sum(1 for r in resultados if r["status"] == "sem_mapeamento")
+    total_sem = len(lps_sem_cfop)  # nao entram em resultados, so' no resumo
 
     return {
         "empresa_id": empresa_id,
@@ -580,3 +558,111 @@ def conferir(
         "lps_sem_cfop": lps_sem_cfop,
         "resultados": resultados,
     }
+
+
+def analisar_divergencia(
+    db: Session,
+    empresa_id: int,
+    lp_codigo: str,
+    descricao: str,
+    carga_id_ct2: int | None = None,
+    carga_id_sft: int | None = None,
+    tipo_mov: str | None = None,
+) -> dict:
+    """
+    Diagnostico de por que um LP/grupo com status "diferente" nao casou
+    (botao "Analisar com IA" na Pre-Conferencia). Reaproveita o resultado de
+    conferir() para nao duplicar a logica de matching/filtro, busca no SFT
+    completo (sem o filtro de CFOP/TES/Especie do LP) as notas referentes aos
+    lancamentos CT2 nao conciliados, e envia tudo pra engine de diagnostico
+    em smartconciliacoes_ia.
+    """
+    resultado_completo = conferir(db, empresa_id, carga_id_ct2, carga_id_sft, tipo_mov)
+    alvo = next(
+        (
+            r for r in resultado_completo["resultados"]
+            if r["lp_codigo"] == lp_codigo and (r["descricao"] or "") == (descricao or "")
+        ),
+        None,
+    )
+    if not alvo:
+        raise HTTPException(404, f"LP {lp_codigo} / {descricao!r} nao encontrado no resultado da conferencia.")
+
+    registros_nao_conciliados_a = [d for d in alvo["ct2_detalhes"] if not d["matched"]]
+
+    if alvo.get("is_grupo"):
+        membros = (
+            db.query(LancamentoPadrao)
+            .filter(LancamentoPadrao.empresa_id == empresa_id, LancamentoPadrao.grupo == descricao)
+            .all()
+        )
+    else:
+        membros = (
+            db.query(LancamentoPadrao)
+            .filter(
+                LancamentoPadrao.empresa_id == empresa_id,
+                LancamentoPadrao.lp_codigo == lp_codigo,
+                LancamentoPadrao.descricao == descricao,
+            )
+            .all()
+        )
+
+    cfops, tes_codes, especies = set(), set(), set()
+    cfops_excluir, tes_excluir, especies_excluir = set(), set(), set()
+    for m in membros:
+        cfops.update(m.cfops or [])
+        tes_codes.update(m.tes_codes or [])
+        especies.update(m.especies or [])
+        cfops_excluir.update(m.cfops_excluir or [])
+        tes_excluir.update(m.tes_codes_excluir or [])
+        especies_excluir.update(m.especies_excluir or [])
+    config = {
+        "cfops": sorted(cfops), "cfops_excluir": sorted(cfops_excluir),
+        "tes_codes": sorted(tes_codes), "tes_codes_excluir": sorted(tes_excluir),
+        "especies": sorted(especies), "especies_excluir": sorted(especies_excluir),
+    }
+
+    # Candidatos brutos: busca no SFT completo (sem o filtro de CFOP/TES/Especie
+    # do LP) pelas NFs extraidas do historico dos lancamentos CT2 nao conciliados
+    # -- mesma investigacao manual: a nota pode existir, so' nao entrar no
+    # conjunto candidato por causa de um CFOP/TES/Especie nao configurado.
+    sft_data = _carregar_dados_carga(db, resultado_completo["carga_id_sft"])
+    nfs_buscadas = set()
+    for d in registros_nao_conciliados_a:
+        m = _NF_HISTORICO_RE.search(d.get("historico") or "")
+        if m:
+            nfs_buscadas.add(_nf_normalizada(m.group(1)))
+    candidatos_brutos_b = [s for s in sft_data if _nf_normalizada(s.get("nf")) in nfs_buscadas]
+
+    payload = {
+        "dominio": "fiscal",
+        "contexto": {
+            "lp_codigo": lp_codigo,
+            "descricao": descricao,
+            "status": alvo["status"],
+            "total_ct2": alvo["total_ct2"],
+            "total_sft": alvo["total_sft"],
+            "diferenca": alvo["diferenca"],
+        },
+        "registros_nao_conciliados_a": registros_nao_conciliados_a,
+        "rotulo_a": "CT2 (razao)",
+        "rotulo_b": "SFT (livro fiscal)",
+        "config": config,
+        "candidatos_brutos_b": candidatos_brutos_b,
+        "gerar_explicacao_ia": True,
+    }
+
+    if not settings.SMARTCONCILIACOES_IA_URL:
+        raise HTTPException(503, "SMARTCONCILIACOES_IA_URL nao configurada.")
+
+    headers = {"X-API-Key": settings.SMARTCONCILIACOES_IA_API_KEY} if settings.SMARTCONCILIACOES_IA_API_KEY else {}
+    try:
+        resp = httpx.post(
+            f"{settings.SMARTCONCILIACOES_IA_URL}/api/v1/analise/divergencia",
+            json=payload, headers=headers, timeout=30.0,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPError as e:
+        logger.exception("Erro ao chamar smartconciliacoes_ia")
+        raise HTTPException(502, f"Erro ao chamar servico de analise IA: {e}")

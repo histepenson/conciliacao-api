@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # Certificado Digital
     CERT_ENCRYPTION_KEY: str = ""
 
+    # SmartConciliacoes IA (engine externa de matching/diagnostico de divergencias)
+    SMARTCONCILIACOES_IA_URL: str = ""
+    SMARTCONCILIACOES_IA_API_KEY: str = ""
+
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_allowed_origins(cls, value):
