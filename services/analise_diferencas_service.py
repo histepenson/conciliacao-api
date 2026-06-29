@@ -11,10 +11,12 @@ logger = logging.getLogger(__name__)
 class AnaliseDiferencasService:
     """Gera analise detalhada por codigo (financeiro/contabil)."""
 
+    LIMITE_DIVERGENCIA = 1.00
+
     def _classificar_tipo(
         self, valor_fin: float, valor_cont: float, diferenca: float
     ) -> str:
-        if abs(diferenca) <= 0.01:
+        if abs(diferenca) <= self.LIMITE_DIVERGENCIA:
             return "CONCILIADO"
         if valor_fin > 0 and valor_cont == 0:
             return "SO_FINANCEIRO"
@@ -23,7 +25,7 @@ class AnaliseDiferencasService:
         return "DIVERGENTE_VALOR"
 
     def _status(self, diferenca: float) -> str:
-        return "verde" if abs(diferenca) <= 0.01 else "vermelho"
+        return "verde" if abs(diferenca) <= self.LIMITE_DIVERGENCIA else "vermelho"
 
     def _parse_valor(self, valor: object) -> float:
         """Converte valor numerico ou string em formato BR para float."""
