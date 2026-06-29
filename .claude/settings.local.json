@@ -260,7 +260,10 @@
       "PowerShell(Test-NetConnection -ComputerName thomas.proxy.rlwy.net -Port 15093 -WarningAction SilentlyContinue)",
       "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" \"c:\\\\tmp\\\\check_prod.py\")",
       "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" \"c:\\\\tmp\\\\check_8820b.py\")",
-      "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" \"c:\\\\tmp\\\\check_8820c.py\")"
+      "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" \"c:\\\\tmp\\\\check_8820c.py\")",
+      "Bash(mkdir -p /c/smartconciliacoes_ia/core /c/smartconciliacoes_ia/tools/fiscal /c/smartconciliacoes_ia/tools/banco /c/smartconciliacoes_ia/tools/estoque /c/smartconciliacoes_ia/schemas /c/smartconciliacoes_ia/routers /c/smartconciliacoes_ia/services *)",
+      "Bash(xargs '-I{}' python -c ' *)",
+      "Bash(APP_ENV=develop python -c ' *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -274,7 +277,8 @@
       "C:\\conciliacao-app\\src\\components\\ProtheusParamsDialog",
       "c:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog",
       "C:\\conciliacao-app",
-      "\\tmp"
+      "\\tmp",
+      "C:\\smartconciliacoes_ia"
     ]
   }
 }
