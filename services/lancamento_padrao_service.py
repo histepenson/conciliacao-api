@@ -44,6 +44,7 @@ def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> Lancamen
     lp = obter(db, lp_id, empresa_id)
     campos = (
         "descricao",
+        "sequencia",
         "grupo",
         "cfops",
         "tes_codes",

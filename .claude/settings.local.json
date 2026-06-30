@@ -276,7 +276,14 @@
       "Bash(node_modules/.bin/esbuild src/pages/Conciliacoes.jsx --bundle=false --outfile=/tmp/out.js)",
       "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
       "Bash(node_modules/.bin/esbuild src/components/PainelAnaliseIA/PainelAnaliseIA.jsx --bundle=false --outfile=/tmp/out.js)",
-      "Bash(node_modules/.bin/esbuild src/components/SftEntParamsDialog/SftEntParamsDialog.jsx --bundle=false --outfile=/tmp/out.js)"
+      "Bash(node_modules/.bin/esbuild src/components/SftEntParamsDialog/SftEntParamsDialog.jsx --bundle=false --outfile=/tmp/out.js)",
+      "Bash(ls -la \"Railway Oficial - Concilia.session.sql\" 2>/dev/null; echo \"---\"; find / -maxdepth 1 -iname \"*.env*\" 2>/dev/null)",
+      "Bash(where railway *)",
+      "Bash(railway service *)",
+      "Bash(railway variables *)",
+      "Bash(railway environment *)",
+      "Bash(railway project *)",
+      "Bash(railway link *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
