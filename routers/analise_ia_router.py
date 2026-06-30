@@ -127,7 +127,7 @@ async def _enriquecer_titulos_com_ct2(
     description=(
         "Reencaminha os registros nao-conciliados (ja calculados pela conciliacao) para o "
         "servico smartconciliacoes_ia diagnosticar a causa raiz e gerar uma explicacao. "
-        "Para o dominio financeiro, antes de reencaminhar busca na razao contabil se os "
+        "Para o dominio financeiro, antes de reencaminhar busca na razão contábil se os "
         "titulos sem correspondencia foram lancados em outra conta contabil."
     ),
 )
