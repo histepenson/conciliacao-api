@@ -951,8 +951,16 @@ class AnaliseDiferencasService:
                             "data_emissao": self._formatar_data(r.get("data_emissao", ""), periodo),
                             "documento": "-".join(doc_parts),
                             "tipo_titulo": tp_str2,
+                            "parcela": str(parcela_val or "").strip(),
                             "status": status_rec,
                             "dentro_periodo": not _fora_do_periodo_rec,
+                            # Chave crua do titulo, usada pela analise de IA pra localizar
+                            # o lancamento na CT2 -- ver lancamentos_financeiro_detalhes.
+                            "ct2_filial": r.get("ct2_filial"),
+                            "ct2_loja": r.get("ct2_loja"),
+                            "ct2_cliente_fornecedor": r.get("ct2_cliente_fornecedor"),
+                            "ct2_prefixo": r.get("ct2_prefixo"),
+                            "ct2_numero": r.get("ct2_numero"),
                         }
                         if tem_correspondencia is not None:
                             entry["tem_correspondencia"] = tem_correspondencia

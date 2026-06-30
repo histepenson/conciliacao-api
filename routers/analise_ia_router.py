@@ -46,7 +46,10 @@ async def _enriquecer_titulos_com_ct2(
     conta_analisada = str(body.contexto.get("conta_contabil") or "").strip()
 
     for item in body.registros_nao_conciliados_a:
-        titulos = item.get("lancamentos_financeiro_detalhes") or []
+        # SO_FINANCEIRO popula lancamentos_financeiro_detalhes; outros tipos
+        # (ex.: DIVERGENTE_VALOR) populam registros_match_financeiro -- mesmo
+        # fallback que o frontend ja usa pra montar a grid "Lancamentos Financeiro".
+        titulos = item.get("lancamentos_financeiro_detalhes") or item.get("registros_match_financeiro") or []
         for titulo in titulos:
             filial = titulo.get("ct2_filial")
             cliente_fornecedor = titulo.get("ct2_cliente_fornecedor")
