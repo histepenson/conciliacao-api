@@ -762,12 +762,23 @@ class AnaliseDiferencasService:
                             "valor": round(valor_fin_det, 2),
                             "tipo_lancamento": "",
                             "data_lancamento": self._formatar_data(data_emissao, periodo),
+                            "data_emissao": _data_emissao_fmt,
                             "documento": documento,
                             "tipo_titulo": tp_str,
+                            "parcela": str(r.get("parcela") or "").strip(),
                             "historico": "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
                             "tem_correspondencia": tem_corr,
                             "dentro_periodo": _dentro_periodo_fin,
+                            # Chave crua do titulo (FILIAL+CLIENTE/FORNECEDOR+LOJA+
+                            # PREFIXO+NUM), usada pela analise de IA pra localizar o
+                            # lancamento na CT2 -- so' vem preenchida quando a base
+                            # financeira veio de carga automatica via Protheus.
+                            "ct2_filial": r.get("ct2_filial"),
+                            "ct2_loja": r.get("ct2_loja"),
+                            "ct2_cliente_fornecedor": r.get("ct2_cliente_fornecedor"),
+                            "ct2_prefixo": r.get("ct2_prefixo"),
+                            "ct2_numero": r.get("ct2_numero"),
                         }
                     )
 

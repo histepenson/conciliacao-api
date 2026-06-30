@@ -549,6 +549,20 @@ class ProcessadorFinanceiroBase(ABC):
             and df["codigo_cli"].astype(str).str.match(r'^[CFcf]\d+$').any()
         )
         if _usa_codigo_cli:
+            # Campos crus do titulo (FILIAL+CLIENTE/FORNECEDOR+LOJA+PREFIXO+NUM),
+            # disponiveis apenas quando a base vem de carga automatica via Protheus
+            # (ZFINR130API/ZFINR150API). Preservados ANTES de "cliente" ser
+            # sobrescrito pelo nome de exibicao abaixo -- usados para localizar o
+            # titulo na CT2 (busca de lancamento / analise de IA).
+            col_cliefor_raw = next((c for c in ["cliente", "fornecedor"] if c in df.columns), None)
+            df["ct2_filial"] = df["filial"].astype(str).str.strip()
+            df["ct2_loja"] = df["loja"].astype(str).str.strip()
+            df["ct2_cliente_fornecedor"] = (
+                df[col_cliefor_raw].astype(str).str.strip() if col_cliefor_raw else None
+            )
+            df["ct2_prefixo"] = df["prefixo"].astype(str).str.strip() if "prefixo" in df.columns else None
+            df["ct2_numero"] = df["numero"].astype(str).str.strip() if "numero" in df.columns else None
+
             df["codigo"] = df["codigo_cli"].astype(str).str.strip()
             nome_col = next((c for c in ["nome_cliente", col_cliente] if c in df.columns), None)
             df["cliente"] = df[nome_col].astype(str).str.strip() if nome_col else df["codigo"]
@@ -559,6 +573,13 @@ class ProcessadorFinanceiroBase(ABC):
             )
             df["codigo"] = codigo_df["codigo"]
             df["cliente"] = codigo_df["cliente"]
+            # Upload manual de Excel: relatorio nao traz FILIAL/LOJA/PREFIXO
+            # separados, entao a busca na CT2 nao fica disponivel para esses dados.
+            df["ct2_filial"] = None
+            df["ct2_loja"] = None
+            df["ct2_cliente_fornecedor"] = None
+            df["ct2_prefixo"] = None
+            df["ct2_numero"] = None
 
         # Processar datas
         df = self._processar_datas(df)
@@ -838,5 +859,7 @@ class ProcessadorFinanceiroBase(ABC):
         return df[[
             "codigo", "cliente", "valor",
             "data_emissao", "data_vencimento",
-            "numero_documento", "parcela", "tipo_titulo"
+            "numero_documento", "parcela", "tipo_titulo",
+            "ct2_filial", "ct2_loja", "ct2_cliente_fornecedor",
+            "ct2_prefixo", "ct2_numero",
         ]].copy()
