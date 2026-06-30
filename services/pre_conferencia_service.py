@@ -633,6 +633,50 @@ def analisar_divergencia(
             nfs_buscadas.add(_nf_normalizada(m.group(1)))
     candidatos_brutos_b = [s for s in sft_data if _nf_normalizada(s.get("nf")) in nfs_buscadas]
 
+    # Diagnostico de qualidade da carga CT2 -- detecta problemas de parametro
+    # (saldo errado, ct2_lp vazio, lote restrictivo) que causam total_ct2 = 0
+    # mesmo com registros presentes na carga.
+    ct2_data_all = _carregar_dados_carga(db, resultado_completo["carga_id_ct2"])
+    total_carga = len(ct2_data_all)
+    debito_zero = sum(1 for r in ct2_data_all if float(r.get("debito") or 0) == 0)
+    ct2_lp_vazio = sum(1 for r in ct2_data_all if not str(r.get("ct2_lp") or "").strip())
+    contagem_lp: dict[str, int] = {}
+    for r in ct2_data_all:
+        lp_val = str(r.get("ct2_lp") or "").strip() or "(vazio)"
+        contagem_lp[lp_val] = contagem_lp.get(lp_val, 0) + 1
+    top_lps = sorted(contagem_lp.items(), key=lambda x: -x[1])[:10]
+
+    params_ct2 = resultado_completo.get("params_ct2") or {}
+    saldo_usado = str(params_ct2.get("saldo") or "1")
+    saldo_desc = {"1": "Ambos (debito e credito)", "2": "Somente Debito", "3": "Somente Credito"}.get(saldo_usado, saldo_usado)
+    lote_usado = str(params_ct2.get("lote") or "008810 (default)")
+
+    diagnostico_carga = {
+        "total_registros_carga": total_carga,
+        "registros_debito_zero": debito_zero,
+        "pct_debito_zero": round(debito_zero / total_carga * 100, 1) if total_carga else 0,
+        "registros_ct2_lp_vazio": ct2_lp_vazio,
+        "pct_ct2_lp_vazio": round(ct2_lp_vazio / total_carga * 100, 1) if total_carga else 0,
+        "top_ct2_lp": [{"lp": lp, "quantidade": qt} for lp, qt in top_lps],
+        "parametros_usados": {
+            "saldo": saldo_usado,
+            "saldo_descricao": saldo_desc,
+            "lote": lote_usado,
+            "conta_de": params_ct2.get("conta_de"),
+            "conta_ate": params_ct2.get("conta_ate"),
+            "data_ini": params_ct2.get("data_ini"),
+            "data_fim": params_ct2.get("data_fim"),
+        },
+        "alertas": [
+            *(["SALDO=3 (Somente Credito): todos os registros tem debito=0 — a carga nao traz lancamentos de debito, logo total_ct2 sera sempre 0 para todos os LPs."]
+              if saldo_usado == "3" else []),
+            *(["SALDO=1 (Ambos): a carga inclui lancamentos de credito (debito=0) e debito. Se o total_ct2 de um LP e 0, os lancamentos desse LP podem estar do lado credito da particao (conta_de/ate errada)."]
+              if saldo_usado == "1" else []),
+            *(["CT2_LP VAZIO NA MAIORIA DOS REGISTROS: o campo ct2_lp esta em branco para mais de 80% dos registros — a carga trouxe lancamentos que nao tem Lancamento Padrao vinculado no Protheus (CT2_ORIGEM nao bateu com nenhum CT5)."]
+              if total_carga and ct2_lp_vazio / total_carga > 0.8 else []),
+        ],
+    }
+
     payload = {
         "dominio": "fiscal",
         "contexto": {
@@ -642,12 +686,15 @@ def analisar_divergencia(
             "total_ct2": alvo["total_ct2"],
             "total_sft": alvo["total_sft"],
             "diferenca": alvo["diferenca"],
+            "qt_ct2": alvo["qt_ct2"],
+            "qt_sft": alvo["qt_sft"],
         },
         "registros_nao_conciliados_a": registros_nao_conciliados_a,
         "rotulo_a": "CT2 (razao)",
         "rotulo_b": "SFT (livro fiscal)",
         "config": config,
         "candidatos_brutos_b": candidatos_brutos_b,
+        "diagnostico_carga": diagnostico_carga,
         "gerar_explicacao_ia": True,
     }
 
