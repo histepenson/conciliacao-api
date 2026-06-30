@@ -42,7 +42,7 @@ CT2_KEY_CAMPOS: list[tuple[str, int]] = [
 ]
 
 
-def _decompor_ct2_key(ct2_key: str) -> dict[str, str]:
+def decompor_ct2_key(ct2_key: str) -> dict[str, str]:
     """Fatia o CT2_KEY nos campos de origem do titulo, na ordem de CT2_KEY_CAMPOS."""
     chave = ct2_key or ""
     campos: dict[str, str] = {}
@@ -53,7 +53,7 @@ def _decompor_ct2_key(ct2_key: str) -> dict[str, str]:
     return campos
 
 
-def _norm(valor: Any) -> str:
+def normalizar_campo_ct2(valor: Any) -> str:
     return str(valor or "").strip().upper().lstrip("0") or "0"
 
 
@@ -98,16 +98,16 @@ async def buscar_lancamento_contabil_de_titulo(
     )
 
     alvo: dict[str, str] = {
-        "filial": _norm(filial),
-        "cliente_fornecedor": _norm(cliente_fornecedor),
-        "loja": _norm(loja),
-        "num": _norm(num),
-        "tipo": _norm(tipo),
+        "filial": normalizar_campo_ct2(filial),
+        "cliente_fornecedor": normalizar_campo_ct2(cliente_fornecedor),
+        "loja": normalizar_campo_ct2(loja),
+        "num": normalizar_campo_ct2(num),
+        "tipo": normalizar_campo_ct2(tipo),
     }
     if prefixo:
-        alvo["prefixo"] = _norm(prefixo)
+        alvo["prefixo"] = normalizar_campo_ct2(prefixo)
     if parcela:
-        alvo["parcela"] = _norm(parcela)
+        alvo["parcela"] = normalizar_campo_ct2(parcela)
 
     encontrados: list[dict[str, Any]] = []
     page = 1
@@ -122,10 +122,10 @@ async def buscar_lancamento_contabil_de_titulo(
 
         for linha in resultado.get("registros", []):
             ct2_key = linha.get("ct2_key", "")
-            campos = _decompor_ct2_key(ct2_key)
+            campos = decompor_ct2_key(ct2_key)
             logger.debug("[CT2_LANCAMENTO] ct2_key=%r campos=%s", ct2_key, campos)
 
-            if any(_norm(campos.get(chave)) != valor for chave, valor in alvo.items()):
+            if any(normalizar_campo_ct2(campos.get(chave)) != valor for chave, valor in alvo.items()):
                 continue
 
             encontrados.append({

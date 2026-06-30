@@ -273,7 +273,9 @@
       "Bash(node_modules/.bin/esbuild src/components/DetailedAnalysisTable/DetailedAnalysisTable.jsx --bundle=false --outfile=/tmp/out.js)",
       "Bash(node_modules/.bin/esbuild src/components/DetailedAnalysisTable/DetailedAnalysisTable.css --bundle=false --outfile=/tmp/out.css)",
       "Bash(find / -iname \"*importar-csv-protheus*\" -o -iname \"*importar_carga_manual*\" 2>/dev/null | grep -v node_modules)",
-      "Bash(node_modules/.bin/esbuild src/pages/Conciliacoes.jsx --bundle=false --outfile=/tmp/out.js)"
+      "Bash(node_modules/.bin/esbuild src/pages/Conciliacoes.jsx --bundle=false --outfile=/tmp/out.js)",
+      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
+      "Bash(node_modules/.bin/esbuild src/components/PainelAnaliseIA/PainelAnaliseIA.jsx --bundle=false --outfile=/tmp/out.js)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

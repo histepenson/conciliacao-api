@@ -5,6 +5,8 @@ import re
 
 import pandas as pd
 
+from services.ct2_lancamento_service import decompor_ct2_key, normalizar_campo_ct2
+
 logger = logging.getLogger(__name__)
 
 
@@ -250,6 +252,10 @@ class AnaliseDiferencasService:
                     df_razao_geral_norm,
                     ["ct5_desc", "CT5_DESC"],
                 )
+                col_ct2_key_geral = self._encontrar_coluna(
+                    df_razao_geral_norm,
+                    ["ct2_key", "CT2_KEY"],
+                )
 
         df_merge = fin_agg.merge(cont_agg, on="codigo", how="outer")
         if not razao_agg.empty:
@@ -494,6 +500,15 @@ class AnaliseDiferencasService:
                         # Obter nome do cliente do mapa
                         nome_cliente = codigo_nome_map.get(codigo, "")
 
+                        # Processo inverso: nao achamos titulo pelo matching normal
+                        # (data/valor) -- decodifica o ct2_key do proprio lancamento
+                        # e procura no financeiro o titulo que o originou. Sem
+                        # ct2_key = lancamento manual (nao veio de titulo).
+                        ct2_key_lanc = str(r.get(col_ct2_key_geral, "")) if col_ct2_key_geral else ""
+                        titulo_financeiro = self._buscar_titulo_financeiro_por_ct2_key(
+                            ct2_key_lanc, df_financeiro_detalhado
+                        )
+
                         lancamentos_razao_detalhes.append(
                             {
                                 "conta_origem": item_conta,
@@ -516,6 +531,9 @@ class AnaliseDiferencasService:
                                 "tem_correspondencia": tem_corr_det,
                                 "valor_financeiro_match": vlr_fin_det,
                                 "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
+                                "ct2_key": ct2_key_lanc,
+                                "lancamento_manual": titulo_financeiro["lancamento_manual"],
+                                "titulo_financeiro": titulo_financeiro,
                             }
                         )
 
@@ -1328,6 +1346,64 @@ class AnaliseDiferencasService:
         if "codclval_normalizado" in df_razao_norm.columns:
             mask = mask | (df_razao_norm["codclval_normalizado"] == codigo_normalizado)
         return df_razao_norm[mask]
+
+    def _buscar_titulo_financeiro_por_ct2_key(
+        self, ct2_key: str, df_financeiro_detalhado: Optional[pd.DataFrame]
+    ) -> Dict[str, Any]:
+        """
+        Processo inverso do SO_FINANCEIRO: dado o ct2_key de um lancamento da
+        razao contabil sem titulo correspondente encontrado pelo matching normal,
+        decodifica a chave (FILIAL+CLIENTE/FORNECEDOR+LOJA+PREFIXO+NUM+PARCELA+
+        TIPO) e procura no financeiro ja carregado (todos os periodos, nao so' o
+        analisado) o titulo que efetivamente originou esse lancamento.
+
+        CT2_KEY vazio = lancamento manual (nao veio da contabilizacao automatica
+        de titulos financeiros) -- nao ha titulo a procurar.
+        """
+        chave = (ct2_key or "").strip()
+        if not chave:
+            return {"lancamento_manual": True, "titulo_encontrado": False, "titulo": None}
+
+        if (
+            df_financeiro_detalhado is None
+            or df_financeiro_detalhado.empty
+            or "ct2_filial" not in df_financeiro_detalhado.columns
+        ):
+            return {"lancamento_manual": False, "titulo_encontrado": False, "titulo": None}
+
+        campos = decompor_ct2_key(chave)
+        alvo = {
+            "ct2_filial": normalizar_campo_ct2(campos.get("filial")),
+            "ct2_cliente_fornecedor": normalizar_campo_ct2(campos.get("cliente_fornecedor")),
+            "ct2_loja": normalizar_campo_ct2(campos.get("loja")),
+            "ct2_numero": normalizar_campo_ct2(campos.get("num")),
+            "tipo_titulo": normalizar_campo_ct2(campos.get("tipo")),
+        }
+
+        df = df_financeiro_detalhado
+        mask = pd.Series(True, index=df.index)
+        for col, valor in alvo.items():
+            if col not in df.columns:
+                return {"lancamento_manual": False, "titulo_encontrado": False, "titulo": None}
+            mask &= df[col].apply(normalizar_campo_ct2) == valor
+
+        matches = df[mask]
+        if matches.empty:
+            return {"lancamento_manual": False, "titulo_encontrado": False, "titulo": None}
+
+        r = matches.iloc[0]
+        return {
+            "lancamento_manual": False,
+            "titulo_encontrado": True,
+            "titulo": {
+                "codigo": str(r.get("codigo", "")),
+                "cliente": str(r.get("cliente", "")),
+                "valor": round(float(r.get("valor", 0) or 0), 2),
+                "data_emissao": str(r.get("data_emissao", "") or ""),
+                "documento": str(r.get("numero_documento", "") or ""),
+                "tipo_titulo": str(r.get("tipo_titulo", "") or ""),
+            },
+        }
 
     def _encontrar_coluna(
         self, df: pd.DataFrame, candidatas: List[str]
