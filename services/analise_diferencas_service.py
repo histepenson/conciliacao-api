@@ -55,6 +55,10 @@ class AnaliseDiferencasService:
                 continue
         return None
 
+    def _dentro_periodo(self, data_str: str, periodo: Optional[tuple]) -> bool:
+        """True se a data pertence ao periodo analisado (ou se nao ha periodo definido)."""
+        return periodo is None or self._data_no_periodo(data_str, periodo)
+
     def _data_no_periodo(self, data_str: str, periodo: tuple) -> bool:
         """Verifica se data_str pertence ao mesmo mes/ano do periodo."""
         if not data_str or data_str == "-":
@@ -432,6 +436,7 @@ class AnaliseDiferencasService:
                             else "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
                             "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
+                            "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                         }
                     )
             if tipo == "SO_CONTABILIDADE" and lancamentos_razao_geral:
@@ -510,6 +515,7 @@ class AnaliseDiferencasService:
                                 "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                                 "tem_correspondencia": tem_corr_det,
                                 "valor_financeiro_match": vlr_fin_det,
+                                "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                             }
                         )
 
@@ -591,6 +597,7 @@ class AnaliseDiferencasService:
                         "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                         "tem_correspondencia": tem_corr_div,
                         "valor_financeiro_match": vlr_fin_div,
+                        "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                     })
                 logger.warning("[DIV_VALOR] codigo=%s: %d adicionados, %d skipped (match exato), detalhes=%d", codigo, len(matches_div) - _div_skipped, _div_skipped, len(lancamentos_razao_detalhes))
 
@@ -670,6 +677,7 @@ class AnaliseDiferencasService:
                             "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                             "tem_correspondencia": tem_corr_sf,
                             "valor_financeiro_match": vlr_fin_sf,
+                            "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                         }
                     )
 
@@ -738,7 +746,8 @@ class AnaliseDiferencasService:
                     # Entradas fora do periodo analisado nao tem correspondencia esperada no razao
                     # (o razao so cobre o periodo fechado). Nesses casos, nao marcar como vermelho.
                     _data_emissao_fmt = self._formatar_data(data_emissao, periodo)
-                    if periodo and not self._data_no_periodo(_data_emissao_fmt, periodo):
+                    _dentro_periodo_fin = not (periodo and not self._data_no_periodo(_data_emissao_fmt, periodo))
+                    if not _dentro_periodo_fin:
                         tem_corr = None  # fora do periodo -> frontend: neutro (sem cor)
                     else:
                         tem_corr = bool(prf_str and any(
@@ -758,6 +767,7 @@ class AnaliseDiferencasService:
                             "historico": "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
                             "tem_correspondencia": tem_corr,
+                            "dentro_periodo": _dentro_periodo_fin,
                         }
                     )
 
@@ -834,6 +844,7 @@ class AnaliseDiferencasService:
                             "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                             "tem_correspondencia": tem_corr_tmp,
                             "valor_financeiro_match": vlr_fin_tmp,
+                            "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                         }
                     )
 
@@ -930,6 +941,7 @@ class AnaliseDiferencasService:
                             "documento": "-".join(doc_parts),
                             "tipo_titulo": tp_str2,
                             "status": status_rec,
+                            "dentro_periodo": not _fora_do_periodo_rec,
                         }
                         if tem_correspondencia is not None:
                             entry["tem_correspondencia"] = tem_correspondencia
@@ -1037,12 +1049,16 @@ class AnaliseDiferencasService:
                     # no financeiro (mas valor diferente); False se nenhuma tiver.
                     "tem_correspondencia": lanc.get("tem_correspondencia"),
                     "valor_financeiro_match": lanc.get("valor_financeiro_match"),
+                    # dentro_periodo: True se qualquer entrada do grupo for do periodo analisado
+                    "dentro_periodo": lanc.get("dentro_periodo", True),
                 }
             else:
                 # Propagar tem_correspondencia: True tem prioridade sobre False/None
                 if lanc.get("tem_correspondencia") is True:
                     agrupados[chave]["tem_correspondencia"] = True
                     agrupados[chave]["valor_financeiro_match"] = lanc.get("valor_financeiro_match")
+                if lanc.get("dentro_periodo", True):
+                    agrupados[chave]["dentro_periodo"] = True
             agrupados[chave]["valor"] = round(
                 agrupados[chave]["valor"] + float(lanc.get("valor", 0) or 0), 2
             )

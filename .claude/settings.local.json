@@ -268,7 +268,10 @@
       "Bash(APP_ENV=develop ./venv/Scripts/python.exe scripts/importar_carga_manual.py --listar-empresas)",
       "Bash(./venv/Scripts/python.exe /c/tmp/extrair_ctbr140_genix.py)",
       "Bash(APP_ENV=develop ./venv/Scripts/python.exe scripts/importar_carga_manual.py --empresa-id 13 --tipo CTBR140 --data-base 20251231 --registros-json /c/tmp/ctbr140_genix_registros.json --parametros-json '{\"conta_contabil\":\"211010001\"}')",
-      "Bash(APP_ENV=develop python -c \"import main; print\\('OK', [r.path for r in main.app.routes if 'analise' in r.path]\\)\")"
+      "Bash(APP_ENV=develop python -c \"import main; print\\('OK', [r.path for r in main.app.routes if 'analise' in r.path]\\)\")",
+      "Bash(node -e \"require\\('@babel/core'\\).transformFileSync\\('src/components/DetailedAnalysisTable/DetailedAnalysisTable.jsx', {presets: ['@babel/preset-react']}\\); console.log\\('OK'\\)\")",
+      "Bash(node_modules/.bin/esbuild src/components/DetailedAnalysisTable/DetailedAnalysisTable.jsx --bundle=false --outfile=/tmp/out.js)",
+      "Bash(node_modules/.bin/esbuild src/components/DetailedAnalysisTable/DetailedAnalysisTable.css --bundle=false --outfile=/tmp/out.css)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
