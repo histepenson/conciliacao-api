@@ -699,3 +699,166 @@ def analisar_divergencia(
     }
 
     return analise_ia_service.chamar_diagnostico(payload)
+
+
+def diagnosticar_nota(
+    db: Session,
+    empresa_id: int,
+    nf: str,
+    cliefor: str,
+    filial: str,
+    valor: float,
+    carga_id_ct2: int | None = None,
+    carga_id_sft: int | None = None,
+) -> dict:
+    """
+    Diagnostica por que uma nota fiscal especifica do SFT nao casou com nenhum
+    lancamento CT2. Busca a NF na carga CT2 (via ct2_key e historico) e classifica
+    o motivo: ausente, lote errado, filial/cliefor/valor divergente, ct2_lp vazio.
+    Chama o smartconciliacoes_ia para gerar explicacao em linguagem natural.
+    """
+    # ── Resolve carga CT2 ────────────────────────────────────────────────────
+    if carga_id_ct2 is None:
+        carga_ct2 = _ultima_carga(db, empresa_id, "CT2RAZCT5")
+        if not carga_ct2:
+            raise HTTPException(404, "Nenhuma carga CT2RAZCT5 concluida encontrada.")
+        carga_id_ct2 = carga_ct2.id
+    else:
+        carga_ct2 = db.query(ProtheusCarga).get(carga_id_ct2)
+        if not carga_ct2 or carga_ct2.empresa_id != empresa_id:
+            raise HTTPException(404, f"Carga CT2RAZCT5 {carga_id_ct2} nao encontrada.")
+
+    params_ct2 = carga_ct2.parametros_json or {}
+    lote_carga = str(params_ct2.get("lote") or "008810")
+    saldo_carga = str(params_ct2.get("saldo") or "1")
+    saldo_desc = {"1": "Ambos", "2": "Somente Debito", "3": "Somente Credito"}.get(saldo_carga, saldo_carga)
+    data_ini = str(params_ct2.get("data_ini") or "")
+    data_fim = str(params_ct2.get("data_fim") or "")
+
+    # ── Normaliza chaves de busca ────────────────────────────────────────────
+    nf_norm = re.sub(r"^0+(?=\d)", "", nf.strip())
+    filial_norm = filial.strip().zfill(4) if filial.strip() else ""
+    cliefor_s = cliefor.strip()
+    cliefor_norm = (cliefor_s[:6].zfill(6) if len(cliefor_s) >= 6 else cliefor_s.zfill(6))
+
+    # ── Carrega registros CT2 ────────────────────────────────────────────────
+    ct2_data = _carregar_dados_carga(db, carga_id_ct2)
+
+    # Regex tolerante: "NFE315", "NFE 315", "NF 315", "NF315", "000000315"
+    _nf_re = re.compile(
+        r"(?:NFE?|CTE|NF)\s*\.?\s*0*" + re.escape(nf_norm) + r"(?!\d)",
+        re.IGNORECASE,
+    )
+
+    encontrados_key: list[dict] = []
+    encontrados_hist: list[dict] = []
+
+    for rec in ct2_data:
+        k = str(rec.get("ct2_key") or "").strip()
+        # Busca via ct2_key (posicoes 4:13 = NF)
+        if len(k) >= 13:
+            k_nf = re.sub(r"^0+(?=\d)", "", k[4:13].strip())
+            if k_nf == nf_norm:
+                encontrados_key.append(rec)
+                continue
+        # Busca via historico
+        hist = str(rec.get("historico") or "")
+        if _nf_re.search(hist):
+            encontrados_hist.append(rec)
+
+    encontrados = encontrados_key + encontrados_hist
+
+    # ── Monta diagnostico ────────────────────────────────────────────────────
+    parametros_carga = {
+        "lote": lote_carga,
+        "saldo": saldo_carga,
+        "saldo_descricao": saldo_desc,
+        "data_ini": data_ini,
+        "data_fim": data_fim,
+        "conta_de": params_ct2.get("conta_de") or "",
+        "conta_ate": params_ct2.get("conta_ate") or "",
+    }
+
+    if not encontrados:
+        alertas = [
+            f"Lote filtrado na carga: {lote_carga} — se o lancamento desta NF esta em outro lote, nao aparece nesta carga.",
+        ]
+        if saldo_carga == "3":
+            alertas.append("SALDO=3 (Somente Credito): a carga nao traz lancamentos de debito — confirme o parametro saldo ao recarregar.")
+        diagnostico = {
+            "encontrada": False,
+            "motivo": "ausente_na_carga",
+            "descricao": f"NF {nf_norm} nao encontrada em nenhum registro da carga CT2 {carga_id_ct2} (buscada via ct2_key e historico).",
+            "parametros_carga": parametros_carga,
+            "alertas": alertas,
+        }
+    else:
+        registros_analisados = []
+        for rec in encontrados:
+            k = str(rec.get("ct2_key") or "").strip()
+            debito = round(float(rec.get("debito") or 0), 2)
+            ct2_lp = str(rec.get("ct2_lp") or "").strip()
+            hist = str(rec.get("historico") or "")[:120]
+            via = "ct2_key" if rec in encontrados_key else "historico"
+
+            rec_filial = ""
+            rec_cliefor = ""
+            if len(k) >= 22:
+                rec_filial = k[0:4].strip().zfill(4)
+                raw_cf = k[16:22].strip()
+                rec_cliefor = (raw_cf[:6].zfill(6) if len(raw_cf) >= 6 else raw_cf.zfill(6))
+
+            problemas: list[str] = []
+            if rec_filial and filial_norm and rec_filial != filial_norm:
+                problemas.append(f"filial difere: CT2={rec_filial}, SFT={filial_norm}")
+            if rec_cliefor and cliefor_norm and rec_cliefor != cliefor_norm:
+                problemas.append(f"cliefor difere: CT2={rec_cliefor}, SFT={cliefor_norm}")
+            if debito > 0 and abs(debito - valor) > 0.10:
+                problemas.append(f"valor difere: CT2={debito:.2f}, SFT={valor:.2f}")
+            if not ct2_lp:
+                problemas.append("ct2_lp vazio: lancamento sem LP vinculado — nao aparece em nenhum LP da conferencia")
+            if via == "historico" and len(k) < 13:
+                problemas.append("sem ct2_key valida: matching depende do historico (menos preciso)")
+
+            registros_analisados.append({
+                "via": via,
+                "ct2_key": k,
+                "historico": hist,
+                "debito": debito,
+                "ct2_lp": ct2_lp,
+                "problemas": problemas,
+            })
+
+        tem_problema = any(r["problemas"] for r in registros_analisados)
+        diagnostico = {
+            "encontrada": True,
+            "total_encontrados": len(encontrados),
+            "motivo": "encontrado_com_divergencia" if tem_problema else "encontrado_sem_problema_aparente",
+            "descricao": (
+                f"NF {nf_norm} encontrada em {len(encontrados)} registro(s) da carga CT2, "
+                "mas com divergencias que impediram o matching."
+                if tem_problema else
+                f"NF {nf_norm} encontrada em {len(encontrados)} registro(s) — sem divergencias obvias detectadas; "
+                "o matching pode ter falhado por ambiguidade de fornecedor ou NF duplicada entre filiais."
+            ),
+            "registros": registros_analisados,
+            "parametros_carga": parametros_carga,
+            "alertas": [],
+        }
+
+    # ── Chama IA para explicacao ─────────────────────────────────────────────
+    payload_ia = {
+        "nf": nf_norm,
+        "filial_sft": filial,
+        "cliefor_sft": cliefor,
+        "valor_sft": valor,
+        "carga_id_ct2": carga_id_ct2,
+        "diagnostico": diagnostico,
+    }
+    try:
+        explicacao = analise_ia_service.chamar_diagnostico_nota(payload_ia)
+    except Exception:
+        logger.exception("Falha ao chamar IA para diagnostico de nota — retornando sem explicacao")
+        explicacao = None
+
+    return {**diagnostico, "explicacao": explicacao}
