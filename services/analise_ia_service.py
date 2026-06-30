@@ -16,6 +16,23 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def chamar_diagnostico_nota(payload: dict) -> str:
+    """Chama /v1/analise/nota-sft no smartconciliacoes_ia e retorna a explicacao em texto."""
+    if not settings.SMARTCONCILIACOES_IA_URL:
+        return None
+    headers = {"X-API-Key": settings.SMARTCONCILIACOES_IA_API_KEY} if settings.SMARTCONCILIACOES_IA_API_KEY else {}
+    try:
+        resp = httpx.post(
+            f"{settings.SMARTCONCILIACOES_IA_URL}/api/v1/analise/nota-sft",
+            json=payload, headers=headers, timeout=30.0,
+        )
+        resp.raise_for_status()
+        return resp.json().get("explicacao")
+    except httpx.HTTPError as e:
+        logger.exception("Erro ao chamar smartconciliacoes_ia nota-sft")
+        raise HTTPException(502, f"Erro ao chamar servico de analise IA: {e}")
+
+
 def chamar_diagnostico(payload: dict) -> dict:
     if not settings.SMARTCONCILIACOES_IA_URL:
         raise HTTPException(503, "SMARTCONCILIACOES_IA_URL nao configurada.")

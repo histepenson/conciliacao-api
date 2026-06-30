@@ -34,6 +34,32 @@ def get_conferencia(
 
 
 @router.get(
+    "/diagnostico-nota",
+    summary="Diagnosticar por que uma nota SFT nao casou com o CT2",
+    description=(
+        "Busca a NF na carga CT2 (via ct2_key e historico) e classifica o motivo pelo "
+        "qual nao houve matching: ausente na carga, lote diferente, filial/cliefor/valor "
+        "divergente ou ct2_lp vazio. Retorna diagnostico estruturado + explicacao da IA."
+    ),
+)
+def get_diagnostico_nota(
+    nf: str = Query(..., description="Numero da NF (ex.: 000000315 ou 315)"),
+    cliefor: str = Query(..., description="Codigo do fornecedor/cliente do SFT"),
+    filial: str = Query("", description="Filial do SFT (ex.: 0119)"),
+    valor: float = Query(..., description="Valor contabil da nota no SFT"),
+    empresa_id: Optional[int] = Query(None),
+    carga_id_ct2: Optional[int] = Query(None),
+    carga_id_sft: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    return service.diagnosticar_nota(
+        db, resolved_id, nf, cliefor, filial, valor, carga_id_ct2, carga_id_sft,
+    )
+
+
+@router.get(
     "/analisar",
     summary="Analisar com IA: diagnostico de por que um LP/grupo nao casou",
     description=(
