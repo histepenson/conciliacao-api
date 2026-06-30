@@ -271,7 +271,9 @@
       "Bash(APP_ENV=develop python -c \"import main; print\\('OK', [r.path for r in main.app.routes if 'analise' in r.path]\\)\")",
       "Bash(node -e \"require\\('@babel/core'\\).transformFileSync\\('src/components/DetailedAnalysisTable/DetailedAnalysisTable.jsx', {presets: ['@babel/preset-react']}\\); console.log\\('OK'\\)\")",
       "Bash(node_modules/.bin/esbuild src/components/DetailedAnalysisTable/DetailedAnalysisTable.jsx --bundle=false --outfile=/tmp/out.js)",
-      "Bash(node_modules/.bin/esbuild src/components/DetailedAnalysisTable/DetailedAnalysisTable.css --bundle=false --outfile=/tmp/out.css)"
+      "Bash(node_modules/.bin/esbuild src/components/DetailedAnalysisTable/DetailedAnalysisTable.css --bundle=false --outfile=/tmp/out.css)",
+      "Bash(find / -iname \"*importar-csv-protheus*\" -o -iname \"*importar_carga_manual*\" 2>/dev/null | grep -v node_modules)",
+      "Bash(node_modules/.bin/esbuild src/pages/Conciliacoes.jsx --bundle=false --outfile=/tmp/out.js)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

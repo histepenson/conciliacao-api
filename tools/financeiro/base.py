@@ -538,15 +538,19 @@ class ProcessadorFinanceiroBase(ABC):
         df = self._calcular_valor(df)
 
         # Normalizar codigo:
-        # Se codigo_cli estiver disponivel com formato Protheus (C/F + digitos, ex: C00002101)
-        # e os campos filial/loja tambem existirem (indicativo de dado do Protheus),
-        # usar codigo_cli diretamente pois ja contem base+loja no formato correto.
+        # Se codigo_cli/codigo_for estiver disponivel com formato Protheus (C/F +
+        # digitos, ex: C00002101) e os campos filial/loja tambem existirem
+        # (indicativo de dado do Protheus), usar o codigo pronto diretamente pois
+        # ja contem base+loja no formato correto.
+        # codigo_cli (ZFINR130API, contas a receber) e codigo_for (ZFINR150API,
+        # contas a pagar) sao o mesmo conceito com nomes diferentes por API.
+        col_codigo_pronto = next((c for c in ["codigo_cli", "codigo_for"] if c in df.columns), None)
         _usa_codigo_cli = (
-            "codigo_cli" in df.columns
+            col_codigo_pronto is not None
             and "loja" in df.columns
             and "filial" in df.columns
-            and df["codigo_cli"].notna().any()
-            and df["codigo_cli"].astype(str).str.match(r'^[CFcf]\d+$').any()
+            and df[col_codigo_pronto].notna().any()
+            and df[col_codigo_pronto].astype(str).str.match(r'^[CFcf]\d+$').any()
         )
         if _usa_codigo_cli:
             # Campos crus do titulo (FILIAL+CLIENTE/FORNECEDOR+LOJA+PREFIXO+NUM),
@@ -563,8 +567,8 @@ class ProcessadorFinanceiroBase(ABC):
             df["ct2_prefixo"] = df["prefixo"].astype(str).str.strip() if "prefixo" in df.columns else None
             df["ct2_numero"] = df["numero"].astype(str).str.strip() if "numero" in df.columns else None
 
-            df["codigo"] = df["codigo_cli"].astype(str).str.strip()
-            nome_col = next((c for c in ["nome_cliente", col_cliente] if c in df.columns), None)
+            df["codigo"] = df[col_codigo_pronto].astype(str).str.strip()
+            nome_col = next((c for c in ["nome_cliente", "nome_fornecedor", col_cliente] if c in df.columns), None)
             df["cliente"] = df[nome_col].astype(str).str.strip() if nome_col else df["codigo"]
         else:
             codigo_df = normalizar_codigo_cliente(
