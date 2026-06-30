@@ -588,6 +588,7 @@ def analisar_divergencia(
         raise HTTPException(404, f"LP {lp_codigo} / {descricao!r} nao encontrado no resultado da conferencia.")
 
     registros_nao_conciliados_a = [d for d in alvo["ct2_detalhes"] if not d["matched"]]
+    registros_nao_conciliados_b = [d for d in alvo.get("sft_detalhes", []) if not d.get("matched")]
 
     if alvo.get("is_grupo"):
         membros = (
@@ -690,6 +691,7 @@ def analisar_divergencia(
             "qt_sft": alvo["qt_sft"],
         },
         "registros_nao_conciliados_a": registros_nao_conciliados_a,
+        "registros_nao_conciliados_b": registros_nao_conciliados_b,
         "rotulo_a": "CT2 (razao)",
         "rotulo_b": "SFT (livro fiscal)",
         "config": config,
