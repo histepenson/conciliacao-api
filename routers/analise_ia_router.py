@@ -44,12 +44,19 @@ async def _enriquecer_titulos_com_ct2(
         return
 
     conta_analisada = str(body.contexto.get("conta_contabil") or "").strip()
+    logger.info(
+        "[ANALISE_IA] Iniciando enriquecimento CT2: empresa_id=%s conta_analisada=%s itens=%s",
+        empresa_id, conta_analisada, len(body.registros_nao_conciliados_a),
+    )
 
     for item in body.registros_nao_conciliados_a:
         # SO_FINANCEIRO popula lancamentos_financeiro_detalhes; outros tipos
         # (ex.: DIVERGENTE_VALOR) populam registros_match_financeiro -- mesmo
         # fallback que o frontend ja usa pra montar a grid "Lancamentos Financeiro".
         titulos = item.get("lancamentos_financeiro_detalhes") or item.get("registros_match_financeiro") or []
+        codigo = item.get("codigo_fornecedor") or item.get("codigo") or "?"
+        logger.info("[ANALISE_IA] codigo=%s: %s titulo(s) candidatos", codigo, len(titulos))
+
         for titulo in titulos:
             filial = titulo.get("ct2_filial")
             cliente_fornecedor = titulo.get("ct2_cliente_fornecedor")
@@ -58,19 +65,34 @@ async def _enriquecer_titulos_com_ct2(
             tipo_titulo = titulo.get("tipo_titulo")
             data_emissao = titulo.get("data_emissao") or titulo.get("data_lancamento")
 
-            if not (filial and cliente_fornecedor and loja and numero and tipo_titulo and data_emissao):
+            campos_faltando = [
+                nome for nome, valor in (
+                    ("ct2_filial", filial), ("ct2_cliente_fornecedor", cliente_fornecedor),
+                    ("ct2_loja", loja), ("ct2_numero", numero),
+                    ("tipo_titulo", tipo_titulo), ("data_emissao", data_emissao),
+                ) if not valor
+            ]
+            if campos_faltando:
+                logger.info(
+                    "[ANALISE_IA] codigo=%s titulo pulado (campos ausentes: %s) -- titulo=%s",
+                    codigo, campos_faltando, titulo,
+                )
                 continue
 
             try:
                 dt_emissao = datetime.strptime(data_emissao, "%d/%m/%Y")
             except ValueError:
+                logger.warning(
+                    "[ANALISE_IA] codigo=%s titulo pulado: data_emissao=%r fora do formato dd/mm/aaaa",
+                    codigo, data_emissao,
+                )
                 continue
 
             data_ini = dt_emissao.strftime("%Y%m%d")
             data_fim = (dt_emissao + timedelta(days=_JANELA_BUSCA_CT2_DIAS)).strftime("%Y%m%d")
 
             try:
-                titulo["ct2_lancamento"] = await buscar_lancamento_contabil_de_titulo(
+                resultado = await buscar_lancamento_contabil_de_titulo(
                     protheus_url=protheus.url,
                     protheus_user=protheus.user,
                     protheus_password=protheus.password,
@@ -87,9 +109,15 @@ async def _enriquecer_titulos_com_ct2(
                     data_fim=data_fim,
                     conta_contabil_analisada=conta_analisada,
                 )
+                titulo["ct2_lancamento"] = resultado
+                logger.info(
+                    "[ANALISE_IA] codigo=%s numero=%s -> encontrado=%s contas=%s",
+                    codigo, numero, resultado.get("encontrado"), resultado.get("contas_encontradas"),
+                )
             except Exception:
                 logger.exception(
-                    "[ANALISE_IA] Falha ao buscar lancamento contabil na CT2 para titulo numero=%s", numero,
+                    "[ANALISE_IA] codigo=%s Falha ao buscar lancamento contabil na CT2 para titulo numero=%s",
+                    codigo, numero,
                 )
 
 
