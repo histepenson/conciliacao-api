@@ -14,6 +14,7 @@ _PARAMS_MATR900 = [
     "produto_de", "produto_ate",
     "tipo_de", "tipo_ate",
     "grupo_de", "grupo_ate",
+    "conta_de", "conta_ate",
     "armazem", "documento_por", "moeda", "ordem",
     "lista_sem_movimento", "lista_transferencia", "considera_filiais",
     "tipo_custo",

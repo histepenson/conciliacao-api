@@ -14,13 +14,12 @@ import logging
 import re
 from typing import Any
 
-import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from core.config import settings
 from models.protheus_carga import ProtheusCarga, ProtheusCargaRegistro
 from models.lancamento_padrao import LancamentoPadrao
+from services import analise_ia_service
 from tools.fiscal.match_ct2_sft import match_ct2_sft as _match_ct2_sft_impl
 
 logger = logging.getLogger(__name__)
@@ -652,17 +651,4 @@ def analisar_divergencia(
         "gerar_explicacao_ia": True,
     }
 
-    if not settings.SMARTCONCILIACOES_IA_URL:
-        raise HTTPException(503, "SMARTCONCILIACOES_IA_URL nao configurada.")
-
-    headers = {"X-API-Key": settings.SMARTCONCILIACOES_IA_API_KEY} if settings.SMARTCONCILIACOES_IA_API_KEY else {}
-    try:
-        resp = httpx.post(
-            f"{settings.SMARTCONCILIACOES_IA_URL}/api/v1/analise/divergencia",
-            json=payload, headers=headers, timeout=30.0,
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except httpx.HTTPError as e:
-        logger.exception("Erro ao chamar smartconciliacoes_ia")
-        raise HTTPException(502, f"Erro ao chamar servico de analise IA: {e}")
+    return analise_ia_service.chamar_diagnostico(payload)

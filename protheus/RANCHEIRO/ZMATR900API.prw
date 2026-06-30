@@ -14,8 +14,6 @@ wsrestful ZMATR900API description "MATR900 - Kardex Fisico-Financeiro"
     wsdata tipo_ate             as string
     wsdata grupo_de             as string
     wsdata grupo_ate            as string
-    wsdata conta_de             as string
-    wsdata conta_ate            as string
     wsdata armazem              as string
     wsdata documento_por        as string
     wsdata moeda                as string
@@ -45,8 +43,6 @@ Local cTipoDe := IIf(Empty(AllTrim(Self:tipo_de)), Space(TamSX3("B1_TIPO")[1]), 
 Local cTipoAte := IIf(Empty(AllTrim(Self:tipo_ate)), Repl("Z", TamSX3("B1_TIPO")[1]), AllTrim(Self:tipo_ate))
 Local cGrupoDe := IIf(Empty(AllTrim(Self:grupo_de)), Space(TamSX3("B1_GRUPO")[1]), AllTrim(Self:grupo_de))
 Local cGrupoAte := IIf(Empty(AllTrim(Self:grupo_ate)), Repl("Z", TamSX3("B1_GRUPO")[1]), AllTrim(Self:grupo_ate))
-Local cContaDe := IIf(Empty(AllTrim(Self:conta_de)), Space(TamSX3("B1_CONTA")[1]), AllTrim(Self:conta_de))
-Local cContaAte := IIf(Empty(AllTrim(Self:conta_ate)), Repl("Z", TamSX3("B1_CONTA")[1]), AllTrim(Self:conta_ate))
 // armazem: vazio = de branco ate ZZZ (todos); informado = igualdade no armazem especifico
 Local cLocalInf := IIf(Empty(AllTrim(Self:armazem)), Space(TamSX3("D1_LOCAL")[1]), AllTrim(Self:armazem))
 Local cLocalSup := IIf(Empty(AllTrim(Self:armazem)), Repl("Z", TamSX3("D1_LOCAL")[1]), AllTrim(Self:armazem))
@@ -89,7 +85,6 @@ ConOut(cLogPrefix + "Requisicao recebida | data_ini=" + cDataIni + " data_fim=" 
     " produto_de=[" + cProdutoDe + "] produto_ate=[" + cProdutoAte + "]" + ;
     " tipo_de=[" + cTipoDe + "] tipo_ate=[" + cTipoAte + "]" + ;
     " grupo_de=[" + cGrupoDe + "] grupo_ate=[" + cGrupoAte + "]" + ;
-    " conta_de=[" + cContaDe + "] conta_ate=[" + cContaAte + "]" + ;
     " armazem=[" + IIf(Empty(cLocal), "TODOS", cLocal) + "]" + ;
     " local_de=[" + cLocalInf + "] local_ate=[" + cLocalSup + "]" + ;
     " doc_por=" + cDocPor + " moeda=" + cValToChar(nMoeda) + ;
@@ -156,13 +151,11 @@ cWhereD2 := "%AND D2_LOCAL >= '" + cLocalInf + "' AND D2_LOCAL <= '" + cLocalSup
 cWhereD3 := "% D3_LOCAL >= '" + cLocalInf + "' AND D3_LOCAL <= '" + cLocalSup + "' AND"
 cWhereD3 += " SB1.B1_COD >= '" + cProdutoDe + "' AND SB1.B1_COD <= '" + cProdutoAte + "' AND"
 cWhereD3 += " SB1.B1_FILIAL = '" + xFilial("SB1") + "' AND SB1.B1_TIPO >= '" + cTipoDe + "' AND SB1.B1_TIPO <= '" + cTipoAte + "' AND"
-cWhereD3 += " SB1.B1_GRUPO >= '" + cGrupoDe + "' AND SB1.B1_GRUPO <= '" + cGrupoAte + "' AND"
-cWhereD3 += " SB1.B1_CONTA >= '" + cContaDe + "' AND SB1.B1_CONTA <= '" + cContaAte + "' AND SB1.B1_COD <> '" + cProdImp + "' AND SB1.D_E_L_E_T_=' ' AND%"
+cWhereD3 += " SB1.B1_GRUPO >= '" + cGrupoDe + "' AND SB1.B1_GRUPO <= '" + cGrupoAte + "' AND SB1.B1_COD <> '" + cProdImp + "' AND SB1.D_E_L_E_T_=' ' AND%"
 cWhereD1C := IIf(lTodasFil, "% SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%", "% D1_FILIAL ='" + xFilial("SD1") + "' AND SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%")
 cWhereD2C := IIf(lTodasFil, "% SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%", "% D2_FILIAL ='" + xFilial("SD2") + "' AND SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%")
 cWhereD3C := IIf(lTodasFil, "%1=1 AND %", "% D3_FILIAL ='" + xFilial("SD3") + "' AND %")
-cWhereB1A := "% AND SB1.B1_COD >= '" + cProdutoDe + "' AND SB1.B1_COD <= '" + cProdutoAte + "'"
-cWhereB1A += " AND SB1.B1_CONTA >= '" + cContaDe + "' AND SB1.B1_CONTA <= '" + cContaAte + "'%"
+cWhereB1A := "% AND SB1.B1_COD >= '" + cProdutoDe + "' AND SB1.B1_COD <= '" + cProdutoAte + "'%"
 cWhereB1C := "% SB1.B1_FILIAL = '" + xFilial("SB1") + "' AND SB1.B1_TIPO >= '" + cTipoDe + "' AND SB1.B1_TIPO <= '" + cTipoAte + "' AND SB1.B1_GRUPO >= '" + cGrupoDe + "' AND SB1.B1_GRUPO <= '" + cGrupoAte + "' AND SB1.B1_COD <> '" + cProdImp + "' AND SB1.D_E_L_E_T_=' '%"
 
 cOrder := "%"
@@ -185,7 +178,6 @@ BeginSql Alias cAliasTop
             SB1.B1_TIPO TIPO,
             SB1.B1_UM,
             SB1.B1_GRUPO,
-            SB1.B1_CONTA CONTACONTABIL,
             SB1.B1_DESC,
             SB1.B1_POSIPI,
             D1_SEQCALC SEQCALC,
@@ -218,7 +210,6 @@ BeginSql Alias cAliasTop
             SB1.B1_TIPO,
             SB1.B1_UM,
             SB1.B1_GRUPO,
-            SB1.B1_CONTA,
             SB1.B1_DESC,
             SB1.B1_POSIPI,
             D2_SEQCALC,
@@ -251,7 +242,6 @@ BeginSql Alias cAliasTop
             SB1.B1_TIPO,
             SB1.B1_UM,
             SB1.B1_GRUPO,
-            SB1.B1_CONTA,
             SB1.B1_DESC,
             SB1.B1_POSIPI,
             D3_SEQCALC,
@@ -319,8 +309,6 @@ Begin Sequence
     oParams["tipo_ate"] := cTipoAte
     oParams["grupo_de"] := cGrupoDe
     oParams["grupo_ate"] := cGrupoAte
-    oParams["conta_de"] := cContaDe
-    oParams["conta_ate"] := cContaAte
     oParams["local"] := cLocal
     oParams["documento_por"] := cDocPor
     oParams["moeda"] := nMoeda
@@ -429,7 +417,6 @@ oLinha["Descricao"] := AllTrim((cAliasTop)->B1_DESC)
 oLinha["UM"] := AllTrim((cAliasTop)->B1_UM)
 oLinha["Tipo"] := AllTrim((cAliasTop)->TIPO)
 oLinha["Grupo"] := AllTrim((cAliasTop)->B1_GRUPO)
-oLinha["Conta Contabil"] := AllTrim((cAliasTop)->CONTACONTABIL)
 oLinha["Custo Medio"] := IIf(nSaldoQtd <> 0, Round(nSaldoVlr / nSaldoQtd, 2), 0)
 oLinha["Qtd Saldo"] := Round(nSaldoQtd, 2)
 oLinha["Vlr Total Saldo"] := Round(nSaldoVlr, 2)

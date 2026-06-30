@@ -5,6 +5,12 @@
 /*/{Protheus.doc} ZSFTENTAPI
 API REST do Livro Fiscal via consulta SQL direta na tabela SFT.
 
+FONTE ESPECIFICO DA EMPRESA RANCHEIRO -- nao usar em outras empresas.
+Diferenca em relacao ao fonte generico (protheus/ZSFTENTAPI.prw): sempre
+inclui via UNION ALL as notas de saida da SF2 com FT_SERIE IN ('LOC','ND'),
+que nao geram livro fiscal (nao entram na SFT) nessa empresa. Sem parametro
+-- e' sempre ativo aqui.
+
 Endpoint: GET /rest/zsftentapi/api/v1/sftent
 
 Parametros:
@@ -193,6 +199,51 @@ cSql += "     FT_VALIPI,"
 cSql += "     FT_TIPOMOV"
 cSql += " FROM " + cTabela
 cSql += " WHERE " + cWhere
+
+// --- UNION ALL: notas de saida da SF2 com serie LOC/ND, que nao geram livro
+// fiscal (nao entram na SFT) -- particularidade desta empresa (Rancheiro).
+// Sempre ativo aqui. So' entram quando o filtro de tipo_mov nao exclui saida
+// (essas linhas sao sempre TIPOMOV = 'S').
+If (Empty(cTipoMov) .Or. cTipoMov == "S")
+    cSql += " UNION ALL"
+    cSql += " SELECT"
+    cSql += "     F2_FILIAL       AS FT_FILIAL,"
+    cSql += "     F2_DOC          AS FT_NFISCAL,"
+    cSql += "     F2_SERIE        AS FT_SERIE,"
+    cSql += "     ''              AS FT_TES,"
+    cSql += "     F2_EMISSAO      AS FT_EMISSAO,"
+    cSql += "     F2_EMISSAO      AS FT_ENTRADA,"
+    cSql += "     F2_CLIENTE      AS FT_CLIEFOR,"
+    cSql += "     F2_EST          AS FT_ESTADO,"
+    cSql += "     ''              AS FT_CFOP,"
+    cSql += "     F2_ESPECIE      AS FT_ESPECIE,"
+    cSql += "     0               AS FT_QUANT,"
+    cSql += "     SUM(F2_VALBRUT) AS FT_VALCONT,"
+    cSql += "     0               AS FT_ALIQICM,"
+    cSql += "     0               AS FT_BASEICM,"
+    cSql += "     0               AS FT_VALICM,"
+    cSql += "     0               AS FT_ISENICM,"
+    cSql += "     0               AS FT_OUTRICM,"
+    cSql += "     0               AS FT_ICMSCOM,"
+    cSql += "     0               AS FT_ICMSDIF,"
+    cSql += "     0               AS FT_DIFAL,"
+    cSql += "     0               AS FT_VFCPDIF,"
+    cSql += "     0               AS FT_ICMSRET,"
+    cSql += "     ''              AS FT_PRODUTO,"
+    cSql += "     ''              AS FT_CSTPIS,"
+    cSql += "     ''              AS FT_CODBCC,"
+    cSql += "     SUM(F2_VALIMP6) AS FT_VALPIS,"
+    cSql += "     SUM(F2_VALIMP5) AS FT_VALCOF,"
+    cSql += "     0               AS FT_VALIPI,"
+    cSql += "     'S'             AS FT_TIPOMOV"
+    cSql += " FROM " + RetSqlName("SF2")
+    cSql += " WHERE D_E_L_E_T_ = ' '"
+    cSql += "   AND F2_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
+    cSql += "   AND F2_EMISSAO BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
+    cSql += "   AND F2_SERIE IN ('LOC','ND')"
+    cSql += " GROUP BY F2_FILIAL, F2_DOC, F2_SERIE, F2_EMISSAO, F2_CLIENTE, F2_EST, F2_ESPECIE"
+EndIf
+
 cSql += " ORDER BY FT_ENTRADA, FT_FILIAL, FT_NFISCAL"
 
 ConOut("[ZSFTENTAPI] SQL montado | tabela=" + cTabela)

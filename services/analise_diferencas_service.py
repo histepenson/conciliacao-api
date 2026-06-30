@@ -5,16 +5,20 @@ import re
 
 import pandas as pd
 
+from services.ct2_lancamento_service import decompor_ct2_key, normalizar_campo_ct2
+
 logger = logging.getLogger(__name__)
 
 
 class AnaliseDiferencasService:
     """Gera analise detalhada por codigo (financeiro/contabil)."""
 
+    LIMITE_DIVERGENCIA = 1.00
+
     def _classificar_tipo(
         self, valor_fin: float, valor_cont: float, diferenca: float
     ) -> str:
-        if abs(diferenca) <= 0.01:
+        if abs(diferenca) <= self.LIMITE_DIVERGENCIA:
             return "CONCILIADO"
         if valor_fin > 0 and valor_cont == 0:
             return "SO_FINANCEIRO"
@@ -23,7 +27,7 @@ class AnaliseDiferencasService:
         return "DIVERGENTE_VALOR"
 
     def _status(self, diferenca: float) -> str:
-        return "verde" if abs(diferenca) <= 0.01 else "vermelho"
+        return "verde" if abs(diferenca) <= self.LIMITE_DIVERGENCIA else "vermelho"
 
     def _parse_valor(self, valor: object) -> float:
         """Converte valor numerico ou string em formato BR para float."""
@@ -52,6 +56,10 @@ class AnaliseDiferencasService:
             except ValueError:
                 continue
         return None
+
+    def _dentro_periodo(self, data_str: str, periodo: Optional[tuple]) -> bool:
+        """True se a data pertence ao periodo analisado (ou se nao ha periodo definido)."""
+        return periodo is None or self._data_no_periodo(data_str, periodo)
 
     def _data_no_periodo(self, data_str: str, periodo: tuple) -> bool:
         """Verifica se data_str pertence ao mesmo mes/ano do periodo."""
@@ -244,6 +252,10 @@ class AnaliseDiferencasService:
                     df_razao_geral_norm,
                     ["ct5_desc", "CT5_DESC"],
                 )
+                col_ct2_key_geral = self._encontrar_coluna(
+                    df_razao_geral_norm,
+                    ["ct2_key", "CT2_KEY"],
+                )
 
         df_merge = fin_agg.merge(cont_agg, on="codigo", how="outer")
         if not razao_agg.empty:
@@ -430,6 +442,7 @@ class AnaliseDiferencasService:
                             else "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
                             "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
+                            "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                         }
                     )
             if tipo == "SO_CONTABILIDADE" and lancamentos_razao_geral:
@@ -487,6 +500,15 @@ class AnaliseDiferencasService:
                         # Obter nome do cliente do mapa
                         nome_cliente = codigo_nome_map.get(codigo, "")
 
+                        # Processo inverso: nao achamos titulo pelo matching normal
+                        # (data/valor) -- decodifica o ct2_key do proprio lancamento
+                        # e procura no financeiro o titulo que o originou. Sem
+                        # ct2_key = lancamento manual (nao veio de titulo).
+                        ct2_key_lanc = str(r.get(col_ct2_key_geral, "")) if col_ct2_key_geral else ""
+                        titulo_financeiro = self._buscar_titulo_financeiro_por_ct2_key(
+                            ct2_key_lanc, df_financeiro_detalhado
+                        )
+
                         lancamentos_razao_detalhes.append(
                             {
                                 "conta_origem": item_conta,
@@ -508,6 +530,10 @@ class AnaliseDiferencasService:
                                 "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                                 "tem_correspondencia": tem_corr_det,
                                 "valor_financeiro_match": vlr_fin_det,
+                                "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
+                                "ct2_key": ct2_key_lanc,
+                                "lancamento_manual": titulo_financeiro["lancamento_manual"],
+                                "titulo_financeiro": titulo_financeiro,
                             }
                         )
 
@@ -589,6 +615,7 @@ class AnaliseDiferencasService:
                         "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                         "tem_correspondencia": tem_corr_div,
                         "valor_financeiro_match": vlr_fin_div,
+                        "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                     })
                 logger.warning("[DIV_VALOR] codigo=%s: %d adicionados, %d skipped (match exato), detalhes=%d", codigo, len(matches_div) - _div_skipped, _div_skipped, len(lancamentos_razao_detalhes))
 
@@ -668,6 +695,7 @@ class AnaliseDiferencasService:
                             "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                             "tem_correspondencia": tem_corr_sf,
                             "valor_financeiro_match": vlr_fin_sf,
+                            "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                         }
                     )
 
@@ -736,7 +764,8 @@ class AnaliseDiferencasService:
                     # Entradas fora do periodo analisado nao tem correspondencia esperada no razao
                     # (o razao so cobre o periodo fechado). Nesses casos, nao marcar como vermelho.
                     _data_emissao_fmt = self._formatar_data(data_emissao, periodo)
-                    if periodo and not self._data_no_periodo(_data_emissao_fmt, periodo):
+                    _dentro_periodo_fin = not (periodo and not self._data_no_periodo(_data_emissao_fmt, periodo))
+                    if not _dentro_periodo_fin:
                         tem_corr = None  # fora do periodo -> frontend: neutro (sem cor)
                     else:
                         tem_corr = bool(prf_str and any(
@@ -751,11 +780,23 @@ class AnaliseDiferencasService:
                             "valor": round(valor_fin_det, 2),
                             "tipo_lancamento": "",
                             "data_lancamento": self._formatar_data(data_emissao, periodo),
+                            "data_emissao": _data_emissao_fmt,
                             "documento": documento,
                             "tipo_titulo": tp_str,
+                            "parcela": str(r.get("parcela") or "").strip(),
                             "historico": "",
                             "tipo_movimento": "NAO_IDENTIFICADO",
                             "tem_correspondencia": tem_corr,
+                            "dentro_periodo": _dentro_periodo_fin,
+                            # Chave crua do titulo (FILIAL+CLIENTE/FORNECEDOR+LOJA+
+                            # PREFIXO+NUM), usada pela analise de IA pra localizar o
+                            # lancamento na CT2 -- so' vem preenchida quando a base
+                            # financeira veio de carga automatica via Protheus.
+                            "ct2_filial": r.get("ct2_filial"),
+                            "ct2_loja": r.get("ct2_loja"),
+                            "ct2_cliente_fornecedor": r.get("ct2_cliente_fornecedor"),
+                            "ct2_prefixo": r.get("ct2_prefixo"),
+                            "ct2_numero": r.get("ct2_numero"),
                         }
                     )
 
@@ -832,6 +873,7 @@ class AnaliseDiferencasService:
                             "ct5_desc": str(r.get(col_ct5_desc_geral, "")) if col_ct5_desc_geral else "",
                             "tem_correspondencia": tem_corr_tmp,
                             "valor_financeiro_match": vlr_fin_tmp,
+                            "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                         }
                     )
 
@@ -927,7 +969,16 @@ class AnaliseDiferencasService:
                             "data_emissao": self._formatar_data(r.get("data_emissao", ""), periodo),
                             "documento": "-".join(doc_parts),
                             "tipo_titulo": tp_str2,
+                            "parcela": str(parcela_val or "").strip(),
                             "status": status_rec,
+                            "dentro_periodo": not _fora_do_periodo_rec,
+                            # Chave crua do titulo, usada pela analise de IA pra localizar
+                            # o lancamento na CT2 -- ver lancamentos_financeiro_detalhes.
+                            "ct2_filial": r.get("ct2_filial"),
+                            "ct2_loja": r.get("ct2_loja"),
+                            "ct2_cliente_fornecedor": r.get("ct2_cliente_fornecedor"),
+                            "ct2_prefixo": r.get("ct2_prefixo"),
+                            "ct2_numero": r.get("ct2_numero"),
                         }
                         if tem_correspondencia is not None:
                             entry["tem_correspondencia"] = tem_correspondencia
@@ -1035,12 +1086,16 @@ class AnaliseDiferencasService:
                     # no financeiro (mas valor diferente); False se nenhuma tiver.
                     "tem_correspondencia": lanc.get("tem_correspondencia"),
                     "valor_financeiro_match": lanc.get("valor_financeiro_match"),
+                    # dentro_periodo: True se qualquer entrada do grupo for do periodo analisado
+                    "dentro_periodo": lanc.get("dentro_periodo", True),
                 }
             else:
                 # Propagar tem_correspondencia: True tem prioridade sobre False/None
                 if lanc.get("tem_correspondencia") is True:
                     agrupados[chave]["tem_correspondencia"] = True
                     agrupados[chave]["valor_financeiro_match"] = lanc.get("valor_financeiro_match")
+                if lanc.get("dentro_periodo", True):
+                    agrupados[chave]["dentro_periodo"] = True
             agrupados[chave]["valor"] = round(
                 agrupados[chave]["valor"] + float(lanc.get("valor", 0) or 0), 2
             )
@@ -1291,6 +1346,64 @@ class AnaliseDiferencasService:
         if "codclval_normalizado" in df_razao_norm.columns:
             mask = mask | (df_razao_norm["codclval_normalizado"] == codigo_normalizado)
         return df_razao_norm[mask]
+
+    def _buscar_titulo_financeiro_por_ct2_key(
+        self, ct2_key: str, df_financeiro_detalhado: Optional[pd.DataFrame]
+    ) -> Dict[str, Any]:
+        """
+        Processo inverso do SO_FINANCEIRO: dado o ct2_key de um lancamento da
+        razao contabil sem titulo correspondente encontrado pelo matching normal,
+        decodifica a chave (FILIAL+CLIENTE/FORNECEDOR+LOJA+PREFIXO+NUM+PARCELA+
+        TIPO) e procura no financeiro ja carregado (todos os periodos, nao so' o
+        analisado) o titulo que efetivamente originou esse lancamento.
+
+        CT2_KEY vazio = lancamento manual (nao veio da contabilizacao automatica
+        de titulos financeiros) -- nao ha titulo a procurar.
+        """
+        chave = (ct2_key or "").strip()
+        if not chave:
+            return {"lancamento_manual": True, "titulo_encontrado": False, "titulo": None}
+
+        if (
+            df_financeiro_detalhado is None
+            or df_financeiro_detalhado.empty
+            or "ct2_filial" not in df_financeiro_detalhado.columns
+        ):
+            return {"lancamento_manual": False, "titulo_encontrado": False, "titulo": None}
+
+        campos = decompor_ct2_key(chave)
+        alvo = {
+            "ct2_filial": normalizar_campo_ct2(campos.get("filial")),
+            "ct2_cliente_fornecedor": normalizar_campo_ct2(campos.get("cliente_fornecedor")),
+            "ct2_loja": normalizar_campo_ct2(campos.get("loja")),
+            "ct2_numero": normalizar_campo_ct2(campos.get("num")),
+            "tipo_titulo": normalizar_campo_ct2(campos.get("tipo")),
+        }
+
+        df = df_financeiro_detalhado
+        mask = pd.Series(True, index=df.index)
+        for col, valor in alvo.items():
+            if col not in df.columns:
+                return {"lancamento_manual": False, "titulo_encontrado": False, "titulo": None}
+            mask &= df[col].apply(normalizar_campo_ct2) == valor
+
+        matches = df[mask]
+        if matches.empty:
+            return {"lancamento_manual": False, "titulo_encontrado": False, "titulo": None}
+
+        r = matches.iloc[0]
+        return {
+            "lancamento_manual": False,
+            "titulo_encontrado": True,
+            "titulo": {
+                "codigo": str(r.get("codigo", "")),
+                "cliente": str(r.get("cliente", "")),
+                "valor": round(float(r.get("valor", 0) or 0), 2),
+                "data_emissao": str(r.get("data_emissao", "") or ""),
+                "documento": str(r.get("numero_documento", "") or ""),
+                "tipo_titulo": str(r.get("tipo_titulo", "") or ""),
+            },
+        }
 
     def _encontrar_coluna(
         self, df: pd.DataFrame, candidatas: List[str]
