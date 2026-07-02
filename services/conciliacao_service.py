@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -220,11 +221,13 @@ class ConciliacaoService:
         """
         Retorna dict para compatibilidade com o frontend.
         """
+        _t_total = time.perf_counter()
         logger.info(" Executando conciliacao contabil")
 
         # ==========================
         # 1 NORMALIZAR FINANCEIRO
         # ==========================
+        _t0 = time.perf_counter()
         df_financeiro_raw = pd.DataFrame(request.base_origem.registros)
         logger.info(" Registros origem recebidos: %s", len(df_financeiro_raw))
 
@@ -268,9 +271,12 @@ class ConciliacaoService:
             financeiro_detalhado = normalizar_planilha_financeira_detalhada(df_financeiro_raw)
             logger.info(" Financeiro normalizado (legado): %s registros", len(financeiro_norm))
 
+        logger.info("[TEMPO] Etapa 1 (normalizar financeiro): %.3fs", time.perf_counter() - _t0)
+
         # ==========================
         # 1.5 FILTRAR EMISSAO DO MES
         # ==========================
+        _t0 = time.perf_counter()
         mes_analise = self._mes_analise_from_parametros(request.parametros or {})
         df_fin_mes: Optional[pd.DataFrame] = None
         if mes_analise:
@@ -289,10 +295,12 @@ class ConciliacaoService:
 
         contabil_norm = normalizar_planilha_contabilidade(df_contabil_raw)
         logger.info(" Contabilidade normalizada: %s registros", len(contabil_norm))
+        logger.info("[TEMPO] Etapa 2 (normalizar contabilidade + filtro mes): %.3fs", time.perf_counter() - _t0)
 
         # ==========================
         # 3 CALCULAR DIFERENCAS
         # ==========================
+        _t0 = time.perf_counter()
         resultado = calcular_diferencas(
             df_financeiro=financeiro_norm,
             df_contabilidade=contabil_norm,
@@ -304,6 +312,7 @@ class ConciliacaoService:
 
         logger.info(" Resumo calculado: %s", resumo_calc)
         logger.info(" Colunas do df_completo: %s", df_completo.columns.tolist())
+        logger.info("[TEMPO] Etapa 3 (calcular diferencas): %.3fs", time.perf_counter() - _t0)
 
         # ==========================
         # 4 FILTRAR DIFERENCAS
@@ -384,6 +393,7 @@ class ConciliacaoService:
         # ==========================
         # 7 ANALISE DETALHADA (RESTAURO)
         # ==========================
+        _t0 = time.perf_counter()
         analise_detalhada = []
         analise_profunda_contabil = []
         resumo_analise = self._gerar_resumo_analise_fallback(df_completo)
@@ -413,6 +423,10 @@ class ConciliacaoService:
                     except (ValueError, TypeError):
                         pass
 
+            _n_registros = len(df_fin_para_analise) + len(contabil_norm)
+            logger.info("[TEMPO] Preparacao analise detalhada: %.3fs (%d registros combinados)", time.perf_counter() - _t0, _n_registros)
+            _t0 = time.perf_counter()
+
             analise_detalhada = analise_service.processar_analise_detalhada(
                 df_financeiro=df_fin_para_analise,
                 df_contabilidade_filtrada=contabil_norm,
@@ -424,6 +438,8 @@ class ConciliacaoService:
                 saldo_ant_map=saldo_ant_map if saldo_ant_map else None,
             )
 
+            logger.info("[TEMPO] Etapa 7 (analise detalhada): %.3fs -> %d codigos", time.perf_counter() - _t0, len(analise_detalhada))
+
             if analise_detalhada:
                 resumo_analise = analise_service.gerar_resumo_analise(analise_detalhada)
             else:
@@ -433,7 +449,6 @@ class ConciliacaoService:
             # ==========================
             # 7.1 ANALISE PROFUNDA SO_CONTABILIDADE
             # ==========================
-            # DEBUG: Verificar tipos de diferenca disponiveis
             tipos_encontrados = set(a.get("tipo_diferenca") for a in analise_detalhada)
             logger.info(" Tipos de diferenca encontrados: %s", tipos_encontrados)
 
@@ -444,6 +459,7 @@ class ConciliacaoService:
             logger.info(" Registros SO_CONTABILIDADE encontrados: %s", len(registros_so_contabilidade))
 
             if registros_so_contabilidade:
+                _t0 = time.perf_counter()
                 logger.info(
                     " Iniciando analise profunda de %s registros SO_CONTABILIDADE",
                     len(registros_so_contabilidade)
@@ -453,7 +469,7 @@ class ConciliacaoService:
                     df_razao_geral=df_razao_geral,  # Usa razao geral COMPLETO para buscar origens
                     conta_analisada=conta_contabil,
                 )
-                logger.info(" Analise profunda concluida: %s registros", len(analise_profunda_contabil))
+                logger.info("[TEMPO] Etapa 7.1 (analise profunda SO_CONTABILIDADE): %.3fs -> %d registros", time.perf_counter() - _t0, len(analise_profunda_contabil))
 
         except Exception as exc:
             logger.error(" Falha ao gerar analise detalhada: %s", exc, exc_info=True)
@@ -501,6 +517,7 @@ class ConciliacaoService:
             len(analise_detalhada),
             len(analise_profunda_contabil),
         )
+        logger.info("[TEMPO] TOTAL conciliacao: %.3fs", time.perf_counter() - _t_total)
 
         return retorno
 
