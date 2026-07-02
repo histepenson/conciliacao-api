@@ -283,7 +283,18 @@
       "Bash(railway variables *)",
       "Bash(railway environment *)",
       "Bash(railway project *)",
-      "Bash(railway link *)"
+      "Bash(railway link *)",
+      "PowerShell(cd c:\\\\conciliacao-api; $env:APP_ENV=\"develop\"; .\\\\venv\\\\Scripts\\\\python.exe -c \"from services.pre_conferencia_service import diagnosticar_nota; from services.analise_ia_service import chamar_diagnostico_nota; from routers.pre_conferencia_router import router; print\\('OK'\\)\")",
+      "Bash(git stash *)",
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, CPU, @{N='CMD';E={$_.MainWindowTitle}} | Format-Table -AutoSize)",
+      "Read(//c/conciliacao-app/src/components/Finr470ParamsDialog/**)",
+      "Bash(grep -n \"parametrosFiltro\\\\|parametros_filtro\\\\|cache\" \"C:\\\\conciliacao-app\\\\DIALOGS_RELATORIOS.md\" | head -60)",
+      "Read(//c/conciliacao-app/src/components/Ctbr140ParamsDialog/**)",
+      "Read(//c/conciliacao-app/src/pages/**)",
+      "Read(//c/conciliacao-app/src/components/**)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -298,7 +309,9 @@
       "c:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog",
       "C:\\conciliacao-app",
       "\\tmp",
-      "C:\\smartconciliacoes_ia"
+      "C:\\smartconciliacoes_ia",
+      "C:\\conciliacao-app\\src\\components\\Matr900ParamsDialog",
+      "C:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog"
     ]
   }
 }
