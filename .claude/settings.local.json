@@ -288,7 +288,12 @@
       "Bash(git stash *)",
       "PowerShell(Get-Process python -ErrorAction SilentlyContinue | Select-Object Id, CPU, @{N='CMD';E={$_.MainWindowTitle}} | Format-Table -AutoSize)",
       "Read(//c/conciliacao-app/src/components/Finr470ParamsDialog/**)",
-      "Bash(grep -n \"parametrosFiltro\\\\|parametros_filtro\\\\|cache\" \"C:\\\\conciliacao-app\\\\DIALOGS_RELATORIOS.md\" | head -60)"
+      "Bash(grep -n \"parametrosFiltro\\\\|parametros_filtro\\\\|cache\" \"C:\\\\conciliacao-app\\\\DIALOGS_RELATORIOS.md\" | head -60)",
+      "Read(//c/conciliacao-app/src/components/Ctbr140ParamsDialog/**)",
+      "Read(//c/conciliacao-app/src/pages/**)",
+      "Read(//c/conciliacao-app/src/components/**)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -303,7 +308,9 @@
       "c:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog",
       "C:\\conciliacao-app",
       "\\tmp",
-      "C:\\smartconciliacoes_ia"
+      "C:\\smartconciliacoes_ia",
+      "C:\\conciliacao-app\\src\\components\\Matr900ParamsDialog",
+      "C:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog"
     ]
   }
 }
