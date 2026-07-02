@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.config import settings
@@ -118,7 +119,8 @@ def login(
     email: str,
     password: str,
 ) -> Dict[str, Any]:
-    user = db.query(Usuario).filter(Usuario.email == email).first()
+    email_normalizado = (email or "").strip().lower()
+    user = db.query(Usuario).filter(func.lower(Usuario.email) == email_normalizado).first()
     if not user or not user.is_active:
         _log_audit(db, None, None, AuditAction.LOGIN_FAILED, "usuario", None)
         db.commit()
@@ -312,7 +314,8 @@ def me(db: Session, user: Usuario, empresa_id: Optional[int]) -> Dict[str, Any]:
 
 
 def request_password_reset(db: Session, email: str) -> Dict[str, Any]:
-    user = db.query(Usuario).filter(Usuario.email == email).first()
+    email_normalizado = (email or "").strip().lower()
+    user = db.query(Usuario).filter(func.lower(Usuario.email) == email_normalizado).first()
     if not user:
         return {"message": "Se o email existir, voce recebera instrucoes para redefinir sua senha."}
 

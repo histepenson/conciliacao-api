@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -91,12 +92,12 @@ def obter_usuario(db: Session, usuario_id: int) -> dict:
 
 
 def criar_usuario(db: Session, data: dict) -> dict:
-    email = data.get("email")
+    email = (data.get("email") or "").strip().lower()
     nome = data.get("nome")
     password = data.get("password")
     is_admin = bool(data.get("is_admin", False))
 
-    if db.query(Usuario).filter(Usuario.email == email).first():
+    if db.query(Usuario).filter(func.lower(Usuario.email) == email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ja cadastrado")
 
     valid, msg = validate_password_strength(password)
@@ -136,7 +137,10 @@ def atualizar_usuario(db: Session, usuario_id: int, data: dict) -> dict:
 
     for field in ["email", "nome", "is_admin", "is_active"]:
         if field in data and data[field] is not None:
-            setattr(user, field, data[field])
+            valor = data[field]
+            if field == "email":
+                valor = valor.strip().lower()
+            setattr(user, field, valor)
 
     user.updated_at = _now_utc()
     _log_audit(db, None, None, AuditAction.UPDATE, "usuario", user.id)

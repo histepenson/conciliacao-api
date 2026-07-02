@@ -115,6 +115,12 @@ async def processar_conciliacao(
         )
         protheus_config = resolve_protheus_config(ctx.empresa_id, db) if precisa_protheus else None
 
+        # A partir daqui o processamento e' CPU-bound (pandas) e/ou chamadas HTTP ao
+        # Protheus, sem mais acesso ao banco -- libera a conexao de volta ao pool
+        # em vez de segura-la presa pelos minutos que o processamento pode levar
+        # em contas com muitos registros (evita esgotar o pool para o resto da API).
+        db.close()
+
         # Resolve base contabil filtrada: busca do Protheus se ctbr140_params presente
         request = await _resolver_base_contabil(request, protheus_config)
 

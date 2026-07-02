@@ -29,55 +29,69 @@ def calcular_diferencas(df_financeiro: pd.DataFrame, df_contabilidade: pd.DataFr
     
     print("[INFO] Calculando diferencas...")
     
-    # Padronizar nomes das colunas
-    df_fin = df_financeiro.copy()
-    df_cont = df_contabilidade.copy()
-    
     # Garantir que as colunas existem
-    if 'codigo' not in df_fin.columns or 'valor' not in df_fin.columns:
+    if 'codigo' not in df_financeiro.columns or 'valor' not in df_financeiro.columns:
         raise ValueError("df_financeiro deve ter colunas 'codigo' e 'valor'")
-    if 'codigo' not in df_cont.columns or 'valor' not in df_cont.columns:
+    if 'codigo' not in df_contabilidade.columns or 'valor' not in df_contabilidade.columns:
         raise ValueError("df_contabilidade deve ter colunas 'codigo' e 'valor'")
-    
-    # Fazer merge completo (outer join) para pegar todos os codigos
-    df_merge = pd.merge(
-        df_fin[['codigo', 'cliente', 'valor']],
-        df_cont[['codigo', 'cliente', 'valor']],
-        on='codigo',
-        how='outer',
-        suffixes=('_fin', '_cont')
+
+    # Agregar por codigo antes do merge para reduzir cardinalidade
+    # (evita produto cartesiano em codigos duplicados)
+    fin_agg = (
+        df_financeiro[['codigo', 'cliente', 'valor']]
+        .groupby('codigo', as_index=False)
+        .agg(cliente=('cliente', 'first'), valor=('valor', 'sum'))
     )
-    
-    # Preencher valores NaN com 0
-    df_merge['valor_fin'] = df_merge['valor_fin'].fillna(0)
-    df_merge['valor_cont'] = df_merge['valor_cont'].fillna(0)
-    
+    cont_agg = (
+        df_contabilidade[['codigo', 'cliente', 'valor']]
+        .groupby('codigo', as_index=False)
+        .agg(cliente=('cliente', 'first'), valor=('valor', 'sum'))
+    )
+
+    # Usar set_index para merge mais eficiente em grandes volumes
+    fin_idx = fin_agg.set_index('codigo')
+    cont_idx = cont_agg.set_index('codigo')
+
+    df_merge = fin_idx.join(cont_idx, how='outer', lsuffix='_fin', rsuffix='_cont')
+    df_merge = df_merge.reset_index()
+
+    # Preencher valores NaN com 0 em uma unica operacao
+    df_merge[['valor_fin', 'valor_cont']] = (
+        df_merge[['valor_fin', 'valor_cont']].fillna(0.0)
+    )
+
     # Usar cliente do financeiro, se nao existir usar da contabilidade
     df_merge['cliente'] = df_merge['cliente_fin'].fillna(df_merge['cliente_cont'])
     
-    # Calcular diferenca: Contabilidade - Financeiro
+    # Calcular diferenca: Contabilidade - Financeiro (operacoes vetorizadas)
     df_merge['diferenca'] = df_merge['valor_cont'] - df_merge['valor_fin']
     df_merge['diferenca_abs'] = df_merge['diferenca'].abs()
     
-    # Calcular percentual de diferenca
+    # Calcular percentual de diferenca (vetorizado, evita divisao por zero)
+    mask_fin_nz = df_merge['valor_fin'] != 0
     df_merge['diferenca_perc'] = 0.0
-    mask = df_merge['valor_fin'] != 0
-    df_merge.loc[mask, 'diferenca_perc'] = (
-        (df_merge.loc[mask, 'diferenca'] / df_merge.loc[mask, 'valor_fin']) * 100
+    df_merge.loc[mask_fin_nz, 'diferenca_perc'] = (
+        df_merge.loc[mask_fin_nz, 'diferenca']
+        / df_merge.loc[mask_fin_nz, 'valor_fin']
+        * 100
     )
     
-    # Classificar origem dos registros
+    # Classificar origem dos registros (vetorizado com numpy.select via pd.Series.where)
     df_merge['origem'] = 'Ambos'
     df_merge.loc[df_merge['valor_fin'] == 0, 'origem'] = 'So Contabilidade'
     df_merge.loc[df_merge['valor_cont'] == 0, 'origem'] = 'So Financeiro'
     
-    # Classificar tipo de diferenca
-    df_merge['tipo_diferenca'] = 'Sem diferenca'
-    df_merge.loc[df_merge['diferenca'] > 0, 'tipo_diferenca'] = 'Contabilidade > Financeiro'
-    df_merge.loc[df_merge['diferenca'] < 0, 'tipo_diferenca'] = 'Financeiro > Contabilidade'
-    df_merge.loc[df_merge['origem'] != 'Ambos', 'tipo_diferenca'] = 'Exclusivo'
+    # Classificar tipo de diferenca (vetorizado)
+    import numpy as np
+    conditions = [
+        df_merge['origem'] != 'Ambos',
+        df_merge['diferenca'] > 0,
+        df_merge['diferenca'] < 0,
+    ]
+    choices = ['Exclusivo', 'Contabilidade > Financeiro', 'Financeiro > Contabilidade']
+    df_merge['tipo_diferenca'] = np.select(conditions, choices, default='Sem diferenca')
     
-    # Selecionar e ordenar colunas finais
+    # Selecionar colunas finais (sem sort desnecessario -- frontend ordena conforme necessario)
     df_resultado = df_merge[[
         'codigo',
         'cliente',
