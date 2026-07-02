@@ -294,7 +294,12 @@
       "Read(//c/conciliacao-app/src/components/**)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Read(//c/conciliacao-app/src/components/Ct2RazCt5ParamsDialog/**)",
+      "Read(//c/conciliacao-app/src/hooks/**)",
+      "Bash(python -m py_compile routers/conciliacao_router.py)",
+      "Read(//c/conciliacao-app/src/**)",
+      "Read(//c/conciliacao-app/src/components/Ctbr480ParamsDialog/**)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
