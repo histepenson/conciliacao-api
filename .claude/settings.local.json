@@ -293,7 +293,8 @@
       "Read(//c/conciliacao-app/src/pages/**)",
       "Read(//c/conciliacao-app/src/components/**)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
