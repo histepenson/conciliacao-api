@@ -48,7 +48,6 @@ wsmethod GET getSn4 WSRESTFUL ZSN4API
 Local aArea      := GetArea()
 Local oResp      := JsonObject():New()
 Local oParams    := JsonObject():New()
-Local aAllLinhas := {}
 Local aLinhas    := {}
 Local oLinha     := Nil
 Local oError     := Nil
@@ -68,7 +67,6 @@ Local nPageSize  := Val(AllTrim(Self:pageSize))
 Local nTotalReg   := 0
 Local nTotalPages := 1
 Local nOffset     := 0
-Local nRecAtual   := 0
 Local lHasMore    := .F.
 
 Self:SetContentType("application/json")
@@ -122,30 +120,29 @@ Begin Sequence
 
     (cAlias)->(DbGoTop())
     While !(cAlias)->(Eof())
-        oLinha := JsonObject():New()
-        oLinha["filial"] := AllTrim((cAlias)->N4_FILIAL)
-        oLinha["cbase"]  := AllTrim((cAlias)->N4_CBASE)
-        oLinha["item"]   := AllTrim((cAlias)->N4_ITEM)
-        oLinha["tipo"]   := AllTrim((cAlias)->N4_TIPO)
-        oLinha["data"]   := DtoC((cAlias)->N4_DATA)
-        oLinha["ocorr"]  := AllTrim((cAlias)->N4_OCORR)
-        oLinha["seq"]    := AllTrim((cAlias)->N4_SEQ)
-        oLinha["vlroc1"] := Round((cAlias)->N4_VLROC1, 2)
-        AAdd(aAllLinhas, oLinha)
+        // So' monta o JsonObject quando a linha estiver dentro da janela da
+        // pagina pedida -- evita reter em memoria o resultado inteiro so'
+        // para devolver no maximo pageSize (5000) por requisicao.
+        nTotalReg++
+        If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
+            oLinha := JsonObject():New()
+            oLinha["filial"] := AllTrim((cAlias)->N4_FILIAL)
+            oLinha["cbase"]  := AllTrim((cAlias)->N4_CBASE)
+            oLinha["item"]   := AllTrim((cAlias)->N4_ITEM)
+            oLinha["tipo"]   := AllTrim((cAlias)->N4_TIPO)
+            oLinha["data"]   := DtoC((cAlias)->N4_DATA)
+            oLinha["ocorr"]  := AllTrim((cAlias)->N4_OCORR)
+            oLinha["seq"]    := AllTrim((cAlias)->N4_SEQ)
+            oLinha["vlroc1"] := Round((cAlias)->N4_VLROC1, 2)
+            AAdd(aLinhas, oLinha)
+        EndIf
         (cAlias)->(DbSkip())
     EndDo
 
     (cAlias)->(DbCloseArea())
 
-    nTotalReg   := Len(aAllLinhas)
     nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
     lHasMore    := (nPage < nTotalPages)
-
-    nRecAtual := 0
-    While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-        AAdd(aLinhas, aAllLinhas[nOffset + nRecAtual + 1])
-        nRecAtual++
-    EndDo
 
 Recover Using oError
     If Select(cAlias) > 0
@@ -159,7 +156,7 @@ Recover Using oError
     Self:SetResponse(Sn4_MontaErro("INTERNAL_ERROR", cErrMsg, ""))
     FreeObj(oResp)
     FreeObj(oParams)
-    AEval(aAllLinhas, {|o| FreeObj(o)})
+    AEval(aLinhas, {|o| FreeObj(o)})
     RestArea(aArea)
 Return .T.
 End Sequence
@@ -188,7 +185,7 @@ Self:SetResponse(oResp:ToJson())
 
 FreeObj(oResp)
 FreeObj(oParams)
-AEval(aAllLinhas, {|o| FreeObj(o)})
+AEval(aLinhas, {|o| FreeObj(o)})
 RestArea(aArea)
 
 Return .T.

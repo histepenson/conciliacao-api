@@ -98,7 +98,6 @@ Local aArea         := GetArea()
 Local oResp         := JsonObject():New()
 Local oParams       := JsonObject():New()
 Local aLinhas       := {}
-Local aAllLinhas    := {}
 Local oLinha        := Nil
 Local oError        := Nil
 Local cSql          := ""
@@ -158,7 +157,6 @@ Local cMoedaFmt     := ""
 Local nTotalReg     := 0
 Local nTotalPages   := 1
 Local nOffset       := 0
-Local nRecAtual     := 0
 
 // Tamanhos de campos
 Local aTamConta     := {}
@@ -211,6 +209,7 @@ lImpMov      := (cImpMov != "2")   // default: retorna movimento
 // Default "1" (lancamentos normais, conforme SX1 CTR140 par12). "CT4" e o nome da TABELA.
 cTpSald := IIf(Empty(cTpLanc), "1", AllTrim(cTpLanc))
 nPageSize    := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
+nOffset      := (nPage - 1) * nPageSize
 
 Do Case
 	Case nDividePor == 2; nDivide := 100
@@ -411,31 +410,38 @@ Begin Sequence
 		EndIf
 
 		ConOut("ZCTBR140API - item=" + AllTrim((cAlias)->CTD_ITEM) + " tipoitem=[" + AllTrim((cAlias)->TIPOITEM) + "] lAddItem=" + cValToChar(lAddItem) + " nTipoBalanc=" + cValToChar(nTipoBalanc) + " saldoAtu=" + cValToChar(nSaldoAtu))
+		// So' monta o JsonObject quando a linha passar no filtro E estiver
+		// dentro da janela da pagina pedida -- evita reter em memoria o
+		// resultado filtrado inteiro so' para devolver no maximo pageSize.
 		If lAddItem
-			oLinha := JsonObject():New()
-			oLinha["conta"]        := AllTrim((cAlias)->CT1_CONTA)
-			oLinha["item"]         := AllTrim((cAlias)->CTD_ITEM)
-			oLinha["desc_conta"]   := AllTrim((cAlias)->DESCCTA)
-			oLinha["desc_item"]    := AllTrim((cAlias)->DESCITEM)
-			oLinha["normal_cta"]   := AllTrim((cAlias)->NORMAL_CTA)    // "1"=D  "2"=C
-			oLinha["ctares"]       := AllTrim((cAlias)->CTARES)         // codigo reduzido da conta
-			oLinha["ctasup"]       := AllTrim((cAlias)->CTASUP)         // conta superior
-			oLinha["tipoconta"]    := AllTrim((cAlias)->TIPOCONTA)      // classe da conta (CT1_CLASSE)
-			oLinha["normal_item"]  := AllTrim((cAlias)->NORMAL_ITEM)   // "1"=D  "2"=C
-			oLinha["itemres"]      := AllTrim((cAlias)->ITEMRES)        // codigo reduzido do item
-			oLinha["itsup"]        := AllTrim((cAlias)->ITSUP)          // item superior
-			oLinha["tipoitem"]     := AllTrim((cAlias)->TIPOITEM)       // classe do item (CTD_CLASSE)
-			oLinha["saldo_ant_db"] := Round(nSaldoAntDB, 2)  // debito acumulado anterior
-			oLinha["saldo_ant_cr"] := Round(nSaldoAntCR, 2)  // credito acumulado anterior
-			oLinha["saldo_ant"]    := Round(nSaldoAnt,   2)  // signed: positivo=devedor
-			oLinha["debito"]       := Round(nDebito,     2)  // sempre positivo
-			oLinha["credito"]      := Round(nCredito,    2)  // sempre positivo
-			If lImpMov
-				oLinha["movimento"] := Round(nMovimento, 2)  // positivo=credito liquido
-			EndIf
-			oLinha["saldo_atu"]    := Round(nSaldoAtu,   2)  // signed: positivo=devedor
+			nTotalReg++
 
-			aAdd(aAllLinhas, oLinha)
+			If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
+				oLinha := JsonObject():New()
+				oLinha["conta"]        := AllTrim((cAlias)->CT1_CONTA)
+				oLinha["item"]         := AllTrim((cAlias)->CTD_ITEM)
+				oLinha["desc_conta"]   := AllTrim((cAlias)->DESCCTA)
+				oLinha["desc_item"]    := AllTrim((cAlias)->DESCITEM)
+				oLinha["normal_cta"]   := AllTrim((cAlias)->NORMAL_CTA)    // "1"=D  "2"=C
+				oLinha["ctares"]       := AllTrim((cAlias)->CTARES)         // codigo reduzido da conta
+				oLinha["ctasup"]       := AllTrim((cAlias)->CTASUP)         // conta superior
+				oLinha["tipoconta"]    := AllTrim((cAlias)->TIPOCONTA)      // classe da conta (CT1_CLASSE)
+				oLinha["normal_item"]  := AllTrim((cAlias)->NORMAL_ITEM)   // "1"=D  "2"=C
+				oLinha["itemres"]      := AllTrim((cAlias)->ITEMRES)        // codigo reduzido do item
+				oLinha["itsup"]        := AllTrim((cAlias)->ITSUP)          // item superior
+				oLinha["tipoitem"]     := AllTrim((cAlias)->TIPOITEM)       // classe do item (CTD_CLASSE)
+				oLinha["saldo_ant_db"] := Round(nSaldoAntDB, 2)  // debito acumulado anterior
+				oLinha["saldo_ant_cr"] := Round(nSaldoAntCR, 2)  // credito acumulado anterior
+				oLinha["saldo_ant"]    := Round(nSaldoAnt,   2)  // signed: positivo=devedor
+				oLinha["debito"]       := Round(nDebito,     2)  // sempre positivo
+				oLinha["credito"]      := Round(nCredito,    2)  // sempre positivo
+				If lImpMov
+					oLinha["movimento"] := Round(nMovimento, 2)  // positivo=credito liquido
+				EndIf
+				oLinha["saldo_atu"]    := Round(nSaldoAtu,   2)  // signed: positivo=devedor
+
+				aAdd(aLinhas, oLinha)
+			EndIf
 		EndIf
 
 		(cAlias)->(DbSkip())
@@ -443,19 +449,9 @@ Begin Sequence
 
 	(cAlias)->(DbCloseArea())
 
-	// Paginacao sobre registros filtrados em memoria
-	nTotalReg   := Len(aAllLinhas)
 	nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
-	nOffset     := (nPage - 1) * nPageSize
 
-	ConOut("ZCTBR140API - aAllLinhas=" + cValToChar(nTotalReg) + " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize) + " offset=" + cValToChar(nOffset))
-
-	nRecAtual := 0
-	While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-		aAdd(aLinhas, aAllLinhas[nOffset + nRecAtual + 1])
-		nRecAtual++
-	EndDo
-
+	ConOut("ZCTBR140API - total=" + cValToChar(nTotalReg) + " page=" + cValToChar(nPage) + " pageSize=" + cValToChar(nPageSize) + " offset=" + cValToChar(nOffset))
 	ConOut("ZCTBR140API - aLinhas=" + cValToChar(Len(aLinhas)) + " totalPages=" + cValToChar(nTotalPages))
 
 	Recover Using oError
@@ -469,7 +465,7 @@ Begin Sequence
 		"Erro interno ao consultar balancete", oError:Description))
 	FreeObj(oResp)
 	FreeObj(oParams)
-	AEval(aAllLinhas, {|o| FreeObj(o)})
+	AEval(aLinhas, {|o| FreeObj(o)})
 	RestArea(aArea)
 Return .T.
 End Sequence
@@ -498,6 +494,8 @@ oResp["linhas"]          := aLinhas
 
 Self:SetResponse(oResp:ToJson())
 FreeObj(oResp)
+FreeObj(oParams)
+AEval(aLinhas, {|o| FreeObj(o)})
 RestArea(aArea)
 
 Return .T.

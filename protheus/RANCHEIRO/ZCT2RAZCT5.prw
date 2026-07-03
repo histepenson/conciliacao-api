@@ -79,7 +79,6 @@ wsmethod GET getRazaoCT5 WSRESTFUL ZCT2RAZCT5
 Local aArea      := GetArea()
 Local oResp      := JsonObject():New()
 Local oParams    := JsonObject():New()
-Local aAllLinhas := {}
 Local aLinhas    := {}
 Local oLinha     := Nil
 Local oError     := Nil
@@ -110,7 +109,6 @@ Local nPageSize     := Val(AllTrim(Self:pageSize))
 Local nTotalReg   := 0
 Local nTotalPages := 1
 Local nOffset     := 0
-Local nRecAtual   := 0
 Local lHasMore    := .F.
 Local lIncCred    := .T.
 Local lIncDeb     := .T.
@@ -134,7 +132,7 @@ cContaDe   := IIf(Empty(cContaDe),  "",             cContaDe)
 cContaAte  := IIf(Empty(cContaAte), "zzzzzzzzzzzzz", cContaAte)
 cFilialDe  := IIf(Empty(cFilialDe),  "",          cFilialDe)
 cFilialAte := IIf(Empty(cFilialAte), "zzzzzzzzz", cFilialAte)
-nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
+nPageSize  := IIf(nPageSize <= 0 .Or. nPageSize > 8000, 8000, nPageSize)
 nOffset    := (nPage - 1) * nPageSize
 
 // saldo=2 => somente debito | saldo=3 => somente credito
@@ -163,6 +161,19 @@ EndIf
 cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 
 cWhere += " AND CT2_LOTE = '" + cLote + "'"
+
+// --- Paginacao no proprio SQL via ROW_NUMBER() OVER() -- evita reexecutar e
+// rematerializar o resultado inteiro (UNION + LEFT JOIN na CT5) a cada
+// pagina pedida. Preferido a OFFSET/FETCH (SQL Server 2012+, exige nivel de
+// compatibilidade >=110) porque ROW_NUMBER() funciona desde o SQL Server
+// 2005, sem depender do nivel de compatibilidade do banco. COUNT(*) OVER()
+// traz o total de linhas (antes do corte por RN) em cada linha devolvida,
+// entao uma unica execucao ja da a pagina E o total, sem segunda consulta.
+cSql := " SELECT * FROM ("
+cSql += "   SELECT *,"
+cSql += "     ROW_NUMBER() OVER (ORDER BY CT2_DATA, CT2_LOTE, CT2_SBLOTE, CT2_DOC, CT2_LINHA, CT2_KEY) AS RN,"
+cSql += "     COUNT(*) OVER() AS TOTAL_REG"
+cSql += "   FROM ("
 
 // --- Bloco CREDITO (DC=2 e DC=3) ---
 If lIncCred
@@ -235,9 +246,13 @@ If lIncDeb
     EndIf
 EndIf
 
-cSql += " ORDER BY CT2_DATA, CT2_LOTE, CT2_SBLOTE, CT2_DOC, CT2_LINHA, CT2_KEY"
+cSql += "   ) AS RAZAO"
+cSql += " ) AS PAGINADO"
+cSql += " WHERE RN > " + cValToChar(nOffset) + " AND RN <= " + cValToChar(nOffset + nPageSize)
+cSql += " ORDER BY RN"
 
-ConOut("[ZCT2RAZCT5] SQL montado | tabela=" + cTabela + " incCred=" + IIf(lIncCred,"S","N") + " incDeb=" + IIf(lIncDeb,"S","N"))
+ConOut("[ZCT2RAZCT5] SQL montado | tabela=" + cTabela + " incCred=" + IIf(lIncCred,"S","N") + " incDeb=" + IIf(lIncDeb,"S","N") + ;
+    " offset=" + cValToChar(nOffset) + " pageSize=" + cValToChar(nPageSize))
 
 Begin Sequence
     dbUseArea(.T., "TOPCONN", TCGenQry(,, cSql), cAlias, .T., .F.)
@@ -249,8 +264,17 @@ Begin Sequence
     TCSetField(cAlias, "CT2_ORIGEM", "C", 60, 0)
     TCSetField(cAlias, "ct2_sequen", "C",  6, 0)
     TCSetField(cAlias, "ct2_itemc",  "C", 30, 0)
+    TCSetField(cAlias, "TOTAL_REG",  "N", 10, 0)
+    TCSetField(cAlias, "RN",         "N", 10, 0)
 
     (cAlias)->(DbGoTop())
+    // O SQL ja devolve so' a pagina pedida (filtro por RN) -- toda linha lida
+    // aqui pertence a pagina, sem precisar pular nenhuma em ADVPL. TOTAL_REG
+    // vem do COUNT(*) OVER() (mesmo valor em toda linha) e reflete o total
+    // ANTES do corte por RN.
+    If !(cAlias)->(Eof())
+        nTotalReg := (cAlias)->TOTAL_REG
+    EndIf
     While !(cAlias)->(Eof())
         oLinha := JsonObject():New()
         oLinha["data"]               := DtoC((cAlias)->CT2_DATA)
@@ -274,21 +298,14 @@ Begin Sequence
         oLinha["ct2_origem"]         := AllTrim((cAlias)->CT2_ORIGEM)
         oLinha["ct2_sequen"]         := AllTrim((cAlias)->ct2_sequen)
         oLinha["ct2_itemc"]          := AllTrim((cAlias)->ct2_itemc)
-        AAdd(aAllLinhas, oLinha)
+        AAdd(aLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo
 
     (cAlias)->(DbCloseArea())
 
-    nTotalReg   := Len(aAllLinhas)
     nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
     lHasMore    := (nPage < nTotalPages)
-
-    nRecAtual := 0
-    While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-        AAdd(aLinhas, aAllLinhas[nOffset + nRecAtual + 1])
-        nRecAtual++
-    EndDo
 
 Recover Using oError
     If Select(cAlias) > 0
@@ -302,7 +319,7 @@ Recover Using oError
     Self:SetResponse(CT2RazCT5_MontaErro("INTERNAL_ERROR", cErrMsg, ""))
     FreeObj(oResp)
     FreeObj(oParams)
-    AEval(aAllLinhas, {|o| FreeObj(o)})
+    AEval(aLinhas, {|o| FreeObj(o)})
     RestArea(aArea)
 Return .T.
 End Sequence
@@ -341,7 +358,7 @@ Self:SetResponse(oResp:ToJson())
 
 FreeObj(oResp)
 FreeObj(oParams)
-AEval(aAllLinhas, {|o| FreeObj(o)})
+AEval(aLinhas, {|o| FreeObj(o)})
 RestArea(aArea)
 
 Return .T.

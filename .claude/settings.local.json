@@ -304,7 +304,24 @@
       "Bash(curl -s -o \"c:/conciliacao-api/_debug_login3.txt\" -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\" -X POST \"https://back-smart-conciliacao-prod-prodution.up.railway.app/api/auth/login\" -H \"Content-Type: application/json\" -d '{\"email\":\"ana.ribeiro@rancheiro.com.br\",\"password\":\"Rancheiro@1010\"}' --max-time 20)",
       "Bash(PGCONNECT_TIMEOUT=15 psql \"postgresql://postgres:TEQdHCNkUipWQKsbesMbkvzPvPYfArkd@shinkansen.proxy.rlwy.net:54745/railway?sslmode=require\" -c \"select 1\")",
       "Bash(cd \"c:/conciliacao-api\" && rm -f _debug_login*.txt && git status --short | grep _debug || echo \"limpo\")",
-      "Bash(curl -s -o \"c:/conciliacao-api/_debug_login_final.txt\" -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\" -X POST \"https://back-smart-conciliacao-prod-prodution.up.railway.app/api/auth/login\" -H \"Content-Type: application/json\" -d '{\"email\":\"ana.ribeiro@rancheiro.com.br\",\"password\":\"Rancheiro@1010\"}' --max-time 20)"
+      "Bash(curl -s -o \"c:/conciliacao-api/_debug_login_final.txt\" -w \"\\\\nHTTP_STATUS:%{http_code}\\\\n\" -X POST \"https://back-smart-conciliacao-prod-prodution.up.railway.app/api/auth/login\" -H \"Content-Type: application/json\" -d '{\"email\":\"ana.ribeiro@rancheiro.com.br\",\"password\":\"Rancheiro@1010\"}' --max-time 20)",
+      "Bash(xxd tools/calc_diferencas.py)",
+      "Bash(xxd \"C:/conciliacao-api/_mb_tmp.py\")",
+      "Bash(git show *)",
+      "Bash(.venv/Scripts/python.exe -m py_compile services/conciliacao_service.py tools/calc_diferencas.py)",
+      "Bash(git commit -m ' *)",
+      "Bash(gh pr *)",
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue)",
+      "Bash(git ls-remote *)",
+      "Bash(ls -la /c/ 2>/dev/null | head -50)",
+      "Bash(find /c/smartconciliacoes_ia -maxdepth 2 -type d | grep -v -E '\\\\.git|__pycache__|node_modules|\\\\.venv|venv' | sort)",
+      "Read(//c/smartconciliacoes_ia/**)",
+      "Bash(grep -rl \"divergencia\\\\|prompt\\\\|explicacao\" /c/smartconciliacoes_ia/routers /c/smartconciliacoes_ia/services /c/smartconciliacoes_ia/tools 2>/dev/null | grep -v __pycache__)",
+      "Read(//c/smartconciliacoes_ia/routers/**)",
+      "Read(//c/smartconciliacoes_ia/services/**)",
+      "Bash(python -m py_compile services/analise_service.py services/ia_service.py)",
+      "Bash(cd /c/smartconciliacoes_ia && find . -iname \"*test*bancario*\" -o -iname \"*test*analise*\" 2>/dev/null | grep -v __pycache__)",
+      "Bash(python -m py_compile workers/protheus_carga_worker.py)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -322,7 +339,8 @@
       "C:\\smartconciliacoes_ia",
       "C:\\conciliacao-app\\src\\components\\Matr900ParamsDialog",
       "C:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog",
-      "C:\\conciliacao-api"
+      "C:\\conciliacao-api",
+      "C:\\smartconciliacoes_ia\\services"
     ]
   }
 }
