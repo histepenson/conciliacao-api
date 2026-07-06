@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from core import storage
 from db import get_db
 from middleware.auth import get_current_user, CurrentUser
+from middleware.permission import require_empresa_admin
+from middleware.tenant import EmpresaContext
 from schemas.efetivacao_schema import (
     EfetivarConciliacaoRequest,
     EfetivarConciliacaoResponse,
@@ -51,7 +53,7 @@ async def efetivar_conciliacao(
     1. Valida o resultado da conciliacao
     2. Salva arquivos originais e normalizados em estrutura hierarquica
     3. Cria registros no banco de dados
-    4. E irreversivel (somente admin pode excluir)
+    4. E irreversivel (somente admin master ou admin da empresa pode excluir)
     """
     logger.info(f"Efetivando conciliacao - usuario: {current_user.user_id}")
 
@@ -350,27 +352,27 @@ async def excluir_conciliacao(
     conciliacao_id: int,
     empresa_id: int = Query(..., description="ID da empresa"),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user)
+    context: EmpresaContext = Depends(require_empresa_admin())
 ):
     """
     Exclui uma conciliacao efetivada.
 
-    **REQUER PERMISSAO DE ADMINISTRADOR**
+    **REQUER ADMIN MASTER OU ADMIN DA EMPRESA**
 
     Esta operacao:
     - Remove o registro do banco de dados
     - Remove os arquivos do sistema de arquivos
     - Registra a acao no audit log
     """
-    # Validar acesso a empresa
-    if not current_user.is_admin and current_user.empresa_id != empresa_id:
+    # Validar acesso a empresa (admin master pode operar em qualquer empresa)
+    if not context.is_admin and context.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem acesso a esta empresa"
         )
 
     service = EfetivacaoService()
-    service.excluir(db, conciliacao_id, empresa_id, current_user)
+    service.excluir(db, conciliacao_id, empresa_id, context)
 
     # Retorna 204 No Content
     return None
