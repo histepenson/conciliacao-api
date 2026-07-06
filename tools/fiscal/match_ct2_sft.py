@@ -38,6 +38,21 @@ def match_ct2_sft(
     ("debito" para notas de Entrada, "credito" para notas de Saida).
 
     Fases:
+    0. Soma aglutinada por nota (roda ANTES da fase 1, so' pra CT2 com
+       CT2_KEY valida): agrupa CT2 e SFT por (filial, nf, fornece) -- SEM
+       produto, mesmo quando Saida. Se a soma total de um lado bater com a
+       soma total do outro pra aquela MESMA nota (dentro da tolerancia),
+       casa a nota INTEIRA de uma vez, sem se importar em quantos itens cada
+       lado quebrou o valor (cobre o caso comum de um lado lancar a nota
+       inteira numa linha so' enquanto o outro lista por item). O que nao
+       fechar aqui segue pro fluxo normal (fase 1 -> fase 2 -> fase 3) sem
+       nenhuma mudanca de comportamento. Essa fase evita que, quando a nota
+       INTEIRA ja' fecharia de cara, um match 1:1 "por coincidencia de
+       valor" (dois itens de valores proximos, ambos dentro da tolerancia,
+       sem relacao real) consuma o par errado na fase 1 e deixe pra tras um
+       residuo que so' fecharia por sorte -- ou que, por ruido de ponto
+       flutuante na subtracao de dois valores ja' arredondados, fique a
+       centesimos de milionesimos ACIMA da tolerancia e nunca feche na fase 2.
     1. Matching exato 1:1 por chave (filial+nf+fornece[+produto]) + valor
        dentro da tolerancia.
     2. Reconciliacao por nota: para o que sobrou da fase 1 mas ainda tem
@@ -190,19 +205,19 @@ def match_ct2_sft(
         """
         total_ct2 = _soma(ct2_idxs_grupo, ct2_recs, campo_valor_ct2)
         total_sft = _soma(sft_idxs_grupo, sft_recs, campo_valor_sft)
-        if abs(total_ct2 - total_sft) <= tolerancia:
+        if round(abs(total_ct2 - total_sft), 2) <= tolerancia:
             ct2_matched_set.update(ct2_idxs_grupo)
             sft_matched.update(sft_idxs_grupo)
             return
 
         if total_ct2 >= total_sft:
             cobertos = _cobrir_greedy(ct2_idxs_grupo, ct2_recs, campo_valor_ct2, total_sft)
-            if abs(_soma(cobertos, ct2_recs, campo_valor_ct2) - total_sft) <= tolerancia:
+            if round(abs(_soma(cobertos, ct2_recs, campo_valor_ct2) - total_sft), 2) <= tolerancia:
                 ct2_matched_set.update(cobertos)
                 sft_matched.update(sft_idxs_grupo)
         else:
             cobertos = _cobrir_greedy(sft_idxs_grupo, sft_recs, campo_valor_sft, total_ct2)
-            if abs(_soma(cobertos, sft_recs, campo_valor_sft) - total_ct2) <= tolerancia:
+            if round(abs(_soma(cobertos, sft_recs, campo_valor_sft) - total_ct2), 2) <= tolerancia:
                 sft_matched.update(cobertos)
                 ct2_matched_set.update(ct2_idxs_grupo)
 
@@ -212,20 +227,54 @@ def match_ct2_sft(
 
     # Indice SFT por (filial, nf, fornece[, produto]) -> lista de indices
     sft_por_doc: dict = {}
+    # Indice SFT por (filial, nf, fornece) -- SEM produto, mesmo quando Saida
+    # -- usado so' pela fase 0 (soma aglutinada da nota inteira).
+    sft_por_nota: dict = {}
     for i, s in enumerate(sft_recs):
         chave = _chave_sft(s, eh_saida)
         if chave:
             sft_por_doc.setdefault(chave, []).append(i)
+            sft_por_nota.setdefault(chave[:3], []).append(i)
+
+    sft_matched: set = set()
+    ct2_matched_set: set = set()
+
+    # ==========================================================
+    # Fase 0: soma aglutinada por nota (aditiva, roda antes da fase 1) --
+    # ver docstring da funcao. So' considera CT2 com CT2_KEY valida e valor
+    # != 0 (os mesmos que a fase 1 processaria); o que nao casar aqui segue
+    # normalmente para a fase 1 sem nenhuma alteracao de comportamento.
+    # ==========================================================
+    ct2_por_nota_fase0: dict = {}
+    for i, rec in enumerate(ct2_recs):
+        valor_ct2 = round(float(rec.get(campo_valor_ct2) or 0), 2)
+        if valor_ct2 == 0:
+            continue  # tratado como auto-matched na fase 1, nao participa da soma
+        chave = _extrair_chave_ct2(rec, eh_saida)
+        if chave is None:
+            continue  # sem chave -- fase 0 nao se aplica, fica pro fallback da fase 3
+        ct2_por_nota_fase0.setdefault(chave[:3], []).append(i)
+
+    for chave_nota, ct2_idxs in ct2_por_nota_fase0.items():
+        sft_idxs = sft_por_nota.get(chave_nota, [])
+        if not sft_idxs:
+            continue  # nenhuma nota correspondente -- fica pro fluxo normal
+
+        total_ct2 = _soma(ct2_idxs, ct2_recs, campo_valor_ct2)
+        total_sft = _soma(sft_idxs, sft_recs, campo_valor_sft)
+        if round(abs(total_ct2 - total_sft), 2) <= tolerancia:
+            ct2_matched_set.update(ct2_idxs)
+            sft_matched.update(sft_idxs)
 
     # ==========================================================
     # Fase 1: matching exato 1:1 por CT2_KEY + valor (tolerancia)
     # ==========================================================
-    sft_matched: set = set()
-    ct2_matched_set: set = set()
     ct2_pendente_com_chave: list = []  # tem ct2_key valida mas nao casou 1:1
     ct2_sem_chave: list = []  # sem ct2_key -- candidato ao fallback por historico (fase 3)
 
     for i, rec in enumerate(ct2_recs):
+        if i in ct2_matched_set:
+            continue  # ja casado na fase 0 (soma aglutinada)
         valor_ct2 = round(float(rec.get(campo_valor_ct2) or 0), 2)
         if valor_ct2 == 0:
             ct2_matched_set.add(i)
@@ -240,7 +289,7 @@ def match_ct2_sft(
         for idx in sft_por_doc.get(chave, []):
             if idx not in sft_matched:
                 valor_sft = round(float(sft_recs[idx].get(campo_valor_sft) or 0), 2)
-                if abs(valor_sft - valor_ct2) <= tolerancia:
+                if round(abs(valor_sft - valor_ct2), 2) <= tolerancia:
                     sft_matched.add(idx)
                     ct2_matched_set.add(i)
                     matched = True

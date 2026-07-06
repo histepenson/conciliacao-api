@@ -322,7 +322,15 @@
       "Bash(python -m py_compile services/analise_service.py services/ia_service.py)",
       "Bash(cd /c/smartconciliacoes_ia && find . -iname \"*test*bancario*\" -o -iname \"*test*analise*\" 2>/dev/null | grep -v __pycache__)",
       "Bash(python -m py_compile workers/protheus_carga_worker.py)",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('routers/efetivacao_router.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('services/efetivacao_service.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('routers/efetivacao_router.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('services/efetivacao_service.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(ls .github/workflows)",
+      "Bash(cat railway.json)",
+      "Bash(cat railway.toml)",
+      "Read(//c/conciliacao-app/src/contexts/**)",
+      "Bash(python -m pytest tools/fiscal/test_match_ct2_sft.py -q)",
+      "Bash(pip show *)",
+      "Bash(python -c \"import unittest; print\\('ok'\\)\")",
+      "Bash(python -m unittest tools.fiscal.test_match_ct2_sft -v)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -341,7 +349,8 @@
       "C:\\conciliacao-app\\src\\components\\Matr900ParamsDialog",
       "C:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog",
       "C:\\conciliacao-api",
-      "C:\\smartconciliacoes_ia\\services"
+      "C:\\smartconciliacoes_ia\\services",
+      "C:\\conciliacao-app\\src\\pages"
     ]
   }
 }
