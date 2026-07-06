@@ -330,7 +330,14 @@
       "Bash(python -m pytest tools/fiscal/test_match_ct2_sft.py -q)",
       "Bash(pip show *)",
       "Bash(python -c \"import unittest; print\\('ok'\\)\")",
-      "Bash(python -m unittest tools.fiscal.test_match_ct2_sft -v)"
+      "Bash(python -m unittest tools.fiscal.test_match_ct2_sft -v)",
+      "Bash(grep -rn \"SMARTCONCILIACOES_IA\" c:/conciliacao-api/core/config.py 2>/dev/null; echo ---; ls /c/ 2>/dev/null | grep -i concilia; echo ---; ls /c/ 2>/dev/null | grep -i ia)",
+      "Bash(grep -rln \"match_ct2_sft\\\\|_reconciliar_grupo\\\\|cobrir_greedy\\\\|CT2_KEY\\\\|ct2_key\" /c/smartconciliacoes_ia --include=*.py 2>/dev/null)",
+      "Read(//c/smartconciliacoes_ia/tools/fiscal/**)",
+      "Read(//c/smartconciliacoes_ia/tools/fiscal//**)",
+      "Bash(cd /c/smartconciliacoes_ia && ls tools/fiscal/ && python --version 2>&1; find . -iname \"test_*.py\" | head -20)",
+      "Bash(grep -rln \"match_ct2_sft\" /c/ConciliaAI /c/agente_concilia /c/smartconciliacoes_site 2>/dev/null)",
+      "Read(//c/ConciliaAI/**)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -350,7 +357,8 @@
       "C:\\conciliacao-app\\src\\components\\Ctbr140ParamsDialog",
       "C:\\conciliacao-api",
       "C:\\smartconciliacoes_ia\\services",
-      "C:\\conciliacao-app\\src\\pages"
+      "C:\\conciliacao-app\\src\\pages",
+      "c:\\smartconciliacoes_ia\\tools\\fiscal"
     ]
   }
 }
