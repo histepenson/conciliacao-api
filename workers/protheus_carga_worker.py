@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 _PAGE_SIZE = 5000
 _PAGE_SIZE_POR_TIPO: dict[str, int] = {
     "CTBR140": 3000,
+    "CT2RAZCT5": 8000,
 }
 _INSERT_CHUNK_SIZE = 1000
 _MAX_PARALLEL_PAGES = 5  # paginas simultâneas por carga

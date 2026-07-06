@@ -20,6 +20,7 @@ from schemas.efetivacao_schema import (
 )
 from services.file_storage_service import FileStorageService
 from middleware.auth import CurrentUser
+from middleware.tenant import EmpresaContext
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,7 @@ class EfetivacaoService:
         # Registrar no audit log
         try:
             audit = AuditLog(
-                usuario_id=current_user.user_id,
+                usuario_id=context.user_id,
                 empresa_id=request.empresa_id,
                 action=AuditAction.CREATE,
                 entity_type="conciliacao",
@@ -495,22 +496,22 @@ class EfetivacaoService:
         db: Session,
         conciliacao_id: int,
         empresa_id: int,
-        current_user: CurrentUser
+        context: EmpresaContext
     ) -> bool:
         """
-        Exclui uma conciliacao efetivada (apenas admin).
+        Exclui uma conciliacao efetivada (admin master ou admin da empresa).
 
         Args:
             db: Sessao do banco
             conciliacao_id: ID da conciliacao
             empresa_id: ID da empresa
-            current_user: Usuario atual
+            context: Contexto do usuario atual
 
         Returns:
             True se excluido com sucesso
         """
-        # Verificar se e admin
-        if not current_user.is_admin:
+        # Verificar se e admin master ou admin da empresa (permissao "*")
+        if not context.is_admin and not context.has_permission("*"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Apenas administradores podem excluir conciliacoes"
@@ -546,7 +547,7 @@ class EfetivacaoService:
         # Registrar no audit log antes de excluir
         try:
             audit = AuditLog(
-                usuario_id=current_user.user_id,
+                usuario_id=context.user_id,
                 empresa_id=empresa_id,
                 action=AuditAction.DELETE,
                 entity_type="conciliacao",
@@ -566,5 +567,5 @@ class EfetivacaoService:
         db.delete(conciliacao)
         db.commit()
 
-        logger.info(f"Conciliacao {conciliacao_id} excluida por usuario {current_user.user_id}")
+        logger.info(f"Conciliacao {conciliacao_id} excluida por usuario {context.user_id}")
         return True

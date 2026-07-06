@@ -53,7 +53,6 @@ Local oParams        := JsonObject():New()
 Local oBanco         := JsonObject():New()
 Local oTotais        := JsonObject():New()
 Local aMovimentos    := {}
-Local aAllMovs       := {}
 Local oItem          := Nil
 Local oError         := Nil
 Local cAlias         := GetNextAlias()
@@ -109,7 +108,6 @@ Local nTxContr       := 0
 Local nTotalReg      := 0
 Local nTotalPages    := 1
 Local nOffset        := 0
-Local nRecAtual      := 0
 Local nI             := 0
 
 Local lSpbInUse      := SpbInUse()
@@ -191,6 +189,7 @@ nSaldoCompart  := IIf(Empty(cSaldoCompart),  1, Val(cSaldoCompart))
 nTodasFiliais  := IIf(Empty(cTodasFiliais),  2, Val(cTodasFiliais))
 nDataConvSaldo := IIf(Empty(cDataConvSaldo), 1, Val(cDataConvSaldo))
 nPageSize      := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
+nOffset        := (nPage - 1) * nPageSize
 lAllFil        := (nTodasFiliais == 1)
 nDecMoeda      := GetMv("MV_CENT" + IIf(nMoedaRel > 1, AllTrim(Str(nMoedaRel)), ""))
 ConOut("ZFIN470API - [3] params: moeda=" + cValToChar(nMoedaRel) + " lAllFil=" + cValToChar(lAllFil) + " pageSize=" + cValToChar(nPageSize))
@@ -475,45 +474,46 @@ Begin Sequence
 			cPrefTit := (cAlias)->E5_PREFIXO + IIf(Empty((cAlias)->E5_PREFIXO), " ", "-") + (cAlias)->E5_NUMERO + IIf(Empty((cAlias)->E5_PARCELA), " ", "-") + (cAlias)->E5_PARCELA
 		EndIf
 
-		oItem := JsonObject():New()
-		// Campos no formato esperado pelo backend Python / frontend de conciliacao bancaria.
-		oItem["data"]                    := cDataDisp
-		oItem["documento"]               := AllTrim(cDocument)
-		oItem["prefixo_titulo"]          := AllTrim(cPrefTit)
-		oItem["entradas"]                := Round(nValorRec, 2)
-		oItem["saidas"]                  := Round(nValorPag, 2)
-		oItem["saldo_atual"]             := Round(nSaldoRod, 2)
-		oItem["descricao"]               := cHistSE5
-		// Campos adicionais uteis para rastreabilidade e debug.
-		oItem["data_disponibilidade"]    := DtoS((cAlias)->E5_DTDISPO)
-		oItem["data_movimento"]          := DtoS((cAlias)->E5_DATA)
-		oItem["data_disponibilidade_br"] := cDataDisp
-		oItem["historico"]               := cHistSE5
-		oItem["tipo_documento"]          := AllTrim((cAlias)->E5_TIPODOC)
-		oItem["tipo_movimento"]          := AllTrim((cAlias)->E5_TIPO)
-		oItem["natureza"]                := AllTrim((cAlias)->E5_RECPAG)
-		oItem["conciliado"]              := !Empty((cAlias)->E5_RECONC)
-		oItem["codigo_conciliacao"]      := AllTrim((cAlias)->E5_RECONC)
-		oItem["valor_entrada"]           := Round(nValorRec, 2)
-		oItem["valor_saida"]             := Round(nValorPag, 2)
-		oItem["valor_movimento"]         := Round(nValorMov, 2)
-		oItem["moeda_relatorio"]         := nMoedaRel
+		// O calculo de saldo/totais acima precisa rodar para TODA linha (saldo
+		// corrente e totalizadores dependem do somatorio completo), mas o
+		// JsonObject de retorno so' precisa existir para a pagina pedida --
+		// monta-lo para todas as linhas e cortar a pagina depois mantinha o
+		// resultado inteiro em memoria a toa.
+		nTotalReg++
 
-		AAdd(aAllMovs, oItem)
+		If nTotalReg > nOffset .And. Len(aMovimentos) < nPageSize
+			oItem := JsonObject():New()
+			// Campos no formato esperado pelo backend Python / frontend de conciliacao bancaria.
+			oItem["data"]                    := cDataDisp
+			oItem["documento"]               := AllTrim(cDocument)
+			oItem["prefixo_titulo"]          := AllTrim(cPrefTit)
+			oItem["entradas"]                := Round(nValorRec, 2)
+			oItem["saidas"]                  := Round(nValorPag, 2)
+			oItem["saldo_atual"]             := Round(nSaldoRod, 2)
+			oItem["descricao"]               := cHistSE5
+			// Campos adicionais uteis para rastreabilidade e debug.
+			oItem["data_disponibilidade"]    := DtoS((cAlias)->E5_DTDISPO)
+			oItem["data_movimento"]          := DtoS((cAlias)->E5_DATA)
+			oItem["data_disponibilidade_br"] := cDataDisp
+			oItem["historico"]               := cHistSE5
+			oItem["tipo_documento"]          := AllTrim((cAlias)->E5_TIPODOC)
+			oItem["tipo_movimento"]          := AllTrim((cAlias)->E5_TIPO)
+			oItem["natureza"]                := AllTrim((cAlias)->E5_RECPAG)
+			oItem["conciliado"]              := !Empty((cAlias)->E5_RECONC)
+			oItem["codigo_conciliacao"]      := AllTrim((cAlias)->E5_RECONC)
+			oItem["valor_entrada"]           := Round(nValorRec, 2)
+			oItem["valor_saida"]             := Round(nValorPag, 2)
+			oItem["valor_movimento"]         := Round(nValorMov, 2)
+			oItem["moeda_relatorio"]         := nMoedaRel
+
+			AAdd(aMovimentos, oItem)
+		EndIf
 		(cAlias)->(DbSkip())
 	EndDo
 
 	(cAlias)->(DbCloseArea())
 
-	nTotalReg   := Len(aAllMovs)
 	nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
-	nOffset     := (nPage - 1) * nPageSize
-
-	nRecAtual := 0
-	While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-		AAdd(aMovimentos, aAllMovs[nOffset + nRecAtual + 1])
-		nRecAtual++
-	EndDo
 
 Recover Using oError
 	If Select(cAlias) > 0
@@ -527,7 +527,7 @@ Recover Using oError
 	FreeObj(oParams)
 	FreeObj(oBanco)
 	FreeObj(oTotais)
-	AEval(aAllMovs, {|oObj| FreeObj(oObj)})
+	AEval(aMovimentos, {|oObj| FreeObj(oObj)})
 	RestArea(aArea)
 Return .T.
 End Sequence
@@ -582,6 +582,10 @@ oResp["movimentos"]      := aMovimentos
 Self:SetResponse(oResp:ToJson())
 
 FreeObj(oResp)
+FreeObj(oParams)
+FreeObj(oBanco)
+FreeObj(oTotais)
+AEval(aMovimentos, {|oObj| FreeObj(oObj)})
 RestArea(aArea)
 Return .T.
 

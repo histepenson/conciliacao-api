@@ -77,7 +77,6 @@ wsmethod GET getSftEnt WSRESTFUL ZSFTENTAPI
 Local aArea      := GetArea()
 Local oResp      := JsonObject():New()
 Local oParams    := JsonObject():New()
-Local aAllLinhas := {}
 Local aLinhas    := {}
 Local oLinha     := Nil
 Local oError     := Nil
@@ -111,7 +110,6 @@ Local nPageSize  := Val(AllTrim(Self:pageSize))
 Local nTotalReg   := 0
 Local nTotalPages := 1
 Local nOffset     := 0
-Local nRecAtual   := 0
 Local lHasMore    := .F.
 
 Self:SetContentType("application/json")
@@ -270,57 +268,59 @@ Begin Sequence
 
     (cAlias)->(DbGoTop())
     While !(cAlias)->(Eof())
-        oLinha := JsonObject():New()
-        oLinha["filial"]   := AllTrim((cAlias)->FT_FILIAL)
-        oLinha["nf"]       := AllTrim((cAlias)->FT_NFISCAL)
-        oLinha["serie"]    := AllTrim((cAlias)->FT_SERIE)
-        oLinha["tes"]      := AllTrim((cAlias)->FT_TES)
-        oLinha["emissao"]  := DtoC((cAlias)->FT_EMISSAO)
-        oLinha["entrada"]  := DtoC((cAlias)->FT_ENTRADA)
-        oLinha["cliefor"]  := AllTrim((cAlias)->FT_CLIEFOR)
-        oLinha["estado"]   := AllTrim((cAlias)->FT_ESTADO)
-        oLinha["cfop"]     := AllTrim((cAlias)->FT_CFOP)
-        oLinha["especie"]  := AllTrim((cAlias)->FT_ESPECIE)
-        oLinha["quant"]    := Round((cAlias)->FT_QUANT,   3)
-        oLinha["valcont"]  := Round((cAlias)->FT_VALCONT, 2)
-        oLinha["aliqicm"]  := Round((cAlias)->FT_ALIQICM, 4)
-        oLinha["baseicm"]  := Round((cAlias)->FT_BASEICM, 2)
-        oLinha["valicm"]   := Round((cAlias)->FT_VALICM,  2)
-        oLinha["isenicm"]  := Round((cAlias)->FT_ISENICM, 2)
-        oLinha["outricm"]  := Round((cAlias)->FT_OUTRICM, 2)
-        oLinha["icmscom"]  := Round((cAlias)->FT_ICMSCOM, 2)
-        oLinha["icmsdif"]  := Round((cAlias)->FT_ICMSDIF, 2)
-        oLinha["difal"]    := Round((cAlias)->FT_DIFAL,   2)
-        oLinha["vfcpdif"]  := Round((cAlias)->FT_VFCPDIF, 2)
-        oLinha["icmsret"]  := Round((cAlias)->FT_ICMSRET, 2)
-        oLinha["produto"]  := AllTrim((cAlias)->FT_PRODUTO)
-        oLinha["cstpis"]   := AllTrim((cAlias)->FT_CSTPIS)
-        oLinha["codbcc"]   := AllTrim((cAlias)->FT_CODBCC)
-        oLinha["valpis"]   := Round((cAlias)->FT_VALPIS,  2)
-        oLinha["valcof"]   := Round((cAlias)->FT_VALCOF,  2)
-        oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
-        oLinha["tipomov"]  := AllTrim((cAlias)->FT_TIPOMOV)
-
+        // Avalia o filtro de lista direto nos campos da tabela -- so' monta o
+        // JsonObject (custo de memoria) se a linha passar E estiver dentro da
+        // janela da pagina pedida. Evita manter em memoria o resultado inteiro
+        // (pode passar de 200 mil linhas) so' para devolver no maximo
+        // pageSize (5000) por requisicao -- essa retencao de todos os
+        // JsonObject simultaneamente era o que estourava a memoria do AppServer.
         If !lFiltraLista .Or. SftEnt_PassaFiltro(AllTrim((cAlias)->FT_CFOP), AllTrim((cAlias)->FT_TES), AllTrim((cAlias)->FT_ESPECIE), ;
                 aCfopInc, aCfopExc, aTesInc, aTesExc, aEspecieInc, aEspecieExc)
-            AAdd(aAllLinhas, oLinha)
-        Else
-            FreeObj(oLinha)
+
+            nTotalReg++
+
+            If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
+                oLinha := JsonObject():New()
+                oLinha["filial"]   := AllTrim((cAlias)->FT_FILIAL)
+                oLinha["nf"]       := AllTrim((cAlias)->FT_NFISCAL)
+                oLinha["serie"]    := AllTrim((cAlias)->FT_SERIE)
+                oLinha["tes"]      := AllTrim((cAlias)->FT_TES)
+                oLinha["emissao"]  := DtoC((cAlias)->FT_EMISSAO)
+                oLinha["entrada"]  := DtoC((cAlias)->FT_ENTRADA)
+                oLinha["cliefor"]  := AllTrim((cAlias)->FT_CLIEFOR)
+                oLinha["estado"]   := AllTrim((cAlias)->FT_ESTADO)
+                oLinha["cfop"]     := AllTrim((cAlias)->FT_CFOP)
+                oLinha["especie"]  := AllTrim((cAlias)->FT_ESPECIE)
+                oLinha["quant"]    := Round((cAlias)->FT_QUANT,   3)
+                oLinha["valcont"]  := Round((cAlias)->FT_VALCONT, 2)
+                oLinha["aliqicm"]  := Round((cAlias)->FT_ALIQICM, 4)
+                oLinha["baseicm"]  := Round((cAlias)->FT_BASEICM, 2)
+                oLinha["valicm"]   := Round((cAlias)->FT_VALICM,  2)
+                oLinha["isenicm"]  := Round((cAlias)->FT_ISENICM, 2)
+                oLinha["outricm"]  := Round((cAlias)->FT_OUTRICM, 2)
+                oLinha["icmscom"]  := Round((cAlias)->FT_ICMSCOM, 2)
+                oLinha["icmsdif"]  := Round((cAlias)->FT_ICMSDIF, 2)
+                oLinha["difal"]    := Round((cAlias)->FT_DIFAL,   2)
+                oLinha["vfcpdif"]  := Round((cAlias)->FT_VFCPDIF, 2)
+                oLinha["icmsret"]  := Round((cAlias)->FT_ICMSRET, 2)
+                oLinha["produto"]  := AllTrim((cAlias)->FT_PRODUTO)
+                oLinha["cstpis"]   := AllTrim((cAlias)->FT_CSTPIS)
+                oLinha["codbcc"]   := AllTrim((cAlias)->FT_CODBCC)
+                oLinha["valpis"]   := Round((cAlias)->FT_VALPIS,  2)
+                oLinha["valcof"]   := Round((cAlias)->FT_VALCOF,  2)
+                oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
+                oLinha["tipomov"]  := AllTrim((cAlias)->FT_TIPOMOV)
+
+                AAdd(aLinhas, oLinha)
+            EndIf
         EndIf
         (cAlias)->(DbSkip())
     EndDo
 
     (cAlias)->(DbCloseArea())
 
-    nTotalReg   := Len(aAllLinhas)
     nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
     lHasMore    := (nPage < nTotalPages)
-
-    nRecAtual := 0
-    While nRecAtual < nPageSize .And. (nOffset + nRecAtual + 1) <= nTotalReg
-        AAdd(aLinhas, aAllLinhas[nOffset + nRecAtual + 1])
-        nRecAtual++
-    EndDo
 
 Recover Using oError
     If Select(cAlias) > 0
@@ -334,7 +334,7 @@ Recover Using oError
     Self:SetResponse(SftEnt_MontaErro("INTERNAL_ERROR", cErrMsg, ""))
     FreeObj(oResp)
     FreeObj(oParams)
-    AEval(aAllLinhas, {|o| FreeObj(o)})
+    AEval(aLinhas, {|o| FreeObj(o)})
     RestArea(aArea)
 Return .T.
 End Sequence
@@ -370,7 +370,7 @@ Self:SetResponse(oResp:ToJson())
 
 FreeObj(oResp)
 FreeObj(oParams)
-AEval(aAllLinhas, {|o| FreeObj(o)})
+AEval(aLinhas, {|o| FreeObj(o)})
 RestArea(aArea)
 
 Return .T.
