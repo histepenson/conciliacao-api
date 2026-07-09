@@ -20,6 +20,17 @@ def listar(
     return service.listar(db, eid)
 
 
+@router.post("")
+def criar(
+    body: dict[str, Any],
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    eid = resolve_empresa_id(context, empresa_id)
+    return service.criar(db, eid, body)
+
+
 @router.get("/{lp_id}")
 def obter(
     lp_id: int,

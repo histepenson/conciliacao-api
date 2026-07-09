@@ -340,7 +340,13 @@
       "Read(//c/ConciliaAI/**)",
       "Bash(grep -rn \"Difal ST\\\\|Difal\\\\b\\\\|icmscom\" /c/conciliacao-app/src --include=*.jsx --include=*.js -i | head -30)",
       "Bash(./venv/Scripts/python -c \"import psycopg2; print\\('ok'\\)\")",
-      "Bash(./venv/Scripts/python)"
+      "Bash(./venv/Scripts/python)",
+      "Bash(find / -iname \"*genix*\" 2>/dev/null | grep -v -E \"Windows|Program Files|AppData/Local/Packages\" | head -50)",
+      "Bash(ls -la \"/c/Users/histepenson/Desktop/GENIX\" 2>&1)",
+      "Read(//c/Users/histepenson/Desktop/GENIX/**)",
+      "Bash(APP_ENV=develop python scripts/importar_finr130_finr150_excel.py --empresa-id 13 --data-base 20260430 --finr130 'C:\\\\Users\\\\histepenson\\\\Desktop\\\\GENIX\\\\FIN130.xlsx' --finr150 'C:\\\\Users\\\\histepenson\\\\Desktop\\\\GENIX\\\\FIN150.xlsx')",
+      "Bash(APP_ENV=develop python scripts/importar_ct2_completo.py --empresa-id 13 --header 0 --data-base 20260430 --excel 'C:\\\\Users\\\\histepenson\\\\Desktop\\\\GENIX\\\\CT2 04.2026.xlsx')",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('services/lancamento_padrao_service.py'\\).read\\(\\)\\); ast.parse\\(open\\('routers/lancamento_padrao_router.py'\\).read\\(\\)\\); print\\('OK'\\)\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
