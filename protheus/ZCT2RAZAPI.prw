@@ -46,7 +46,7 @@ Campos por linha (compativel com CTBR400 / CTBR480):
 
 @author Equipe Desenvolvimento
 @since 21/05/2026
-@version 1.1
+@version 1.2
 /*/
 
 wsrestful ZCT2RAZAPI description "CT2 - Razao Contabil SQL Direto"
@@ -85,6 +85,8 @@ Local cAlias     := GetNextAlias()
 Local cSql       := ""
 Local cWhere     := ""
 Local cTabela    := RetSqlName("CT2")
+
+Local cErrMsg       := ""
 
 Local cContaDe      := AllTrim(Self:conta_de)
 Local cContaAte     := AllTrim(Self:conta_ate)
@@ -170,6 +172,17 @@ Else
     cWhere += " AND CT2_FILORI = '" + cFilialAtual + "'"
 EndIf
 
+// --- Paginacao no proprio SQL via ROW_NUMBER() OVER() -- evita reexecutar e
+// rematerializar o resultado inteiro (UNION) a cada pagina pedida. Mesma
+// tecnica usada no ZCT2RAZCT5. COUNT(*) OVER() traz o total de linhas (antes
+// do corte por RN) em cada linha devolvida, entao uma unica execucao ja da a
+// pagina E o total, sem segunda consulta.
+cSql := " SELECT * FROM ("
+cSql += "   SELECT *,"
+cSql += "     ROW_NUMBER() OVER (ORDER BY CT2_DATA, CT2_LOTE, CT2_SBLOTE, CT2_DOC, CT2_LINHA, CT2_KEY) AS RN,"
+cSql += "     COUNT(*) OVER() AS TOTAL_REG"
+cSql += "   FROM ("
+
 // --- Bloco CREDITO (DC=2 e DC=3) ---
 If lIncCred
     cSql += " SELECT"
@@ -223,41 +236,47 @@ If lIncDeb
     EndIf
 EndIf
 
-cSql += " ORDER BY CT2_DATA, CT2_LOTE, CT2_SBLOTE, CT2_DOC, CT2_LINHA, CT2_KEY"
+cSql += "   ) AS RAZAO"
+cSql += " ) AS PAGINADO"
+cSql += " WHERE RN > " + cValToChar(nOffset) + " AND RN <= " + cValToChar(nOffset + nPageSize)
+cSql += " ORDER BY RN"
 
-ConOut("[ZCT2RAZ] SQL montado | tabela=" + cTabela + " incCred=" + IIf(lIncCred,"S","N") + " incDeb=" + IIf(lIncDeb,"S","N"))
-ConOut("[ZCT2RAZ] SQL=" + cSql)
+ConOut("[ZCT2RAZ] SQL montado | tabela=" + cTabela + " incCred=" + IIf(lIncCred,"S","N") + " incDeb=" + IIf(lIncDeb,"S","N") + ;
+    " offset=" + cValToChar(nOffset) + " pageSize=" + cValToChar(nPageSize))
 
 Begin Sequence
     dbUseArea(.T., "TOPCONN", TCGenQry(,, cSql), cAlias, .T., .F.)
-    TCSetField(cAlias, "CT2_DATA", "D",  8, 0)
-    TCSetField(cAlias, "debito",   "N", 18, 2)
-    TCSetField(cAlias, "credito",  "N", 18, 2)
+    TCSetField(cAlias, "CT2_DATA",  "D",  8, 0)
+    TCSetField(cAlias, "debito",    "N", 18, 2)
+    TCSetField(cAlias, "credito",   "N", 18, 2)
+    TCSetField(cAlias, "TOTAL_REG", "N", 10, 0)
+    TCSetField(cAlias, "RN",        "N", 10, 0)
 
     (cAlias)->(DbGoTop())
+    // O SQL ja devolve so' a pagina pedida (filtro por RN) -- toda linha lida
+    // aqui pertence a pagina, sem precisar pular nenhuma em ADVPL. TOTAL_REG
+    // vem do COUNT(*) OVER() (mesmo valor em toda linha) e reflete o total
+    // ANTES do corte por RN.
+    If !(cAlias)->(Eof())
+        nTotalReg := (cAlias)->TOTAL_REG
+    EndIf
     While !(cAlias)->(Eof())
-        // So' monta o JsonObject quando a linha estiver dentro da janela da
-        // pagina pedida -- evita reter em memoria o resultado inteiro so'
-        // para devolver no maximo pageSize (5000) por requisicao.
-        nTotalReg++
-        If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
-            oLinha := JsonObject():New()
-            oLinha["data"]               := DtoC((cAlias)->CT2_DATA)
-            oLinha["lote_sub_doc_linha"] := AllTrim((cAlias)->CT2_LOTE)  + ;
-                                            AllTrim((cAlias)->CT2_SBLOTE) + ;
-                                            AllTrim((cAlias)->CT2_DOC)    + ;
-                                            AllTrim((cAlias)->CT2_LINHA)
-            oLinha["historico"]          := AllTrim((cAlias)->historico)
-            oLinha["xpartida"]           := AllTrim((cAlias)->xpartida)
-            oLinha["c_custo"]            := ""
-            oLinha["item_conta"]         := AllTrim((cAlias)->item_conta)
-            oLinha["cod_cl_val"]         := AllTrim((cAlias)->cod_cl_val)
-            oLinha["debito"]             := Round((cAlias)->debito,  2)
-            oLinha["credito"]            := Round((cAlias)->credito, 2)
-            oLinha["saldo_atual"]        := 0
-            oLinha["conta"]              := AllTrim((cAlias)->conta)
-            AAdd(aLinhas, oLinha)
-        EndIf
+        oLinha := JsonObject():New()
+        oLinha["data"]               := DtoC((cAlias)->CT2_DATA)
+        oLinha["lote_sub_doc_linha"] := AllTrim((cAlias)->CT2_LOTE)  + ;
+                                        AllTrim((cAlias)->CT2_SBLOTE) + ;
+                                        AllTrim((cAlias)->CT2_DOC)    + ;
+                                        AllTrim((cAlias)->CT2_LINHA)
+        oLinha["historico"]          := AllTrim((cAlias)->historico)
+        oLinha["xpartida"]           := AllTrim((cAlias)->xpartida)
+        oLinha["c_custo"]            := ""
+        oLinha["item_conta"]         := AllTrim((cAlias)->item_conta)
+        oLinha["cod_cl_val"]         := AllTrim((cAlias)->cod_cl_val)
+        oLinha["debito"]             := Round((cAlias)->debito,  2)
+        oLinha["credito"]            := Round((cAlias)->credito, 2)
+        oLinha["saldo_atual"]        := 0
+        oLinha["conta"]              := AllTrim((cAlias)->conta)
+        AAdd(aLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo
 
@@ -270,8 +289,12 @@ Recover Using oError
     If Select(cAlias) > 0
         (cAlias)->(DbCloseArea())
     EndIf
-    ConOut("[ZCT2RAZ] ERRO: " + oError:Description)
-    Self:SetResponse(CT2Raz_MontaErro("INTERNAL_ERROR", "Erro ao consultar CT2: " + oError:Description, ""))
+    cErrMsg := "Erro ao consultar CT2"
+    If ValType(oError) == "O"
+        cErrMsg += ": " + AllTrim(oError:Description)
+    EndIf
+    ConOut("[ZCT2RAZ] ERRO: " + cErrMsg)
+    Self:SetResponse(CT2Raz_MontaErro("INTERNAL_ERROR", cErrMsg, ""))
     FreeObj(oResp)
     FreeObj(oParams)
     AEval(aLinhas, {|o| FreeObj(o)})

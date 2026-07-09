@@ -259,11 +259,6 @@ Begin Sequence
     TCSetField(cAlias, "CT2_DATA",   "D",  8, 0)
     TCSetField(cAlias, "debito",     "N", 18, 2)
     TCSetField(cAlias, "credito",    "N", 18, 2)
-    TCSetField(cAlias, "ct5_desc",   "C", 30, 0)
-    TCSetField(cAlias, "CT2_LP",     "C",  6, 0)
-    TCSetField(cAlias, "CT2_ORIGEM", "C", 60, 0)
-    TCSetField(cAlias, "ct2_sequen", "C",  6, 0)
-    TCSetField(cAlias, "ct2_itemc",  "C", 30, 0)
     TCSetField(cAlias, "TOTAL_REG",  "N", 10, 0)
     TCSetField(cAlias, "RN",         "N", 10, 0)
 
