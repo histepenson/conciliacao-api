@@ -50,7 +50,7 @@ Campos por linha:
 
 @author Equipe Desenvolvimento
 @since 27/05/2026
-@version 1.8
+@version 1.9
 /*/
 
 wsrestful ZSFTENTAPI description "SFT - Livro Fiscal SQL Direto"
@@ -103,7 +103,16 @@ Local aTesInc    := {}
 Local aTesExc    := {}
 Local aEspecieInc := {}
 Local aEspecieExc := {}
-Local lFiltraLista := .F.
+Local cFiltroCfopInc       := ""
+Local cFiltroCfopExc       := ""
+Local cFiltroTesInc        := ""
+Local cFiltroTesExc        := ""
+Local cFiltroEspecieInc    := ""
+Local cFiltroEspecieExc    := ""
+Local cFiltroCfopIncSF2    := ""
+Local cFiltroTesIncSF2     := ""
+Local cFiltroEspecieIncSF2 := ""
+Local cFiltroEspecieExcSF2 := ""
 Local nPage      := Max(1, Val(AllTrim(Self:page)))
 Local nPageSize  := Val(AllTrim(Self:pageSize))
 
@@ -144,8 +153,30 @@ aTesInc  := SftEnt_ParseLista(cTesInc)
 aTesExc  := SftEnt_ParseLista(cTesExc)
 aEspecieInc := SftEnt_ParseLista(cEspecieInc)
 aEspecieExc := SftEnt_ParseLista(cEspecieExc)
-lFiltraLista := (Len(aCfopInc) > 0 .Or. Len(aCfopExc) > 0 .Or. Len(aTesInc) > 0 .Or. Len(aTesExc) > 0 .Or. ;
-    Len(aEspecieInc) > 0 .Or. Len(aEspecieExc) > 0)
+
+// --- Filtros de lista (contem/nao contem) traduzidos para SQL (CHARINDEX) --
+// para que a paginacao (ROW_NUMBER/COUNT(*) OVER) mais abaixo ja considere
+// so' as linhas que passam no filtro. Antes esse filtro era feito em ADVPL
+// apos ler cada linha do cursor, o que exigia reexecutar e percorrer o
+// resultado inteiro (sem LIMIT) a cada pagina pedida -- essa retencao/varredura
+// completa a cada pagina era o que estourava a memoria do AppServer em cargas
+// grandes.
+// No bloco SF2 (notas LOC/ND) os campos FT_CFOP/FT_TES nao existem de fato
+// (vem como '' fixo na projecao) -- por isso o filtro de inclusao usa a
+// string literal '' como "campo": nunca casa com nenhum codigo informado,
+// excluindo essas linhas quando cfop_inc/tes_inc estao ativos, igual ao
+// comportamento original em ADVPL (SftEnt_Contem("", lista) sempre .F.).
+cFiltroCfopInc    := SftEnt_FiltroCharIdx("FT_CFOP",    aCfopInc,    .F.)
+cFiltroCfopExc    := SftEnt_FiltroCharIdx("FT_CFOP",    aCfopExc,    .T.)
+cFiltroTesInc     := SftEnt_FiltroCharIdx("FT_TES",     aTesInc,     .F.)
+cFiltroTesExc     := SftEnt_FiltroCharIdx("FT_TES",     aTesExc,     .T.)
+cFiltroEspecieInc := SftEnt_FiltroCharIdx("FT_ESPECIE", aEspecieInc, .F.)
+cFiltroEspecieExc := SftEnt_FiltroCharIdx("FT_ESPECIE", aEspecieExc, .T.)
+
+cFiltroCfopIncSF2    := SftEnt_FiltroCharIdx("''",         aCfopInc,    .F.)
+cFiltroTesIncSF2     := SftEnt_FiltroCharIdx("''",         aTesInc,     .F.)
+cFiltroEspecieIncSF2 := SftEnt_FiltroCharIdx("F2_ESPECIE", aEspecieInc, .F.)
+cFiltroEspecieExcSF2 := SftEnt_FiltroCharIdx("F2_ESPECIE", aEspecieExc, .T.)
 
 ConOut("[ZSFTENTAPI] data=" + cDataIni + "/" + cDataFim + ;
     " filial_de=" + cFilialDe + " filial_ate=" + cFilialAte + ;
@@ -163,88 +194,131 @@ cWhere += " AND FT_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 If !Empty(cTipoMov)
     cWhere += " AND FT_TIPOMOV = '" + cTipoMov + "'"
 EndIf
+If !Empty(cFiltroCfopInc)
+    cWhere += " AND " + cFiltroCfopInc
+EndIf
+If !Empty(cFiltroCfopExc)
+    cWhere += " AND " + cFiltroCfopExc
+EndIf
+If !Empty(cFiltroTesInc)
+    cWhere += " AND " + cFiltroTesInc
+EndIf
+If !Empty(cFiltroTesExc)
+    cWhere += " AND " + cFiltroTesExc
+EndIf
+If !Empty(cFiltroEspecieInc)
+    cWhere += " AND " + cFiltroEspecieInc
+EndIf
+If !Empty(cFiltroEspecieExc)
+    cWhere += " AND " + cFiltroEspecieExc
+EndIf
 
-// --- SQL ---
-cSql := " SELECT"
-cSql += "     FT_FILIAL,"
-cSql += "     FT_NFISCAL,"
-cSql += "     FT_SERIE,"
-cSql += "     FT_TES,"
-cSql += "     FT_EMISSAO,"
-cSql += "     FT_ENTRADA,"
-cSql += "     FT_CLIEFOR,"
-cSql += "     FT_ESTADO,"
-cSql += "     FT_CFOP,"
-cSql += "     FT_ESPECIE,"
-cSql += "     FT_QUANT,"
-cSql += "     FT_VALCONT,"
-cSql += "     FT_ALIQICM,"
-cSql += "     FT_BASEICM,"
-cSql += "     FT_VALICM,"
-cSql += "     FT_ISENICM,"
-cSql += "     FT_OUTRICM,"
-cSql += "     FT_ICMSCOM,"
-cSql += "     FT_ICMSDIF,"
-cSql += "     FT_DIFAL,"
-cSql += "     FT_VFCPDIF,"
-cSql += "     FT_ICMSRET,"
-cSql += "     FT_PRODUTO,"
-cSql += "     FT_CSTPIS,"
-cSql += "     FT_CODBCC,"
-cSql += "     FT_VALPIS,"
-cSql += "     FT_VALCOF,"
-cSql += "     FT_VALIPI,"
-cSql += "     FT_TIPOMOV"
-cSql += " FROM " + cTabela
-cSql += " WHERE " + cWhere
+// --- Paginacao no proprio SQL via ROW_NUMBER() OVER() -- mesma tecnica do
+// ZCT2RAZCT5/ZCT2RAZAPI: evita reexecutar e percorrer o resultado inteiro
+// (pode passar de 200 mil linhas) a cada pagina pedida. COUNT(*) OVER() traz
+// o total de linhas (ja filtrado) em cada linha devolvida, entao uma unica
+// execucao ja da a pagina E o total.
+cSql := " SELECT * FROM ("
+cSql += "   SELECT *,"
+cSql += "     ROW_NUMBER() OVER (ORDER BY FT_ENTRADA, FT_FILIAL, FT_NFISCAL) AS RN,"
+cSql += "     COUNT(*) OVER() AS TOTAL_REG"
+cSql += "   FROM ("
+cSql += "     SELECT"
+cSql += "         FT_FILIAL,"
+cSql += "         FT_NFISCAL,"
+cSql += "         FT_SERIE,"
+cSql += "         FT_TES,"
+cSql += "         FT_EMISSAO,"
+cSql += "         FT_ENTRADA,"
+cSql += "         FT_CLIEFOR,"
+cSql += "         FT_ESTADO,"
+cSql += "         FT_CFOP,"
+cSql += "         FT_ESPECIE,"
+cSql += "         FT_QUANT,"
+cSql += "         FT_VALCONT,"
+cSql += "         FT_ALIQICM,"
+cSql += "         FT_BASEICM,"
+cSql += "         FT_VALICM,"
+cSql += "         FT_ISENICM,"
+cSql += "         FT_OUTRICM,"
+cSql += "         FT_ICMSCOM,"
+cSql += "         FT_ICMSDIF,"
+cSql += "         FT_DIFAL,"
+cSql += "         FT_VFCPDIF,"
+cSql += "         FT_ICMSRET,"
+cSql += "         FT_PRODUTO,"
+cSql += "         FT_CSTPIS,"
+cSql += "         FT_CODBCC,"
+cSql += "         FT_VALPIS,"
+cSql += "         FT_VALCOF,"
+cSql += "         FT_VALIPI,"
+cSql += "         FT_TIPOMOV"
+cSql += "     FROM " + cTabela
+cSql += "     WHERE " + cWhere
 
 // --- UNION ALL: notas de saida da SF2 com serie LOC/ND, que nao geram livro
 // fiscal (nao entram na SFT) -- particularidade desta empresa (Rancheiro).
 // Sempre ativo aqui. So' entram quando o filtro de tipo_mov nao exclui saida
 // (essas linhas sao sempre TIPOMOV = 'S').
 If (Empty(cTipoMov) .Or. cTipoMov == "S")
-    cSql += " UNION ALL"
-    cSql += " SELECT"
-    cSql += "     F2_FILIAL       AS FT_FILIAL,"
-    cSql += "     F2_DOC          AS FT_NFISCAL,"
-    cSql += "     F2_SERIE        AS FT_SERIE,"
-    cSql += "     ''              AS FT_TES,"
-    cSql += "     F2_EMISSAO      AS FT_EMISSAO,"
-    cSql += "     F2_EMISSAO      AS FT_ENTRADA,"
-    cSql += "     F2_CLIENTE      AS FT_CLIEFOR,"
-    cSql += "     F2_EST          AS FT_ESTADO,"
-    cSql += "     ''              AS FT_CFOP,"
-    cSql += "     F2_ESPECIE      AS FT_ESPECIE,"
-    cSql += "     0               AS FT_QUANT,"
-    cSql += "     SUM(F2_VALBRUT) AS FT_VALCONT,"
-    cSql += "     0               AS FT_ALIQICM,"
-    cSql += "     0               AS FT_BASEICM,"
-    cSql += "     0               AS FT_VALICM,"
-    cSql += "     0               AS FT_ISENICM,"
-    cSql += "     0               AS FT_OUTRICM,"
-    cSql += "     0               AS FT_ICMSCOM,"
-    cSql += "     0               AS FT_ICMSDIF,"
-    cSql += "     0               AS FT_DIFAL,"
-    cSql += "     0               AS FT_VFCPDIF,"
-    cSql += "     0               AS FT_ICMSRET,"
-    cSql += "     ''              AS FT_PRODUTO,"
-    cSql += "     ''              AS FT_CSTPIS,"
-    cSql += "     ''              AS FT_CODBCC,"
-    cSql += "     SUM(F2_VALIMP6) AS FT_VALPIS,"
-    cSql += "     SUM(F2_VALIMP5) AS FT_VALCOF,"
-    cSql += "     0               AS FT_VALIPI,"
-    cSql += "     'S'             AS FT_TIPOMOV"
-    cSql += " FROM " + RetSqlName("SF2")
-    cSql += " WHERE D_E_L_E_T_ = ' '"
-    cSql += "   AND F2_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
-    cSql += "   AND F2_EMISSAO BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
-    cSql += "   AND F2_SERIE IN ('LOC','ND')"
-    cSql += " GROUP BY F2_FILIAL, F2_DOC, F2_SERIE, F2_EMISSAO, F2_CLIENTE, F2_EST, F2_ESPECIE"
+    cSql += "     UNION ALL"
+    cSql += "     SELECT"
+    cSql += "         F2_FILIAL       AS FT_FILIAL,"
+    cSql += "         F2_DOC          AS FT_NFISCAL,"
+    cSql += "         F2_SERIE        AS FT_SERIE,"
+    cSql += "         ''              AS FT_TES,"
+    cSql += "         F2_EMISSAO      AS FT_EMISSAO,"
+    cSql += "         F2_EMISSAO      AS FT_ENTRADA,"
+    cSql += "         F2_CLIENTE      AS FT_CLIEFOR,"
+    cSql += "         F2_EST          AS FT_ESTADO,"
+    cSql += "         ''              AS FT_CFOP,"
+    cSql += "         F2_ESPECIE      AS FT_ESPECIE,"
+    cSql += "         0               AS FT_QUANT,"
+    cSql += "         SUM(F2_VALBRUT) AS FT_VALCONT,"
+    cSql += "         0               AS FT_ALIQICM,"
+    cSql += "         0               AS FT_BASEICM,"
+    cSql += "         0               AS FT_VALICM,"
+    cSql += "         0               AS FT_ISENICM,"
+    cSql += "         0               AS FT_OUTRICM,"
+    cSql += "         0               AS FT_ICMSCOM,"
+    cSql += "         0               AS FT_ICMSDIF,"
+    cSql += "         0               AS FT_DIFAL,"
+    cSql += "         0               AS FT_VFCPDIF,"
+    cSql += "         0               AS FT_ICMSRET,"
+    cSql += "         ''              AS FT_PRODUTO,"
+    cSql += "         ''              AS FT_CSTPIS,"
+    cSql += "         ''              AS FT_CODBCC,"
+    cSql += "         SUM(F2_VALIMP6) AS FT_VALPIS,"
+    cSql += "         SUM(F2_VALIMP5) AS FT_VALCOF,"
+    cSql += "         0               AS FT_VALIPI,"
+    cSql += "         'S'             AS FT_TIPOMOV"
+    cSql += "     FROM " + RetSqlName("SF2")
+    cSql += "     WHERE D_E_L_E_T_ = ' '"
+    cSql += "       AND F2_FILIAL BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
+    cSql += "       AND F2_EMISSAO BETWEEN '" + cDataIni + "' AND '" + cDataFim + "'"
+    cSql += "       AND F2_SERIE IN ('LOC','ND')"
+    If !Empty(cFiltroCfopIncSF2)
+        cSql += "       AND " + cFiltroCfopIncSF2
+    EndIf
+    If !Empty(cFiltroTesIncSF2)
+        cSql += "       AND " + cFiltroTesIncSF2
+    EndIf
+    If !Empty(cFiltroEspecieIncSF2)
+        cSql += "       AND " + cFiltroEspecieIncSF2
+    EndIf
+    If !Empty(cFiltroEspecieExcSF2)
+        cSql += "       AND " + cFiltroEspecieExcSF2
+    EndIf
+    cSql += "     GROUP BY F2_FILIAL, F2_DOC, F2_SERIE, F2_EMISSAO, F2_CLIENTE, F2_EST, F2_ESPECIE"
 EndIf
 
-cSql += " ORDER BY FT_ENTRADA, FT_FILIAL, FT_NFISCAL"
+cSql += "   ) AS SFTUNION"
+cSql += " ) AS PAGINADO"
+cSql += " WHERE RN > " + cValToChar(nOffset) + " AND RN <= " + cValToChar(nOffset + nPageSize)
+cSql += " ORDER BY RN"
 
-ConOut("[ZSFTENTAPI] SQL montado | tabela=" + cTabela)
+ConOut("[ZSFTENTAPI] SQL montado | tabela=" + cTabela + ;
+    " offset=" + cValToChar(nOffset) + " pageSize=" + cValToChar(nPageSize))
 
 Begin Sequence
     dbUseArea(.T., "TOPCONN", TCGenQry(,, cSql), cAlias, .T., .F.)
@@ -265,55 +339,50 @@ Begin Sequence
     TCSetField(cAlias, "FT_VALPIS",  "N", 16, 2)
     TCSetField(cAlias, "FT_VALCOF",  "N", 16, 2)
     TCSetField(cAlias, "FT_VALIPI",  "N", 16, 2)
+    TCSetField(cAlias, "TOTAL_REG",  "N", 10, 0)
+    TCSetField(cAlias, "RN",         "N", 10, 0)
 
     (cAlias)->(DbGoTop())
+    // O SQL ja devolve so' a pagina pedida (filtro por RN) -- toda linha lida
+    // aqui pertence a pagina, sem precisar filtrar/pular nada em ADVPL.
+    // TOTAL_REG vem do COUNT(*) OVER() (mesmo valor em toda linha) e reflete
+    // o total ja filtrado, ANTES do corte por RN.
+    If !(cAlias)->(Eof())
+        nTotalReg := (cAlias)->TOTAL_REG
+    EndIf
     While !(cAlias)->(Eof())
-        // Avalia o filtro de lista direto nos campos da tabela -- so' monta o
-        // JsonObject (custo de memoria) se a linha passar E estiver dentro da
-        // janela da pagina pedida. Evita manter em memoria o resultado inteiro
-        // (pode passar de 200 mil linhas) so' para devolver no maximo
-        // pageSize (5000) por requisicao -- essa retencao de todos os
-        // JsonObject simultaneamente era o que estourava a memoria do AppServer.
-        If !lFiltraLista .Or. SftEnt_PassaFiltro(AllTrim((cAlias)->FT_CFOP), AllTrim((cAlias)->FT_TES), AllTrim((cAlias)->FT_ESPECIE), ;
-                aCfopInc, aCfopExc, aTesInc, aTesExc, aEspecieInc, aEspecieExc)
+        oLinha := JsonObject():New()
+        oLinha["filial"]   := AllTrim((cAlias)->FT_FILIAL)
+        oLinha["nf"]       := AllTrim((cAlias)->FT_NFISCAL)
+        oLinha["serie"]    := AllTrim((cAlias)->FT_SERIE)
+        oLinha["tes"]      := AllTrim((cAlias)->FT_TES)
+        oLinha["emissao"]  := DtoC((cAlias)->FT_EMISSAO)
+        oLinha["entrada"]  := DtoC((cAlias)->FT_ENTRADA)
+        oLinha["cliefor"]  := AllTrim((cAlias)->FT_CLIEFOR)
+        oLinha["estado"]   := AllTrim((cAlias)->FT_ESTADO)
+        oLinha["cfop"]     := AllTrim((cAlias)->FT_CFOP)
+        oLinha["especie"]  := AllTrim((cAlias)->FT_ESPECIE)
+        oLinha["quant"]    := Round((cAlias)->FT_QUANT,   3)
+        oLinha["valcont"]  := Round((cAlias)->FT_VALCONT, 2)
+        oLinha["aliqicm"]  := Round((cAlias)->FT_ALIQICM, 4)
+        oLinha["baseicm"]  := Round((cAlias)->FT_BASEICM, 2)
+        oLinha["valicm"]   := Round((cAlias)->FT_VALICM,  2)
+        oLinha["isenicm"]  := Round((cAlias)->FT_ISENICM, 2)
+        oLinha["outricm"]  := Round((cAlias)->FT_OUTRICM, 2)
+        oLinha["icmscom"]  := Round((cAlias)->FT_ICMSCOM, 2)
+        oLinha["icmsdif"]  := Round((cAlias)->FT_ICMSDIF, 2)
+        oLinha["difal"]    := Round((cAlias)->FT_DIFAL,   2)
+        oLinha["vfcpdif"]  := Round((cAlias)->FT_VFCPDIF, 2)
+        oLinha["icmsret"]  := Round((cAlias)->FT_ICMSRET, 2)
+        oLinha["produto"]  := AllTrim((cAlias)->FT_PRODUTO)
+        oLinha["cstpis"]   := AllTrim((cAlias)->FT_CSTPIS)
+        oLinha["codbcc"]   := AllTrim((cAlias)->FT_CODBCC)
+        oLinha["valpis"]   := Round((cAlias)->FT_VALPIS,  2)
+        oLinha["valcof"]   := Round((cAlias)->FT_VALCOF,  2)
+        oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
+        oLinha["tipomov"]  := AllTrim((cAlias)->FT_TIPOMOV)
 
-            nTotalReg++
-
-            If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
-                oLinha := JsonObject():New()
-                oLinha["filial"]   := AllTrim((cAlias)->FT_FILIAL)
-                oLinha["nf"]       := AllTrim((cAlias)->FT_NFISCAL)
-                oLinha["serie"]    := AllTrim((cAlias)->FT_SERIE)
-                oLinha["tes"]      := AllTrim((cAlias)->FT_TES)
-                oLinha["emissao"]  := DtoC((cAlias)->FT_EMISSAO)
-                oLinha["entrada"]  := DtoC((cAlias)->FT_ENTRADA)
-                oLinha["cliefor"]  := AllTrim((cAlias)->FT_CLIEFOR)
-                oLinha["estado"]   := AllTrim((cAlias)->FT_ESTADO)
-                oLinha["cfop"]     := AllTrim((cAlias)->FT_CFOP)
-                oLinha["especie"]  := AllTrim((cAlias)->FT_ESPECIE)
-                oLinha["quant"]    := Round((cAlias)->FT_QUANT,   3)
-                oLinha["valcont"]  := Round((cAlias)->FT_VALCONT, 2)
-                oLinha["aliqicm"]  := Round((cAlias)->FT_ALIQICM, 4)
-                oLinha["baseicm"]  := Round((cAlias)->FT_BASEICM, 2)
-                oLinha["valicm"]   := Round((cAlias)->FT_VALICM,  2)
-                oLinha["isenicm"]  := Round((cAlias)->FT_ISENICM, 2)
-                oLinha["outricm"]  := Round((cAlias)->FT_OUTRICM, 2)
-                oLinha["icmscom"]  := Round((cAlias)->FT_ICMSCOM, 2)
-                oLinha["icmsdif"]  := Round((cAlias)->FT_ICMSDIF, 2)
-                oLinha["difal"]    := Round((cAlias)->FT_DIFAL,   2)
-                oLinha["vfcpdif"]  := Round((cAlias)->FT_VFCPDIF, 2)
-                oLinha["icmsret"]  := Round((cAlias)->FT_ICMSRET, 2)
-                oLinha["produto"]  := AllTrim((cAlias)->FT_PRODUTO)
-                oLinha["cstpis"]   := AllTrim((cAlias)->FT_CSTPIS)
-                oLinha["codbcc"]   := AllTrim((cAlias)->FT_CODBCC)
-                oLinha["valpis"]   := Round((cAlias)->FT_VALPIS,  2)
-                oLinha["valcof"]   := Round((cAlias)->FT_VALCOF,  2)
-                oLinha["valipi"]   := Round((cAlias)->FT_VALIPI,  2)
-                oLinha["tipomov"]  := AllTrim((cAlias)->FT_TIPOMOV)
-
-                AAdd(aLinhas, oLinha)
-            EndIf
-        EndIf
+        AAdd(aLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo
 
@@ -415,53 +484,32 @@ Next nI
 
 Return aRet
 
-/*/{Protheus.doc} SftEnt_Contem
-Retorna .T. se cValor contiver (substring) algum dos itens de aLista.
+/*/{Protheus.doc} SftEnt_FiltroCharIdx
+Monta condicao SQL equivalente ao filtro "contem" (substring) que antes era
+avaliado em ADVPL com o operador $. Usa CHARINDEX em vez de LIKE para nao
+precisar escapar coringas (%, _) vindos do usuario. cCampo pode ser um nome
+de coluna ou uma expressao SQL literal (ex.: "''"). Retorna "" (sem filtro)
+se aLista estiver vazia.
 /*/
-Static Function SftEnt_Contem(cValor, aLista)
-Local nI     := 0
-Local cValUp := Upper(cValor)
+Static Function SftEnt_FiltroCharIdx(cCampo, aLista, lExcluir)
+Local cRet    := ""
+Local nI      := 0
+Local cItem   := ""
+Local cOper   := IIf(lExcluir, " = 0", " > 0")
+Local cConcat := IIf(lExcluir, " AND ", " OR ")
 
+If Len(aLista) == 0
+Return ""
+EndIf
+
+cRet := "("
 For nI := 1 To Len(aLista)
-    If aLista[nI] $ cValUp
-        Return .T.
+    If nI > 1
+        cRet += cConcat
     EndIf
+    cItem := StrTran(aLista[nI], "'", "''")
+    cRet += "CHARINDEX('" + cItem + "', " + cCampo + ")" + cOper
 Next nI
+cRet += ")"
 
-Return .F.
-
-/*/{Protheus.doc} SftEnt_PassaFiltro
-Combina os 6 filtros (cfop_inc, cfop_exc, tes_inc, tes_exc, especie_inc, especie_exc):
-  - Se aCfopInc nao vazio: cCfop deve conter ALGUM item de aCfopInc, senao reprova.
-  - Se aCfopExc nao vazio: cCfop NAO PODE conter NENHUM item de aCfopExc, senao reprova.
-  - Mesma logica para TES com cTes/aTesInc/aTesExc.
-  - Mesma logica para Especie com cEspecie/aEspecieInc/aEspecieExc.
-Retorna .T. somente se passar em todos os criterios ativos.
-/*/
-Static Function SftEnt_PassaFiltro(cCfop, cTes, cEspecie, aCfopInc, aCfopExc, aTesInc, aTesExc, aEspecieInc, aEspecieExc)
-
-If Len(aCfopInc) > 0 .And. !SftEnt_Contem(cCfop, aCfopInc)
-Return .F.
-EndIf
-
-If Len(aCfopExc) > 0 .And. SftEnt_Contem(cCfop, aCfopExc)
-Return .F.
-EndIf
-
-If Len(aTesInc) > 0 .And. !SftEnt_Contem(cTes, aTesInc)
-Return .F.
-EndIf
-
-If Len(aTesExc) > 0 .And. SftEnt_Contem(cTes, aTesExc)
-Return .F.
-EndIf
-
-If Len(aEspecieInc) > 0 .And. !SftEnt_Contem(cEspecie, aEspecieInc)
-Return .F.
-EndIf
-
-If Len(aEspecieExc) > 0 .And. SftEnt_Contem(cEspecie, aEspecieExc)
-Return .F.
-EndIf
-
-Return .T.
+Return cRet

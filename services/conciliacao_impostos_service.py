@@ -24,7 +24,7 @@ COLUNAS_IMPOSTO_SFT = {
     "valpis": "Valor PIS",
     "valcof": "Valor COFINS",
     "icmsret": "Icms ST",
-    "icmscom": "Difal ST",
+    "icmscom": "Difal Entrada",
     "difal": "Difal ICMS",
 }
 
