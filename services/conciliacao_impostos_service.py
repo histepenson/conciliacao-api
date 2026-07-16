@@ -108,11 +108,18 @@ class ConciliacaoImpostosService:
         # ==========================
         tipo_mov_filtro = (request.parametros.tipo_mov or "").strip().upper()
 
+        # Difal Entrada (icmscom) e' imposto a recolher (passivo, conta
+        # credora) apurado sobre notas de Entrada -- diferente dos demais
+        # campos, isso nao depende do Tipo Mov escolhido na tela: e' sempre
+        # Entrada refletindo em Credito.
+        if campo_imposto == "icmscom":
+            tipo_mov_filtro = "ENTRADA"
+
         # Nota de Entrada gera lancamento a debito (ex: imposto a recuperar);
         # nota de Saida gera lancamento a credito (ex: imposto a recolher).
-        # Excecao: Difal Entrada (icmscom) e' imposto a recolher (passivo) --
-        # e' creditado mesmo vindo de nota de Entrada, entao sempre usa a
-        # coluna Credito do razao, independente do Tipo Mov selecionado.
+        # Excecao: Difal Entrada (icmscom), forcado acima para ENTRADA, e'
+        # creditado mesmo vindo de nota de Entrada -- sempre usa a coluna
+        # Credito do razao.
         if campo_imposto == "icmscom":
             coluna_razao = "credito"
         else:
