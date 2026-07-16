@@ -410,7 +410,8 @@
       "Bash(APP_ENV=develop venv/Scripts/python.exe scripts/importar_finr130_legado_excel.py --empresa-id 13 --data-base 20260531 --excel \"C:\\\\Users\\\\histepenson\\\\Desktop\\\\GENIX\\\\finr130.xlsx\")",
       "Bash(APP_ENV=develop venv/Scripts/python.exe scripts/importar_matr900_excel.py --empresa-id 13 --data-base 20260531 --excel \"C:\\\\Users\\\\histepenson\\\\Desktop\\\\GENIX\\\\Qualicaps - MATR900 KARDEX - 05.2026.xlsx\")",
       "Read(//c/conciliacao-app/src/components/Matr900ParamsDialog/**)",
-      "Bash(APP_ENV=develop venv/Scripts/python.exe scripts/importar_ctbr400_de_ctbr480.py --empresa-id 13 --ctbr480-carga-id 245 --data-base 20260531 --conta 113010001 113010002 113010003 113010004 113010005 113010006 113030001 113030002 113030004 113070001)"
+      "Bash(APP_ENV=develop venv/Scripts/python.exe scripts/importar_ctbr400_de_ctbr480.py --empresa-id 13 --ctbr480-carga-id 245 --data-base 20260531 --conta 113010001 113010002 113010003 113010004 113010005 113010006 113030001 113030002 113030004 113070001)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('services/conciliacao_impostos_service.py', encoding='utf-8'\\).read\\(\\)\\)\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
