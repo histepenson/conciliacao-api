@@ -56,9 +56,9 @@ def _carregar_dados_carga(db: Session, carga_id: int) -> list[dict]:
     ]
 
 
-# LP que concentra as notas de Entrada (650) ou Saida (610) -- usado quando
-# tipo_mov e informado, independente da sequencia do LP.
-_LP_CODIGO_POR_TIPO_MOV = {"ENTRADA": "650", "SAIDA": "610"}
+# LPs que concentram as notas de Entrada (650, 641, 640) ou Saida (610) -- usado
+# quando tipo_mov e informado, independente da sequencia do LP.
+_LP_CODIGO_POR_TIPO_MOV = {"ENTRADA": {"650", "641", "640"}, "SAIDA": {"610"}}
 
 
 def conferir(
@@ -96,23 +96,23 @@ def conferir(
         .all()
     )
 
-    # ── Filtro Entrada/Saida: restringe ao LP 650 (entrada) ou 610 (saida), ──
-    # independente da sequencia. Aplicado aqui, antes de qualquer indexacao do
-    # SFT ou processamento de grupo/individual, para que o SFT considerado na
-    # conferencia ja saia restrito aos CFOPs/TES desse LP.
+    # ── Filtro Entrada/Saida: restringe aos LPs 650/641/640 (entrada) ou 610 ──
+    # (saida), independente da sequencia. Aplicado aqui, antes de qualquer
+    # indexacao do SFT ou processamento de grupo/individual, para que o SFT
+    # considerado na conferencia ja saia restrito aos CFOPs/TES desses LPs.
     #
-    # LPs de OUTRO lp_codigo que compartilham "grupo" com o LP filtrado
+    # LPs de OUTRO lp_codigo que compartilham "grupo" com algum LP filtrado
     # tambem precisam ficar: um grupo (ex.: "USO CONSUMO") pode juntar LP 650
-    # (entrada geral) com LP 651 (rateio) -- restringir so' por lp_codigo
-    # exato jogaria fora o 651 mesmo com o agrupamento configurado, fazendo
+    # (entrada geral) com LP 651 (rateio) -- restringir so' pelos lp_codigo
+    # exatos jogaria fora o 651 mesmo com o agrupamento configurado, fazendo
     # notas ja lancadas (so' que via 651) aparecerem como divergentes.
     tipo_mov_norm = (tipo_mov or "").strip().upper()
-    lp_codigo_filtro = _LP_CODIGO_POR_TIPO_MOV.get(tipo_mov_norm)
-    if lp_codigo_filtro:
-        grupos_do_filtro = {lp.grupo for lp in todos_lps if lp.lp_codigo == lp_codigo_filtro and lp.grupo}
+    lp_codigos_filtro = _LP_CODIGO_POR_TIPO_MOV.get(tipo_mov_norm)
+    if lp_codigos_filtro:
+        grupos_do_filtro = {lp.grupo for lp in todos_lps if lp.lp_codigo in lp_codigos_filtro and lp.grupo}
         todos_lps = [
             lp for lp in todos_lps
-            if lp.lp_codigo == lp_codigo_filtro or (lp.grupo and lp.grupo in grupos_do_filtro)
+            if lp.lp_codigo in lp_codigos_filtro or (lp.grupo and lp.grupo in grupos_do_filtro)
         ]
 
     lp_configs: dict[tuple[str, str], LancamentoPadrao] = {
@@ -130,11 +130,11 @@ def conferir(
     sft_data = _carregar_dados_carga(db, carga_id_sft)
 
     # Com o filtro Entrada/Saida ativo, descarta do CT2 qualquer lancamento de
-    # LP fora da lista permitida (lp_codigo_filtro + LPs do mesmo grupo, ja
+    # LP fora da lista permitida (lp_codigos_filtro + LPs do mesmo grupo, ja
     # resolvidos acima em todos_lps) -- sem isso eles cairiam como
     # "sem_mapeamento" (LP sem config carregada) em vez de simplesmente nao
     # entrar na conferencia.
-    if lp_codigo_filtro:
+    if lp_codigos_filtro:
         lp_codigos_permitidos = {lp.lp_codigo for lp in todos_lps}
         ct2_data = [r for r in ct2_data if str(r.get("ct2_lp") or "").strip() in lp_codigos_permitidos]
 

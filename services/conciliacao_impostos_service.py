@@ -110,7 +110,13 @@ class ConciliacaoImpostosService:
 
         # Nota de Entrada gera lancamento a debito (ex: imposto a recuperar);
         # nota de Saida gera lancamento a credito (ex: imposto a recolher).
-        coluna_razao = "credito" if tipo_mov_filtro == "SAIDA" else "debito"
+        # Excecao: Difal Entrada (icmscom) e' imposto a recolher (passivo) --
+        # e' creditado mesmo vindo de nota de Entrada, entao sempre usa a
+        # coluna Credito do razao, independente do Tipo Mov selecionado.
+        if campo_imposto == "icmscom":
+            coluna_razao = "credito"
+        else:
+            coluna_razao = "credito" if tipo_mov_filtro == "SAIDA" else "debito"
         coluna_razao_label = "Credito" if coluna_razao == "credito" else "Debito"
 
         razao_raw = request.base_razao.registros

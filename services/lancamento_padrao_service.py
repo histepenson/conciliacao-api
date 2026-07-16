@@ -40,6 +40,47 @@ def obter(db: Session, lp_id: int, empresa_id: int) -> LancamentoPadrao:
     return lp
 
 
+def criar(db: Session, empresa_id: int, dados: dict) -> LancamentoPadrao:
+    lp_codigo = str(dados.get("lp_codigo") or "").strip()
+    if not lp_codigo:
+        raise HTTPException(422, "lp_codigo e obrigatorio")
+    descricao = str(dados.get("descricao") or "").strip()
+
+    existente = (
+        db.query(LancamentoPadrao)
+        .filter(
+            LancamentoPadrao.empresa_id == empresa_id,
+            LancamentoPadrao.lp_codigo == lp_codigo,
+            LancamentoPadrao.descricao == descricao,
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(400, "Ja existe um lancamento padrao com esse codigo e descricao")
+
+    lp = LancamentoPadrao(
+        empresa_id=empresa_id,
+        lp_codigo=lp_codigo,
+        descricao=descricao,
+        sequencia=str(dados.get("sequencia") or "").strip() or None,
+        grupo=str(dados.get("grupo") or "").strip() or None,
+        cfops=dados.get("cfops") or None,
+        cfops_excluir=dados.get("cfops_excluir") or None,
+        tes_codes=dados.get("tes_codes") or None,
+        tes_codes_excluir=dados.get("tes_codes_excluir") or None,
+        series=dados.get("series") or None,
+        especies=dados.get("especies") or None,
+        especies_excluir=dados.get("especies_excluir") or None,
+        colunas_sft=dados.get("colunas_sft") or None,
+        colunas_valor_sft=dados.get("colunas_valor_sft") or None,
+        ativo=dados.get("ativo", True),
+    )
+    db.add(lp)
+    db.commit()
+    db.refresh(lp)
+    return lp
+
+
 def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> LancamentoPadrao:
     lp = obter(db, lp_id, empresa_id)
     campos = (

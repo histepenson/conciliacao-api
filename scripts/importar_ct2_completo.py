@@ -281,6 +281,7 @@ def main():
     parser.add_argument("--excel", required=True, help="Caminho do arquivo CT2 MM.AAAA.xlsx")
     parser.add_argument("--data-base", required=True, help="YYYYMMDD")
     parser.add_argument("--sft-carga-id", type=int, default=None, help="Carga SFTENT a usar no cruzamento do ct2_key (default: ultima concluida da empresa)")
+    parser.add_argument("--header", type=int, default=2, help="Linha do header no Excel (0-indexed). Default 2 (export com 3 linhas de titulo); usar 0 quando o export ja comeca com o header na 1a linha")
     args = parser.parse_args()
 
     db = SessionLocal()
@@ -288,7 +289,7 @@ def main():
     db.close()
 
     print(f"Lendo {args.excel} ...")
-    df = pd.read_excel(args.excel, header=2)
+    df = pd.read_excel(args.excel, header=args.header)
     df["Cta Debito"] = _limpar_conta(df["Cta Debito"])
     df["Cta Credito"] = _limpar_conta(df["Cta Credito"])
     print(f"Total linhas no export: {len(df)}")
