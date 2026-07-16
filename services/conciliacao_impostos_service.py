@@ -28,6 +28,15 @@ COLUNAS_IMPOSTO_SFT = {
     "difal": "Difal ICMS",
 }
 
+# No papel de Saida, alguns impostos somam um campo complementar do SFT:
+# ICMS soma "Vlr ICMS Com" (icmscom); Difal soma "Vlr FCP Difal" (vfcpdif,
+# FT_VFCPDIF) -- sem isso a Saida do Difal ICMS fica divergente do razao
+# quando a nota tem FCP Difal destacado.
+CAMPOS_EXTRA_SAIDA = {
+    "valicm": "icmscom",
+    "difal": "vfcpdif",
+}
+
 
 def _classificar_tipo_mov(registro: Dict[str, Any]) -> str:
     """
@@ -157,16 +166,19 @@ class ConciliacaoImpostosService:
             sft_raw = [r for r in sft_raw if str(r.get("estado") or "").strip().upper() == "EX"]
             logger.info(f"      SFT filtrado para Apenas Exportacao (Estado Ref EX): {len(sft_raw)} registros")
 
-        def _soma_icmscom(registro: Dict[str, Any]) -> Dict[str, Any]:
+        def _somar_campo_extra_saida(registro: Dict[str, Any]) -> Dict[str, Any]:
+            campo_extra = CAMPOS_EXTRA_SAIDA.get(campo_imposto)
+            if not campo_extra:
+                return registro
             return {
                 **registro,
-                "valicm": round(float(registro.get("valicm") or 0) + float(registro.get("icmscom") or 0), 2),
+                campo_imposto: round(float(registro.get(campo_imposto) or 0) + float(registro.get(campo_extra) or 0), 2),
             }
 
         if tipo_mov_filtro == "ENTRADA":
             # Papel de Entrada: todas as notas de Entrada (incluindo as que
-            # tambem compoem a Saida do ICMS), sempre com Valor ICMS puro,
-            # sem somar Vlr ICMS Com.
+            # tambem compoem a Saida do ICMS), sempre com o valor puro (Valor
+            # ICMS ou Difal ICMS), sem somar o campo complementar.
             sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r) == "ENTRADA"]
             logger.info(f"      SFT filtrado por Tipo Mov=ENTRADA: {len(sft_raw)} registros")
         elif tipo_mov_filtro == "SAIDA":
@@ -178,14 +190,14 @@ class ConciliacaoImpostosService:
                 r for r in sft_raw
                 if _classificar_tipo_mov(r) == "SAIDA" or _eh_entrada_tambem_saida_icms(r, campo_imposto)
             ]
-            if campo_imposto == "valicm":
-                sft_raw = [_soma_icmscom(r) for r in sft_raw]
+            if campo_imposto in CAMPOS_EXTRA_SAIDA:
+                sft_raw = [_somar_campo_extra_saida(r) for r in sft_raw]
             logger.info(f"      SFT filtrado por Tipo Mov=SAIDA: {len(sft_raw)} registros")
-        elif campo_imposto == "valicm":
+        elif campo_imposto in CAMPOS_EXTRA_SAIDA:
             # Sem filtro (Todos): cada nota conta uma unica vez, com a formula
             # do seu proprio papel (Saida soma, Entrada nao soma).
             sft_raw = [
-                _soma_icmscom(r) if _classificar_tipo_mov(r) == "SAIDA" else r
+                _somar_campo_extra_saida(r) if _classificar_tipo_mov(r) == "SAIDA" else r
                 for r in sft_raw
             ]
 
