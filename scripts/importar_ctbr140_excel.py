@@ -66,7 +66,10 @@ def carregar_registros(caminho: str) -> list[dict]:
 
     registros = []
     for _, row in df.iterrows():
-        codigo = str(row[coluna_por_campo["Codigo"]] or "").strip()
+        codigo_raw = row[coluna_por_campo["Codigo"]]
+        if pd.isna(codigo_raw):
+            continue
+        codigo = str(codigo_raw).strip()
         if not codigo:
             continue
         registro = {
@@ -95,7 +98,12 @@ def main():
         tipo_relatorio="CTBR140",
         data_base=args.data_base,
         registros=registros,
-        parametros_extra={"conta_contabil": args.conta, "conta_de": args.conta, "conta_ate": args.conta},
+        parametros_extra={
+            "conta_contabil": args.conta,
+            "conta_de": args.conta,
+            "conta_ate": args.conta,
+            "data_fim": args.data_base,
+        },
     )
     print(resultado)
 

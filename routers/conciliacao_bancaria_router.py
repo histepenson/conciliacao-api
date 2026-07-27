@@ -8,6 +8,7 @@ Endpoints:
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 import logging
 import json
+from typing import Optional
 
 from schemas.conciliacao_bancaria_schema import (
     RequestConciliacaoBancaria,
@@ -107,8 +108,8 @@ def processar_conciliacao_bancaria(request: RequestConciliacaoBancaria, db: Sess
 @router.post("/bancaria/efetivar", response_model=EfetivarConciliacaoResponse, status_code=201)
 async def efetivar_conciliacao_bancaria(
     dados: str = Form(...),
-    arquivo_extrato: UploadFile = File(...),
-    arquivo_razao: UploadFile = File(...),
+    arquivo_extrato: list[UploadFile] = File(default_factory=list),
+    arquivo_razao: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -117,8 +118,12 @@ async def efetivar_conciliacao_bancaria(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="JSON invalido no campo 'dados'")
 
-    extrato_bytes = await arquivo_extrato.read()
-    razao_bytes = await arquivo_razao.read()
+    arquivos_extrato_bytes = [
+        (await arquivo.read(), arquivo.filename or "extrato.xlsx")
+        for arquivo in arquivo_extrato
+        if arquivo.filename
+    ]
+    razao_bytes = await arquivo_razao.read() if arquivo_razao and arquivo_razao.filename else None
 
     service = ConciliacaoBancariaEfetivacaoService()
     conciliacao = service.efetivar(
@@ -128,10 +133,9 @@ async def efetivar_conciliacao_bancaria(
         data_base=dados_json["data_base"],
         resultado=dados_json["resultado"],
         current_user=current_user,
-        arquivo_extrato=extrato_bytes,
+        arquivos_extrato=arquivos_extrato_bytes or None,
         arquivo_razao=razao_bytes,
-        nome_extrato=arquivo_extrato.filename or "extrato.xlsx",
-        nome_razao=arquivo_razao.filename or "razao.xlsx"
+        nome_razao=(arquivo_razao.filename if arquivo_razao else None) or "razao.xlsx"
     )
     return EfetivarConciliacaoResponse(
         id=conciliacao.id,

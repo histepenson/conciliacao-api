@@ -69,9 +69,8 @@ class ConciliacaoBancariaEfetivacaoService:
         data_base: str,
         resultado: Dict[str, Any],
         current_user: CurrentUser,
-        arquivo_extrato: Optional[bytes] = None,
+        arquivos_extrato: Optional[list[tuple[bytes, str]]] = None,
         arquivo_razao: Optional[bytes] = None,
-        nome_extrato: str = "extrato.xlsx",
         nome_razao: str = "razao.xlsx"
     ) -> Conciliacao:
         periodo = self._normalize_periodo(data_base)
@@ -112,9 +111,8 @@ class ConciliacaoBancariaEfetivacaoService:
             mes=mes,
             conta_contabil=conta.conta_contabil,
             resultado=resultado_para_salvar,
-            arquivo_extrato=arquivo_extrato,
+            arquivos_extrato=arquivos_extrato,
             arquivo_razao=arquivo_razao,
-            nome_extrato=nome_extrato,
             nome_razao=nome_razao
         )
 
