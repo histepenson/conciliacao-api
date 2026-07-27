@@ -5,7 +5,7 @@ Define estruturas de entrada e saida para o endpoint de conciliacao bancaria.
 """
 
 from typing import List, Dict, Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # =======================
@@ -13,8 +13,9 @@ from pydantic import BaseModel, Field
 # =======================
 
 class BaseExtratoBancario(BaseModel):
-    """Base financeira - FINR470 (extrato bancario)."""
+    """Base financeira - FINR470 (extrato bancario). Uma conta bancaria fisica."""
     registros: List[Dict[str, Any]]
+    identificacao: Optional[str] = None
 
 
 class BaseRazaoBanco(BaseModel):
@@ -32,9 +33,17 @@ class ParametrosConciliacaoBancaria(BaseModel):
 
 class RequestConciliacaoBancaria(BaseModel):
     """Request para processar conciliacao bancaria."""
-    base_extrato: BaseExtratoBancario
+    base_extrato: List[BaseExtratoBancario]
     base_razao: BaseRazaoBanco
     parametros: ParametrosConciliacaoBancaria
+
+    @field_validator("base_extrato", mode="before")
+    @classmethod
+    def _wrap_single_extrato(cls, v):
+        """Aceita tambem o formato antigo (um unico objeto), envolvendo em lista."""
+        if isinstance(v, dict):
+            return [v]
+        return v
 
 
 class EfetivarConciliacaoBancariaRequest(BaseModel):
@@ -63,6 +72,7 @@ class MovimentoExtrato(BaseModel):
     valor: float  # positivo = entrada, negativo = saida
     tipo: str  # ENTRADA ou SAIDA
     saldo_atual: float = 0.0
+    conta_origem: str = ""  # Identificacao da conta bancaria de origem (quando ha mais de uma)
 
 
 class MovimentoRazao(BaseModel):
@@ -107,6 +117,7 @@ class RegistroSoExtrato(BaseModel):
     descricao: str = ""
     valor: float
     tipo: str  # ENTRADA ou SAIDA
+    conta_origem: str = ""  # Identificacao da conta bancaria de origem (quando ha mais de uma)
 
 
 class RegistroSoRazao(BaseModel):

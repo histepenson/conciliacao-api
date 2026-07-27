@@ -208,30 +208,34 @@ class FileStorageService:
         mes: int,
         conta_contabil: str,
         resultado: Dict[str, Any],
-        arquivo_extrato: bytes = None,
+        arquivos_extrato: Optional[list[tuple[bytes, str]]] = None,
         arquivo_razao: bytes = None,
-        nome_extrato: str = "extrato.xlsx",
         nome_razao: str = "razao.xlsx"
-    ) -> Dict[str, Dict[str, str]]:
+    ) -> Dict[str, Any]:
         """
         Salva arquivos de conciliacao bancaria (originais + resultado JSON).
+
+        `arquivos_extrato` e uma lista de (bytes, nome_original) - uma entrada por
+        conta bancaria fisica processada na conciliacao.
 
         Returns:
             Dicionario com estrutura:
             {
-                "extrato": {"original": "chave"},
+                "extrato": [{"original": "chave"}, ...],
                 "razao": {"original": "chave"},
                 "relatorio": {"json": "chave"}
             }
         """
         caminhos = {"relatorio": {}}
 
-        if arquivo_extrato:
-            caminhos["extrato"] = {}
-            caminhos["extrato"]["original"] = self.save_original_file(
-                arquivo_extrato, empresa_id, ano, mes, conta_contabil,
-                "extrato", nome_extrato, "banco"
-            )
+        if arquivos_extrato:
+            caminhos["extrato"] = []
+            for indice, (conteudo, nome_original) in enumerate(arquivos_extrato, start=1):
+                chave = self.save_original_file(
+                    conteudo, empresa_id, ano, mes, conta_contabil,
+                    f"extrato_{indice}", nome_original, "banco"
+                )
+                caminhos["extrato"].append({"original": chave})
 
         if arquivo_razao:
             caminhos["razao"] = {}

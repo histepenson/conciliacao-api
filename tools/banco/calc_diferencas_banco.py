@@ -169,6 +169,7 @@ def _formatar_extrato(row, tipo: str) -> Dict:
         "valor": round(_sf(valor), 2),
         "tipo": tipo.upper(),
         "data_correspondencia": _ss(row.get("data_correspondencia")),
+        "conta_origem": _ss(row.get("conta_origem")),
     }
 
 
@@ -245,7 +246,8 @@ def _filtrar_formatar_dia(
 
 def calcular_diferencas_bancarias(
     df_extrato: pd.DataFrame,
-    df_razao: pd.DataFrame
+    df_razao: pd.DataFrame,
+    saldo_final_extrato: float | None = None
 ) -> Dict[str, Any]:
     """
     Calcula diferencas entre Extrato Bancario e Razao Contabil AGRUPADO POR DIA.
@@ -253,10 +255,17 @@ def calcular_diferencas_bancarias(
     Parametros:
     -----------
     df_extrato : pd.DataFrame
-        DataFrame normalizado do extrato bancario (FINR470)
+        DataFrame normalizado do extrato bancario (FINR470). Pode ser a
+        combinacao de mais de uma conta bancaria (ver coluna "conta_origem").
 
     df_razao : pd.DataFrame
         DataFrame normalizado do razao contabil (CTBR400)
+
+    saldo_final_extrato : float | None
+        Saldo final ja calculado pelo chamador (soma do saldo final de cada
+        conta bancaria antes de combinar os extratos). Quando informado,
+        substitui o calculo padrao (ultima linha de df_extrato), que so faz
+        sentido quando ha uma unica conta bancaria no dataframe.
 
     Retorna:
     --------
@@ -452,11 +461,12 @@ def calcular_diferencas_bancarias(
     # Mesmo que dias individuais nao batam (timing de lancamentos entre dias),
     # se o saldo final do periodo (ultima linha de cada base) bate, a conciliacao
     # e considerada OK e todos os dias sao marcados como CONCILIADO (verde).
-    saldo_final_extrato = (
-        float(df_ext.iloc[-1]["saldo_atual"])
-        if len(df_ext) > 0 and "saldo_atual" in df_ext.columns
-        else None
-    )
+    if saldo_final_extrato is None:
+        saldo_final_extrato = (
+            float(df_ext.iloc[-1]["saldo_atual"])
+            if len(df_ext) > 0 and "saldo_atual" in df_ext.columns
+            else None
+        )
     saldo_final_razao = (
         float(df_raz.iloc[-1]["saldo_atual"])
         if len(df_raz) > 0 and "saldo_atual" in df_raz.columns

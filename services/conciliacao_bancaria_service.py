@@ -24,7 +24,7 @@ class ConciliacaoBancariaService:
 
     def validar_dados(self, request: RequestConciliacaoBancaria) -> tuple[bool, str]:
         """Valida os dados de entrada."""
-        if not request.base_extrato or not request.base_extrato.registros:
+        if not request.base_extrato or not any(b.registros for b in request.base_extrato):
             return False, "Base do extrato bancario vazia"
 
         if not request.base_razao or not request.base_razao.registros:
@@ -53,19 +53,40 @@ class ConciliacaoBancariaService:
         logger.info("=" * 50)
 
         # ==========================
-        # 1. NORMALIZAR EXTRATO
+        # 1. NORMALIZAR EXTRATO (uma ou mais contas bancarias)
         # ==========================
         logger.info("[1/3] Normalizando extrato bancario (FINR470)")
+        logger.info(f"   Contas bancarias recebidas: {len(request.base_extrato)}")
 
-        df_extrato_raw = pd.DataFrame(request.base_extrato.registros)
-        logger.info(f"   Registros recebidos: {len(df_extrato_raw)}")
+        dfs_extrato = []
+        saldos_finais_contas = []
+        identificacoes_contas = []
 
-        try:
-            df_extrato = normalizar_extrato_bancario(df_extrato_raw)
-            logger.info(f"   Movimentos normalizados: {len(df_extrato)}")
-        except Exception as e:
-            logger.error(f"   ERRO ao normalizar extrato: {str(e)}")
-            raise ValueError(f"Erro ao processar extrato bancario: {str(e)}")
+        for idx, base in enumerate(request.base_extrato):
+            identificacao = base.identificacao or f"Conta {idx + 1}"
+            df_conta_raw = pd.DataFrame(base.registros)
+            logger.info(f"   [{identificacao}] Registros recebidos: {len(df_conta_raw)}")
+
+            try:
+                df_conta = normalizar_extrato_bancario(df_conta_raw)
+                logger.info(f"   [{identificacao}] Movimentos normalizados: {len(df_conta)}")
+            except Exception as e:
+                logger.error(f"   [{identificacao}] ERRO ao normalizar extrato: {str(e)}")
+                raise ValueError(f"Erro ao processar extrato bancario ({identificacao}): {str(e)}")
+
+            # Saldo final desta conta precisa ser capturado ANTES de concatenar,
+            # pois a ultima linha do dataframe combinado nao representa nenhuma
+            # conta especifica.
+            if len(df_conta) > 0 and "saldo_atual" in df_conta.columns:
+                saldos_finais_contas.append(float(df_conta.iloc[-1]["saldo_atual"]))
+
+            df_conta["conta_origem"] = identificacao
+            dfs_extrato.append(df_conta)
+            identificacoes_contas.append(identificacao)
+
+        df_extrato = pd.concat(dfs_extrato, ignore_index=True) if dfs_extrato else pd.DataFrame()
+        saldo_final_extrato = sum(saldos_finais_contas) if saldos_finais_contas else None
+        logger.info(f"   Total de movimentos combinados: {len(df_extrato)}")
 
         # ==========================
         # 2. NORMALIZAR RAZAO
@@ -89,7 +110,8 @@ class ConciliacaoBancariaService:
 
         resultado = calcular_diferencas_bancarias(
             df_extrato=df_extrato,
-            df_razao=df_razao
+            df_razao=df_razao,
+            saldo_final_extrato=saldo_final_extrato
         )
 
         resumo = resultado["resumo"]
@@ -119,6 +141,7 @@ class ConciliacaoBancariaService:
                 f"Data-base: {request.parametros.data_base}",
                 f"Total de {resumo['qtd_dias']} dias analisados",
                 f"Percentual de conciliacao: {resumo['percentual_conciliacao']:.2f}%",
+                f"Contas bancarias processadas ({len(identificacoes_contas)}): {', '.join(identificacoes_contas)}",
             ],
             "alertas": self._gerar_alertas(resumo, qtd_so_extrato, qtd_so_razao),
         }
