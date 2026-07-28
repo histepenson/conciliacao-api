@@ -47,6 +47,7 @@ from .estoque import EstoqueSaldo, EstoqueMovimentacao
 from .protheus_carga import ProtheusCarga, ProtheusCargaConfig, ProtheusCargaRegistro
 from .lancamento_padrao import LancamentoPadrao
 from .balancete import BalanceteConta
+from .empresa_configuracao import EmpresaConfiguracao
 
 # Lista todos os modelos exportados
 __all__ = [
@@ -83,4 +84,6 @@ __all__ = [
     "LancamentoPadrao",
     # Balancete
     "BalanceteConta",
+    # Particularidades por empresa
+    "EmpresaConfiguracao",
 ]

@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from db import get_db
+from middleware.auth import CurrentUser, get_current_user
 from middleware.permission import require_admin
 from schemas.empresa_schema import EmpresaCreate, EmpresaUpdate, EmpresaResponse
+from schemas.empresa_configuracao_schema import EmpresaConfiguracaoOut, EmpresaConfiguracaoSet
 from schemas.user_schema import UsuarioEmpresaOut
 from services.admin_empresa_service import (
     listar_empresas,
@@ -12,6 +14,11 @@ from services.admin_empresa_service import (
     atualizar_empresa,
     desativar_empresa,
     listar_usuarios_da_empresa,
+)
+from services.empresa_configuracao_service import (
+    listar_configuracoes,
+    definir_configuracao,
+    remover_configuracao,
 )
 
 
@@ -70,3 +77,35 @@ def admin_usuarios_da_empresa(
     _admin=Depends(require_admin),
 ):
     return listar_usuarios_da_empresa(db, empresa_id)
+
+
+@router.get("/{empresa_id}/configuracoes", response_model=list[EmpresaConfiguracaoOut])
+def admin_listar_configuracoes(
+    empresa_id: int,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    return listar_configuracoes(db, empresa_id)
+
+
+@router.put("/{empresa_id}/configuracoes/{chave}", response_model=EmpresaConfiguracaoOut)
+def admin_definir_configuracao(
+    empresa_id: int,
+    chave: str,
+    payload: EmpresaConfiguracaoSet,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    return definir_configuracao(db, empresa_id, chave, payload.valor, current_user.user_id)
+
+
+@router.delete("/{empresa_id}/configuracoes/{chave}")
+def admin_remover_configuracao(
+    empresa_id: int,
+    chave: str,
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    return remover_configuracao(db, empresa_id, chave, current_user.user_id)

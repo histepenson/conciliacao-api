@@ -447,7 +447,16 @@
       "Bash(cd /c/conciliacao-app && cat package.json | grep -A 15 '\"scripts\"')",
       "Bash(npm run *)",
       "Bash(cd /c/conciliacao-app && ls -la .eslintrc* eslint.config* 2>/dev/null)",
-      "Read(//c/conciliacao-app/src/styles/**)"
+      "Read(//c/conciliacao-app/src/styles/**)",
+      "Bash(APP_ENV=develop venv/Scripts/python.exe -m alembic revision --autogenerate -m \"add empresa_configuracao\")",
+      "Bash(APP_ENV=develop venv/Scripts/python.exe -m alembic current)",
+      "Read(//c/conciliacao-app/src/pages/admin/**)",
+      "Read(//c/conciliacao-app/src/services/**)",
+      "Bash(venv/Scripts/python.exe -m py_compile models/empresa_configuracao.py models/__init__.py core/particularidades.py services/empresa_configuracao_service.py schemas/empresa_configuracao_schema.py routers/admin_empresas_router.py middleware/empresa_config.py routers/pre_conferencia_router.py)",
+      "Bash(APP_ENV=develop venv/Scripts/python.exe -m uvicorn main:app --port 8123)",
+      "Bash(curl -s http://127.0.0.1:8123/openapi.json -o \"C:\\\\Users\\\\HISTEP~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--conciliacao-api\\\\606271d7-1a63-49b5-bef5-6c96ddb0b23b\\\\scratchpad\\\\openapi.json\")",
+      "Bash(powershell -Command 'Get-CimInstance Win32_Process -Filter \"CommandLine like '\\\\''%uvicorn%8123%'\\\\''\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }')",
+      "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Select-Object Id,StartTime\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -471,7 +480,10 @@
       "c:\\smartconciliacoes_ia\\tools\\fiscal",
       "C:\\conciliacao-app\\src\\components\\ResultadoImpostos",
       "C:\\Users\\histepenson\\Desktop\\RIMAQ\\RIMAVE\\FINANCEIRO\\BANCO",
-      "C:\\conciliacao-app\\src\\styles"
+      "C:\\conciliacao-app\\src\\styles",
+      "C:\\conciliacao-app\\src\\components\\Finr470ParamsDialog",
+      "C:\\conciliacao-app\\src\\constants",
+      "C:\\conciliacao-app\\src\\pages\\admin"
     ]
   }
 }
