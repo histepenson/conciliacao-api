@@ -71,10 +71,20 @@ class BaseContabilGeral(BaseModel):
     ctbr480_params: Optional[Ctbr480Params] = None  # busca automatica via Protheus
 
 
+class BaseCroms051(BaseModel):
+    """
+    Conta Corrente Desconto (CROMS051) - particularidade exclusiva da
+    Rancheiro. Quando presente, o valor abate o saldo financeiro antes do
+    calculo de diferencas (ver services/estrategias/abate_croms051.py).
+    """
+    registros: List[Dict[str, Any]] = Field(default_factory=list)
+
+
 class RequestConciliacao(BaseModel):
     base_origem: BaseOrigem
     base_contabil_filtrada: BaseContabilFiltrada
     base_contabil_geral: BaseContabilGeral
+    base_croms051: Optional[BaseCroms051] = None
     parametros: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 

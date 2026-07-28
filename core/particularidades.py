@@ -16,3 +16,4 @@ from enum import Enum
 
 class ChaveParticularidade(str, Enum):
     TEM_PRE_CONFERENCIA = "tem_pre_conferencia"
+    TEM_CROMS051 = "tem_croms051"

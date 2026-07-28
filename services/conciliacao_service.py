@@ -215,6 +215,22 @@ class ConciliacaoService:
         return self.executar(request)
 
     # ==================================================
+    # PONTO DE EXTENSAO
+    # ==================================================
+    def _aplicar_ajuste_financeiro(
+        self,
+        request: RequestConciliacao,
+        financeiro_norm: pd.DataFrame,
+        df_fin_mes: Optional[pd.DataFrame],
+    ) -> tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+        """
+        Ponto de extensao: por padrao nao faz nada. Empresas com regra de
+        calculo diferente (via particularidade em empresa_configuracao) usam
+        uma subclasse que sobrescreve isso (ver services/estrategias/).
+        """
+        return financeiro_norm, df_fin_mes
+
+    # ==================================================
     # EXECUCAO PRINCIPAL
     # ==================================================
     def executar(self, request: RequestConciliacao) -> dict:
@@ -286,6 +302,8 @@ class ConciliacaoService:
                 len(df_fin_mes),
                 float(df_fin_mes["valor"].sum()) if not df_fin_mes.empty else 0.0,
             )
+
+        financeiro_norm, df_fin_mes = self._aplicar_ajuste_financeiro(request, financeiro_norm, df_fin_mes)
 
         # ==========================
         # 2 NORMALIZAR CONTABILIDADE

@@ -29,6 +29,7 @@ RELATORIOS_SUPORTADOS = {
     "CT2RAZCT5",
     "SN3",
     "SN4",
+    "CROMS051",
 }
 
 STATUS_REUTILIZAVEIS = {"concluido"}

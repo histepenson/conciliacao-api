@@ -7,7 +7,10 @@ from sqlalchemy.orm import Session
 from schemas.conciliacao_schema import RequestConciliacao
 from services.conciliacao_service import ConciliacaoService
 from services.ctbr140_service import Ctbr140Service
+from services.empresa_configuracao_service import obter_valor
+from services.estrategias.rancheiro.abate_croms051 import ConciliacaoServiceRancheiro
 from core.config import settings
+from core.particularidades import ChaveParticularidade
 from core.protheus import ProtheusConfig, resolve_protheus_config
 from db import get_db
 from middleware.permission import Permissions, require_permission
@@ -115,6 +118,10 @@ async def processar_conciliacao(
         )
         protheus_config = resolve_protheus_config(ctx.empresa_id, db) if precisa_protheus else None
 
+        # Particularidade exclusiva (ex: Rancheiro) resolvida enquanto o banco
+        # ainda esta aberto -- decide so' qual classe de service usar abaixo.
+        tem_croms051 = bool(obter_valor(db, ctx.empresa_id, ChaveParticularidade.TEM_CROMS051.value))
+
         # A partir daqui o processamento e' CPU-bound (pandas) e/ou chamadas HTTP ao
         # Protheus, sem mais acesso ao banco -- libera a conexao de volta ao pool
         # em vez de segura-la presa pelos minutos que o processamento pode levar
@@ -132,7 +139,7 @@ async def processar_conciliacao(
             bool(request.base_contabil_geral.ctbr480_params),
         )
 
-        service = ConciliacaoService()
+        service = ConciliacaoServiceRancheiro() if tem_croms051 else ConciliacaoService()
 
         valido, mensagem = service.validar_dados(request)
         if not valido:

@@ -462,7 +462,14 @@
       "Bash(APP_ENV=develop venv/Scripts/python.exe -m uvicorn main:app --port 8124)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8124/openapi.json)",
       "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Select-Object Id\")",
-      "Bash(powershell -Command \"Stop-Process -Id 34148 -Force -ErrorAction SilentlyContinue\")"
+      "Bash(powershell -Command \"Stop-Process -Id 34148 -Force -ErrorAction SilentlyContinue\")",
+      "Bash(venv/Scripts/python.exe -m py_compile core/particularidades.py services/croms051_service.py routers/croms051_router.py main.py services/protheus_carga_service.py workers/protheus_carga_worker.py services/conciliacao_service.py services/estrategias/__init__.py services/estrategias/abate_croms051.py schemas/conciliacao_schema.py routers/conciliacao_router.py)",
+      "Bash(APP_ENV=develop venv/Scripts/python.exe -m uvicorn main:app --port 8125)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8125/openapi.json)",
+      "Bash(curl -s http://127.0.0.1:8125/openapi.json -o \"C:\\\\Users\\\\HISTEP~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--conciliacao-api\\\\606271d7-1a63-49b5-bef5-6c96ddb0b23b\\\\scratchpad\\\\openapi2.json\")",
+      "Bash(powershell -Command \"Stop-Process -Id 31420 -Force -ErrorAction SilentlyContinue\")",
+      "Bash(python -c 'from services.estrategias.croms051_tratativas import aplicar_tratativas_croms051; import json *)",
+      "Bash(python -m py_compile \"services/estrategias/rancheiro/abate_croms051.py\" \"services/estrategias/rancheiro/croms051_tratativas.py\" \"services/croms051_service.py\" \"routers/conciliacao_router.py\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -491,7 +498,8 @@
       "C:\\conciliacao-app\\src\\constants",
       "C:\\conciliacao-app\\src\\pages\\admin",
       "C:\\conciliacao-app\\src\\contexts",
-      "C:\\conciliacao-app\\src\\components\\Layout"
+      "C:\\conciliacao-app\\src\\components\\Layout",
+      "C:\\conciliacao-app\\src\\components\\Croms051ParamsDialog"
     ]
   }
 }
