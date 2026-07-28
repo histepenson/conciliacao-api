@@ -18,10 +18,17 @@ from core.security import (
     verify_reset_token,
 )
 from models import Usuario, UsuarioEmpresa, Empresa, Perfil, PasswordReset, UserSession, AuditLog, AuditAction
+from services.empresa_configuracao_service import listar_configuracoes
 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _get_particularidades_ativas(db: Session, empresa_id: Optional[int]) -> List[str]:
+    if not empresa_id:
+        return []
+    return [c.chave for c in listar_configuracoes(db, empresa_id) if c.valor]
 
 
 def _log_audit(
@@ -263,6 +270,7 @@ def select_empresa(
         )
 
     permissoes = _get_user_permissions_for_empresa(db, user, empresa_id)
+    particularidades = _get_particularidades_ativas(db, empresa_id)
     access_token = create_access_token(user_id=user.id, empresa_id=empresa_id, is_admin=user.is_admin)
 
     _log_audit(db, user.id, empresa_id, AuditAction.EMPRESA_SELECT, "empresa", empresa_id)
@@ -281,6 +289,7 @@ def select_empresa(
             "perfil": perfil_nome,
         },
         "permissoes": permissoes,
+        "particularidades": particularidades,
     }
 
 
@@ -298,6 +307,7 @@ def me(db: Session, user: Usuario, empresa_id: Optional[int]) -> Dict[str, Any]:
                 "perfil": None,
             }
     permissoes = _get_user_permissions_for_empresa(db, user, empresa_id)
+    particularidades = _get_particularidades_ativas(db, empresa_id)
     return {
         "id": user.id,
         "email": user.email,
@@ -309,6 +319,7 @@ def me(db: Session, user: Usuario, empresa_id: Optional[int]) -> Dict[str, Any]:
         "last_login": user.last_login,
         "empresa_atual": empresa_atual,
         "permissoes": permissoes,
+        "particularidades": particularidades,
         "empresas": empresas,
     }
 

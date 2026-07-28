@@ -456,7 +456,13 @@
       "Bash(APP_ENV=develop venv/Scripts/python.exe -m uvicorn main:app --port 8123)",
       "Bash(curl -s http://127.0.0.1:8123/openapi.json -o \"C:\\\\Users\\\\HISTEP~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--conciliacao-api\\\\606271d7-1a63-49b5-bef5-6c96ddb0b23b\\\\scratchpad\\\\openapi.json\")",
       "Bash(powershell -Command 'Get-CimInstance Win32_Process -Filter \"CommandLine like '\\\\''%uvicorn%8123%'\\\\''\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }')",
-      "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Select-Object Id,StartTime\")"
+      "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Select-Object Id,StartTime\")",
+      "Read(//c/conciliacao-app/src/components/Layout/**)",
+      "Bash(venv/Scripts/python.exe -m py_compile services/auth_service.py schemas/auth_schema.py routers/auth_router.py)",
+      "Bash(APP_ENV=develop venv/Scripts/python.exe -m uvicorn main:app --port 8124)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8124/openapi.json)",
+      "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Select-Object Id\")",
+      "Bash(powershell -Command \"Stop-Process -Id 34148 -Force -ErrorAction SilentlyContinue\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -483,7 +489,9 @@
       "C:\\conciliacao-app\\src\\styles",
       "C:\\conciliacao-app\\src\\components\\Finr470ParamsDialog",
       "C:\\conciliacao-app\\src\\constants",
-      "C:\\conciliacao-app\\src\\pages\\admin"
+      "C:\\conciliacao-app\\src\\pages\\admin",
+      "C:\\conciliacao-app\\src\\contexts",
+      "C:\\conciliacao-app\\src\\components\\Layout"
     ]
   }
 }
