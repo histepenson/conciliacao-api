@@ -478,7 +478,9 @@
       "Bash(\"./venv/Scripts/python.exe\" \"C:\\\\Users\\\\HISTEP~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--conciliacao-api\\\\fa2efd08-2b7d-44cc-941c-6690d8e6e568\\\\scratchpad\\\\check_610.py\")",
       "Bash(\"./venv/Scripts/python.exe\" -c \"import ast; ast.parse\\(open\\('services/pre_conferencia_service.py', encoding='utf-8'\\).read\\(\\)\\)\")",
       "Read(//c/conciliacao-app/src/components/TipoFilterDialog/**)",
-      "Bash(cd \"C:\\\\conciliacao-app\" && cat package.json | grep -A5 '\"scripts\"')"
+      "Bash(cd \"C:\\\\conciliacao-app\" && cat package.json | grep -A5 '\"scripts\"')",
+      "Bash(find / -iname \"nginx.conf\" -o -iname \"*.service\" 2>/dev/null | head -20; echo ---; find /c/conciliacao-api -iname \"*.conf\" -o -iname \"Procfile\" -o -iname \"gunicorn*\" 2>/dev/null)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('services/analise_diferencas_service.py', encoding='utf-8'\\).read\\(\\)\\)\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

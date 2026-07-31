@@ -575,7 +575,7 @@ class AnaliseDiferencasService:
             if tipo == "DIVERGENTE_VALOR" and df_razao_geral_norm is not None and col_itemconta_geral:
                 codigo_norm_div = self._normalizar_codigo_numerico(codigo)
                 matches_div = _filtrar_razao_por_codigo_idx(codigo_norm_div)
-                logger.warning("[DIV_VALOR] codigo=%s norm=%s matches=%d", codigo, codigo_norm_div, len(matches_div))
+                logger.debug("[DIV_VALOR] codigo=%s norm=%s matches=%d", codigo, codigo_norm_div, len(matches_div))
                 _div_skipped = 0
                 for _, r in matches_div.iterrows():
                     valor_debito = 0.0
@@ -620,7 +620,7 @@ class AnaliseDiferencasService:
                     )
                     if _tem_match_financeiro(codigo, data_lanc, valor_lancamento):
                         _div_skipped += 1
-                        logger.warning("[DIV_VALOR] SKIP exact match: codigo=%s data=%s valor=%.2f", codigo, data_lanc, valor_lancamento)
+                        logger.debug("[DIV_VALOR] SKIP exact match: codigo=%s data=%s valor=%.2f", codigo, data_lanc, valor_lancamento)
                         continue
                     nome_cliente = codigo_nome_map.get(codigo, "")
                     lancamentos_razao_detalhes.append({
@@ -641,7 +641,7 @@ class AnaliseDiferencasService:
                         "valor_financeiro_match": vlr_fin_div,
                         "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                     })
-                logger.warning("[DIV_VALOR] codigo=%s: %d adicionados, %d skipped (match exato), detalhes=%d", codigo, len(matches_div) - _div_skipped, _div_skipped, len(lancamentos_razao_detalhes))
+                logger.debug("[DIV_VALOR] codigo=%s: %d adicionados, %d skipped (match exato), detalhes=%d", codigo, len(matches_div) - _div_skipped, _div_skipped, len(lancamentos_razao_detalhes))
 
             if (
                 valor_cont > valor_fin
@@ -1701,7 +1701,7 @@ class AnaliseDiferencasService:
             amostra = (
                 df_razao[[col_codigo, "codigo_normalizado"]].head(10).to_dict("records")
             )
-            logger.info("[ANALISE PROFUNDA] Amostra de codigos no razao: %s", amostra)
+            logger.debug("[ANALISE PROFUNDA] Amostra de codigos no razao: %s", amostra)
 
         resultados = []
 
@@ -1710,7 +1710,7 @@ class AnaliseDiferencasService:
             nome = str(registro.get("nome", codigo)).strip()
             valor_cont = float(registro.get("valor_contabilidade", 0))
 
-            logger.info(
+            logger.debug(
                 "[ANALISE PROFUNDA] Analisando codigo %s, valor %.2f",
                 codigo,
                 valor_cont,
@@ -1728,7 +1728,7 @@ class AnaliseDiferencasService:
                 matches_codigo = df_razao[
                     df_razao["codigo_normalizado"] == codigo_normalizado
                 ]
-                logger.info(
+                logger.debug(
                     "[ANALISE PROFUNDA] Registros encontrados por COD CL VAL=%s: %d",
                     codigo_normalizado,
                     len(matches_codigo),
@@ -1739,7 +1739,7 @@ class AnaliseDiferencasService:
                 matches_codigo = df_razao[
                     df_razao["itemconta_normalizado"] == codigo_normalizado
                 ]
-                logger.info(
+                logger.debug(
                     "[ANALISE PROFUNDA] Registros encontrados por ITEMCONTA=%s: %d",
                     codigo_normalizado,
                     len(matches_codigo),
@@ -1748,20 +1748,20 @@ class AnaliseDiferencasService:
             # Prioridade 3: Busca flexivel por variacoes no campo de codigo original
             if matches_codigo.empty and col_codigo:
                 variacoes = self._gerar_variacoes_codigo(codigo)
-                logger.info(
+                logger.debug(
                     "[ANALISE PROFUNDA] Variacoes do codigo %s: %s", codigo, variacoes
                 )
 
                 for var in variacoes:
                     matches_codigo = df_razao[df_razao["codigo_original"] == var]
                     if not matches_codigo.empty:
-                        logger.info(
+                        logger.debug(
                             "[ANALISE PROFUNDA] Match encontrado com variacao '%s'",
                             var,
                         )
                         break
 
-                logger.info(
+                logger.debug(
                     "[ANALISE PROFUNDA] Registros encontrados para %s: %d",
                     codigo,
                     len(matches_codigo),
