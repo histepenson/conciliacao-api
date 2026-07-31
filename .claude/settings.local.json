@@ -474,7 +474,9 @@
       "Bash(venv/Scripts/python.exe -m py_compile services/croms051_service.py services/estrategias/rancheiro/croms051_tratativas.py services/estrategias/rancheiro/abate_croms051.py routers/conciliacao_router.py services/estrategias/__init__.py services/estrategias/rancheiro/__init__.py)",
       "Bash(ls \"C:\\\\conciliacao-app\" 2>&1 | head -50)",
       "Bash(powershell -Command \"Compare-Object \\(Get-Content 'c:\\\\conciliacao-api\\\\protheus\\\\ZFINR130API.prw'\\) \\(Get-Content 'c:\\\\conciliacao-api\\\\protheus\\\\RANCHEIRO\\\\ZFINR130API.prw'\\) | Measure-Object | Select-Object -ExpandProperty Count\")",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('tools/banco/calc_diferencas_banco.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('services/conciliacao_bancaria_service.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('tools/banco/calc_diferencas_banco.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('services/conciliacao_bancaria_service.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(\"./venv/Scripts/python.exe\" \"C:\\\\Users\\\\HISTEP~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--conciliacao-api\\\\fa2efd08-2b7d-44cc-941c-6690d8e6e568\\\\scratchpad\\\\check_610.py\")",
+      "Bash(\"./venv/Scripts/python.exe\" -c \"import ast; ast.parse\\(open\\('services/pre_conferencia_service.py', encoding='utf-8'\\).read\\(\\)\\)\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

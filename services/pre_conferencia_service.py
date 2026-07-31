@@ -192,16 +192,23 @@ def conferir(
         cfops_set, tes_set, cfops_excluir_set=None, tes_excluir_set=None,
         especies_set=None, especies_excluir_set=None, series_set=None,
     ):
+        cfops_aceitos = _limpar_set(cfops_set)
         cfops_rejeitados = _limpar_set(cfops_excluir_set)
         tes_rejeitadas = _limpar_set(tes_excluir_set)
         especies_aceitas = _limpar_set(especies_set)
         especies_rejeitadas = _limpar_set(especies_excluir_set)
         series_aceitas = _limpar_set(series_set)
+        # LP sem CFOP configurado (ex.: servicos/NFS-e, que nao tem CFOP no SFT)
+        # -- sem restricao de CFOP, varre o SFT completo. sft_por_cfop indexa
+        # so' os registros com cfop preenchido, entao os "sem cfop" (ex.:
+        # especie=LOC) ficariam de fora se usassemos so' esse indice aqui.
+        origem = (
+            sft_data if cfops_aceitos is None
+            else [s for cfop, lst in sft_por_cfop.items() if any(c in cfop for c in cfops_aceitos) for s in lst]
+        )
         return [
-            s for cfop, lst in sft_por_cfop.items()
-            if any(c in cfop for c in cfops_set)
-            if cfops_rejeitados is None or not any(c in cfop for c in cfops_rejeitados)
-            for s in lst
+            s for s in origem
+            if cfops_rejeitados is None or not any(c in str(s.get("cfop") or "").strip() for c in cfops_rejeitados)
             if tes_set is None or any(t in str(s.get("tes") or "").strip() for t in tes_set)
             if tes_rejeitadas is None or not any(t in str(s.get("tes") or "").strip() for t in tes_rejeitadas)
             if especies_aceitas is None or any(e in str(s.get("especie") or "").strip() for e in especies_aceitas)
@@ -414,22 +421,25 @@ def conferir(
         especies_excluir_parts: list[str] = []
         series_parts: list[str] = []
         colunas_valor_set: set[str] = set()
-        has_cfops = False
+        has_filtro = False
         for m in members:
             if m.cfops:
-                has_cfops = True
+                has_filtro = True
                 cfops_set.update(str(c).strip() for c in m.cfops)
             if m.tes_codes:
+                has_filtro = True
                 tes_parts.extend(str(t).strip() for t in m.tes_codes)
             if m.cfops_excluir:
                 cfops_excluir_parts.extend(str(c).strip() for c in m.cfops_excluir)
             if m.tes_codes_excluir:
                 tes_excluir_parts.extend(str(t).strip() for t in m.tes_codes_excluir)
             if m.especies:
+                has_filtro = True
                 especies_parts.extend(str(e).strip() for e in m.especies)
             if m.especies_excluir:
                 especies_excluir_parts.extend(str(e).strip() for e in m.especies_excluir)
             if m.series:
+                has_filtro = True
                 series_parts.extend(str(sr).strip() for sr in m.series)
             if m.colunas_valor_sft:
                 colunas_valor_set.update(str(c).strip() for c in m.colunas_valor_sft)
@@ -441,8 +451,9 @@ def conferir(
         series_set = set(series_parts) if series_parts else None
         colunas_valor_grupo = sorted(colunas_valor_set) if colunas_valor_set else None
 
-        if not has_cfops:
-            # LP/grupo sem CFOP configurado -- nao aparece na pre-conferencia
+        if not has_filtro:
+            # Grupo sem nenhum filtro (CFOP/TES/Especie/Serie) configurado --
+            # nao ha' como restringir o SFT, nao aparece na pre-conferencia
             # (so' entra no resumo "sem_mapeamento" via lps_sem_cfop).
             lps_sem_cfop.append(grupo_nome)
             continue
@@ -491,13 +502,14 @@ def conferir(
         if not descricao and config and config.descricao:
             descricao = config.descricao
 
-        if not config or not config.cfops:
-            # LP sem CFOP configurado -- nao aparece na pre-conferencia (so'
+        if not config or not (config.cfops or config.tes_codes or config.especies or config.series):
+            # LP sem nenhum filtro (CFOP/TES/Especie/Serie) configurado -- nao
+            # ha' como restringir o SFT, nao aparece na pre-conferencia (so'
             # entra no resumo "sem_mapeamento" via lps_sem_cfop).
             lps_sem_cfop.append(f"{lp_codigo} {descricao}".strip())
             continue
 
-        cfops_set = {str(c).strip() for c in config.cfops}
+        cfops_set = {str(c).strip() for c in config.cfops} if config.cfops else set()
         tes_set = {str(t).strip() for t in config.tes_codes} if config.tes_codes else None
         cfops_excluir_set = {str(c).strip() for c in config.cfops_excluir} if config.cfops_excluir else None
         tes_excluir_set = {str(t).strip() for t in config.tes_codes_excluir} if config.tes_codes_excluir else None
