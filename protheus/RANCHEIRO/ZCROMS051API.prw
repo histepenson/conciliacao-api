@@ -468,9 +468,7 @@ Begin Sequence
 
 			nTotalReg++
 
-			If nTotalReg > (nOffset + nPageSize)
-				lHasMore := .T.
-			ElseIf nTotalReg > nOffset
+			If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
 
 				oItem := JsonObject():New()
 				oItem["modalidade"]         := AllTrim((cAlias)->MODALIDADE)
@@ -505,10 +503,6 @@ Begin Sequence
 
 		(cAlias)->(DbSkip())
 
-		If lHasMore
-			Exit
-		EndIf
-
 		If !(cAlias)->(Eof()) .And. !((cAlias)->CODCLI $ cUltCli)
 			nSubTot := 0
 			nSeqOri := 0
@@ -518,10 +512,14 @@ Begin Sequence
 
 	(cAlias)->(DbCloseArea())
 
+	// Paginacao real: o loop acima percorre o cursor inteiro (sem sair
+	// antecipadamente), entao nTotalReg reflete o total de linhas filtradas
+	// e nTotalPages/lHasMore podem ser calculados com precisao.
+	nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
+	lHasMore    := (nPage < nTotalPages)
+
 	ConOut(cLogPrefix + "Pagina montada | registros_retornados=" + cValToChar(Len(aLinhas)) + ;
 		" total_processado=" + cValToChar(nTotalReg) + " hasMore=" + IIf(lHasMore, "S", "N"))
-
-	nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
 
 Recover Using oError
 	If Select(cAlias) > 0

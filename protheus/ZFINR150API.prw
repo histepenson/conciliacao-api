@@ -839,17 +839,11 @@ Begin Sequence
 				oItem["prazo"]            := cPrazo
 				oItem["codigo_for"]       := cCodigoFor
 				nTotalReg++
-				If nTotalReg > (nOffset + nPageSize)
-					lHasMore := .T.
-					FreeObj(oItem)
-				ElseIf nTotalReg > nOffset
+				If nTotalReg > nOffset .And. Len(aTitulos) < nPageSize
 					aAdd(aTitulos, oItem)
 				Else
 					FreeObj(oItem)
 				EndIf
-			EndIf
-			If lHasMore
-				Exit
 			EndIf
 			(cAliasFJU)->(DbSkip())
 		EndDo
@@ -875,9 +869,10 @@ Begin Sequence
 		__oTBxCanc := Nil
 	EndIf
 
-	// Paginacao real: nTotalReg representa os registros validos processados
-	// ate preencher a pagina solicitada e detectar se existe proxima pagina.
-	nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
+	// Paginacao real: o loop percorre o cursor inteiro (sem sair
+	// antecipadamente), entao nTotalReg reflete o total de titulos filtrados.
+	nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
+	lHasMore    := (nPage < nTotalPages)
 
 Recover Using oError
 	If Select(cAlias) > 0

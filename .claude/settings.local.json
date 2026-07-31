@@ -471,7 +471,9 @@
       "Bash(python -c 'from services.estrategias.croms051_tratativas import aplicar_tratativas_croms051; import json *)",
       "Bash(python -m py_compile \"services/estrategias/rancheiro/abate_croms051.py\" \"services/estrategias/rancheiro/croms051_tratativas.py\" \"services/croms051_service.py\" \"routers/conciliacao_router.py\")",
       "Bash(ls \"C:/conciliacao-app\" 2>&1 | head -50)",
-      "Bash(venv/Scripts/python.exe -m py_compile services/croms051_service.py services/estrategias/rancheiro/croms051_tratativas.py services/estrategias/rancheiro/abate_croms051.py routers/conciliacao_router.py services/estrategias/__init__.py services/estrategias/rancheiro/__init__.py)"
+      "Bash(venv/Scripts/python.exe -m py_compile services/croms051_service.py services/estrategias/rancheiro/croms051_tratativas.py services/estrategias/rancheiro/abate_croms051.py routers/conciliacao_router.py services/estrategias/__init__.py services/estrategias/rancheiro/__init__.py)",
+      "Bash(ls \"C:\\\\conciliacao-app\" 2>&1 | head -50)",
+      "Bash(powershell -Command \"Compare-Object \\(Get-Content 'c:\\\\conciliacao-api\\\\protheus\\\\ZFINR130API.prw'\\) \\(Get-Content 'c:\\\\conciliacao-api\\\\protheus\\\\RANCHEIRO\\\\ZFINR130API.prw'\\) | Measure-Object | Select-Object -ExpandProperty Count\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

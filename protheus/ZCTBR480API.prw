@@ -365,11 +365,7 @@ Begin Sequence
 		oLinha["normal_cta"]           := cNormalConta
 		oLinha["modo"]                 := "analitico"
 		nTotalReg++
-		If nTotalReg > (nOffset + nPageSize)
-			lHasMore := .T.
-			FreeObj(oLinha)
-			Exit
-		ElseIf nTotalReg > nOffset
+		If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
 			aAdd(aLinhas, oLinha)
 		Else
 			FreeObj(oLinha)
@@ -399,7 +395,10 @@ End Sequence
 
 CtbRazClean()
 
-nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
+// Paginacao real: o loop percorre o cursor inteiro (sem sair
+// antecipadamente), entao nTotalReg reflete o total de linhas filtradas.
+nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
+lHasMore    := (nPage < nTotalPages)
 
 oParams["data_ini"]         := DtoS(dDataIni)
 oParams["data_fim"]         := DtoS(dDataFim)
