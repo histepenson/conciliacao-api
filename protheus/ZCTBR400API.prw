@@ -73,7 +73,6 @@ wsmethod GET getRazao WSRESTFUL ZCTBR400API
 Local aArea         := GetArea()
 Local oResp         := JsonObject():New()
 Local oParams       := JsonObject():New()
-Local aAllLinhas    := {}
 Local aLinhas       := {}
 Local oLinha        := Nil
 Local oError        := Nil
@@ -378,7 +377,7 @@ Recover Using oError
 	Self:SetResponse(CTB400ApiMontaErro("INTERNAL_ERROR", "Erro interno ao consultar razao contabil", oError:Description))
 	FreeObj(oResp)
 	FreeObj(oParams)
-	AEval(aAllLinhas, {|oObj| FreeObj(oObj)})
+	AEval(aLinhas, {|oObj| FreeObj(oObj)})
 	RestArea(aArea)
 Return .T.
 End Sequence
@@ -423,6 +422,7 @@ Self:SetResponse(oResp:ToJson())
 
 FreeObj(oResp)
 FreeObj(oParams)
+AEval(aLinhas, {|oObj| FreeObj(oObj)})
 RestArea(aArea)
 
 Return .T.

@@ -30,7 +30,6 @@ wsmethod GET getKardex WSRESTFUL ZMATR900API
 Local aArea := GetArea()
 Local oResp := JsonObject():New()
 Local oParams := JsonObject():New()
-Local aAllLinhas := {}
 Local aLinhas := {}
 Local oLinha := Nil
 Local cAliasTop := GetNextAlias()
@@ -348,14 +347,14 @@ Recover Using oError
         " | ClassName=" + oError:ClassName + ;
         " | SubCode=" + cValToChar(oError:SubCode))
     Self:SetResponse(MTR900ApiErro("INTERNAL_ERROR", "Erro interno ao consultar Kardex", oError:Description))
-    AEval(aAllLinhas, {|o| FreeObj(o)})
+    AEval(aLinhas, {|o| FreeObj(o)})
     FreeObj(oResp)
     FreeObj(oParams)
     RestArea(aArea)
 Return .T.
 End Sequence
 
-AEval(aAllLinhas, {|o| FreeObj(o)})
+AEval(aLinhas, {|o| FreeObj(o)})
 FreeObj(oResp)
 FreeObj(oParams)
 RestArea(aArea)

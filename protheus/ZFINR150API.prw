@@ -128,7 +128,6 @@ Local aArea          := GetArea()
 Local oResp          := JsonObject():New()
 Local oParams        := JsonObject():New()
 Local aTitulos       := {}
-Local aAllTitulos    := {}
 Local oItem          := Nil
 Local oError         := Nil
 Local cSql           := ""
@@ -903,7 +902,7 @@ Recover Using oError
 		"Erro interno ao consultar titulos a pagar", oError:Description)
 	FreeObj(oResp)
 	FreeObj(oParams)
-	AEval(aAllTitulos, {|o| FreeObj(o)})
+	AEval(aTitulos, {|o| FreeObj(o)})
 	RestArea(aArea)
 Return .T.
 End Sequence
@@ -929,6 +928,8 @@ oResp["titulos"]         := aTitulos
 
 Self:SetResponse(oResp:ToJson())
 FreeObj(oResp)
+FreeObj(oParams)
+AEval(aTitulos, {|o| FreeObj(o)})
 
 If Select("SE2") > 0 .And. lAbriuSE2
 	SE2->(DbCloseArea())

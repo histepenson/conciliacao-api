@@ -84,7 +84,6 @@ wsmethod GET getRazao WSRESTFUL ZCTBR480API
 Local aArea         := GetArea()
 Local oResp         := JsonObject():New()
 Local oParams       := JsonObject():New()
-Local aAllLinhas    := {}
 Local aLinhas       := {}
 Local oLinha        := Nil
 Local oError        := Nil
@@ -388,7 +387,7 @@ Begin Sequence
 		"Erro interno ao consultar razao contabil", oError:Description))
 	FreeObj(oResp)
 	FreeObj(oParams)
-	AEval(aAllLinhas, {|o| FreeObj(o)})
+	AEval(aLinhas, {|o| FreeObj(o)})
 	RestArea(aArea)
 Return .T.
 End Sequence
@@ -442,6 +441,7 @@ EndIf
 Self:SetResponse(oResp:ToJson())
 FreeObj(oResp)
 FreeObj(oParams)
+AEval(aLinhas, {|o| FreeObj(o)})
 RestArea(aArea)
 
 Return .T.

@@ -382,9 +382,24 @@ def calcular_diferencas_bancarias(
 
         if dif_ent <= THRESHOLD_CONCILIACAO and dif_sai <= THRESHOLD_CONCILIACAO:
             return "CONCILIADO"
+
+        # Diferenca de entradas igual (em modulo) a diferenca de saidas: indica
+        # lancamento classificado como entrada/saida trocado entre extrato e
+        # razao (o valor "sobra" de um lado e "falta" do outro na mesma
+        # proporcao), o que se anula no total do dia. Nao considerar divergente.
+        if dif_ent > THRESHOLD_CONCILIACAO and abs(dif_ent - dif_sai) <= THRESHOLD_CONCILIACAO:
+            return "CONCILIADO"
+
         return "DIVERGENTE"
 
+    def _conciliado_por_compensacao(row):
+        dif_ent = abs(row["dif_entradas"])
+        dif_sai = abs(row["dif_saidas"])
+        ja_conciliado = dif_ent <= THRESHOLD_CONCILIACAO and dif_sai <= THRESHOLD_CONCILIACAO
+        return (not ja_conciliado) and dif_ent > THRESHOLD_CONCILIACAO and abs(dif_ent - dif_sai) <= THRESHOLD_CONCILIACAO
+
     df_merge["status"] = df_merge.apply(classificar_dia, axis=1)
+    df_merge["conciliado_por_compensacao"] = df_merge.apply(_conciliado_por_compensacao, axis=1)
 
     # Ordenar por data
     df_merge = df_merge.sort_values("data")
@@ -411,6 +426,7 @@ def calcular_diferencas_bancarias(
         dif_entradas = row["dif_entradas"]
         dif_saidas = row["dif_saidas"]
         status_dia = row["status"]
+        conciliado_por_compensacao = bool(row["conciliado_por_compensacao"])
 
         so_ext_ent = _filtrar_formatar_dia(entradas_ext, data_dia, False, "entrada", _formatar_extrato)
         conc_ext_ent = _filtrar_formatar_dia(entradas_ext, data_dia, True, "entrada", _formatar_extrato)
@@ -437,6 +453,7 @@ def calcular_diferencas_bancarias(
             "dif_entradas": round(dif_entradas, 2),
             "dif_saidas": round(dif_saidas, 2),
             "status": status_dia,
+            "conciliado_por_compensacao": conciliado_por_compensacao,
             # Registros NAO conciliados (pendentes) - vermelho
             "so_extrato_entradas": so_ext_ent,
             "so_extrato_saidas": so_ext_sai,
@@ -504,6 +521,9 @@ def calcular_diferencas_bancarias(
     qtd_dias = len(df_merge)
     qtd_conciliados = len(dias_conciliados)
     qtd_divergentes = len(dias_divergentes)
+    qtd_conciliados_por_compensacao = sum(
+        1 for dia in movimentos_por_dia if dia.get("conciliado_por_compensacao")
+    )
 
     percentual_conciliacao = (qtd_conciliados / qtd_dias * 100) if qtd_dias > 0 else 0
     situacao = "CONCILIADO" if qtd_divergentes == 0 else "DIVERGENTE"
@@ -519,6 +539,7 @@ def calcular_diferencas_bancarias(
         "qtd_dias": qtd_dias,
         "qtd_conciliados": qtd_conciliados,
         "qtd_divergentes": qtd_divergentes,
+        "qtd_conciliados_por_compensacao": qtd_conciliados_por_compensacao,
         "percentual_conciliacao": round(percentual_conciliacao, 2),
         "saldo_final_extrato": round(saldo_final_extrato, 2) if saldo_final_extrato is not None else None,
         "saldo_final_razao": round(saldo_final_razao, 2) if saldo_final_razao is not None else None,

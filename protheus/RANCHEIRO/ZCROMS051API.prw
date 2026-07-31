@@ -555,6 +555,8 @@ oResp["linhas"]          := aLinhas
 
 Self:SetResponse(oResp:ToJson())
 FreeObj(oResp)
+FreeObj(oParams)
+AEval(aLinhas, {|o| FreeObj(o)})
 
 RestArea(aArea)
 

@@ -126,7 +126,6 @@ Local aArea          := GetArea()
 Local oResp          := JsonObject():New()
 Local oParams        := JsonObject():New()
 Local aTitulos       := {}
-Local aAllTitulos    := {}
 Local oItem          := Nil
 Local oError         := Nil
 Local cSql           := ""
@@ -1161,7 +1160,7 @@ Recover Using oError
         "Erro interno ao consultar titulos a receber", oError:Description)
     FreeObj(oResp)
     FreeObj(oParams)
-    AEval(aAllTitulos, {|o| FreeObj(o)})
+    AEval(aTitulos, {|o| FreeObj(o)})
     RestArea(aArea)
 Return .T.
 End Sequence
@@ -1187,6 +1186,8 @@ oResp["titulos"]         := aTitulos
 
 Self:SetResponse( oResp:ToJson() )
 FreeObj(oResp)
+FreeObj(oParams)
+AEval(aTitulos, {|o| FreeObj(o)})
 
 // Destroi cache do SaldoTit() — identico ao original FINR130 linha 86/146
 If Select("SE1") > 0 .And. lAbriuSE1
