@@ -664,18 +664,11 @@ Begin Sequence
 			oItem["codigo_cli"]     := cCodigoCli
 
 			nTotalReg++
-			If nTotalReg > (nOffset + nPageSize)
-				lHasMore := .T.
-				FreeObj(oItem)
-			ElseIf nTotalReg > nOffset
+			If nTotalReg > nOffset .And. Len(aTitulos) < nPageSize
 				aAdd(aTitulos, oItem)
 			Else
 				FreeObj(oItem)
 			EndIf
-		EndIf
-
-		If lHasMore
-			Exit
 		EndIf
 
 		(cAlias)->(DbSkip())
@@ -887,18 +880,11 @@ EndIf
 				oItem["codigo_cli"]     := cCodigoCli
 
 				nTotalReg++
-				If nTotalReg > (nOffset + nPageSize)
-					lHasMore := .T.
-					FreeObj(oItem)
-				ElseIf nTotalReg > nOffset
+				If nTotalReg > nOffset .And. Len(aTitulos) < nPageSize
 					aAdd(aTitulos, oItem)
 				Else
 					FreeObj(oItem)
 				EndIf
-			EndIf
-
-			If lHasMore
-				Exit
 			EndIf
 
 			(cAliasAbat)->(DbSkip())

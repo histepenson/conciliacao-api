@@ -633,18 +633,11 @@ Begin Sequence
 			oItem["codigo_for"]       := cCodigoFor
 
 			nTotalReg++
-			If nTotalReg > (nOffset + nPageSize)
-				lHasMore := .T.
-				FreeObj(oItem)
-			ElseIf nTotalReg > nOffset
+			If nTotalReg > nOffset .And. Len(aTitulos) < nPageSize
 				aAdd(aTitulos, oItem)
 			Else
 				FreeObj(oItem)
 			EndIf
-		EndIf
-
-		If lHasMore
-			Exit
 		EndIf
 
 		(cAlias)->(DbSkip())
