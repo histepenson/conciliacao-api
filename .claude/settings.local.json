@@ -480,7 +480,11 @@
       "Read(//c/conciliacao-app/src/components/TipoFilterDialog/**)",
       "Bash(cd \"C:\\\\conciliacao-app\" && cat package.json | grep -A5 '\"scripts\"')",
       "Bash(find / -iname \"nginx.conf\" -o -iname \"*.service\" 2>/dev/null | head -20; echo ---; find /c/conciliacao-api -iname \"*.conf\" -o -iname \"Procfile\" -o -iname \"gunicorn*\" 2>/dev/null)",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('services/analise_diferencas_service.py', encoding='utf-8'\\).read\\(\\)\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('services/analise_diferencas_service.py', encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(python -c \"import pandas; print\\(pandas.__version__\\)\")",
+      "Bash(./venv/Scripts/python.exe -c \"import fastapi, pydantic; print\\('ok'\\)\")",
+      "Bash(./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/repro_croms051.py\")",
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/repro_croms051.py\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -511,7 +515,8 @@
       "C:\\conciliacao-app\\src\\contexts",
       "C:\\conciliacao-app\\src\\components\\Layout",
       "C:\\conciliacao-app\\src\\components\\Croms051ParamsDialog",
-      "C:\\conciliacao-app\\src\\utils"
+      "C:\\conciliacao-app\\src\\utils",
+      "C:\\conciliacao-app\\src\\components\\TipoFilterDialog"
     ]
   }
 }
