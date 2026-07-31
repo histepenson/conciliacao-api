@@ -19,8 +19,14 @@ from tools.financeiro.base import formatar_codigo
 
 def _calcular_abatimento_por_codigo(registros: list[dict]) -> dict[str, float]:
     """
-    Agrupa as linhas do CROMS051 (ja tratadas por aplicar_tratativas_croms051)
-    por codigo de cliente (C+base+loja) e soma o saldo (valor - valor_associacao).
+    Agrupa as linhas do CROMS051 por codigo de cliente (C+base+loja) e soma o
+    saldo (valor - valor_associacao).
+
+    Aceita tanto linhas brutas ja tratadas por aplicar_tratativas_croms051
+    (com "valor"/"valor_associacao") quanto linhas ja agregadas por cliente
+    via agrupar_croms051_por_cliente (com "saldo" direto) -- usado quando a
+    carga tem centenas de milhares de linhas e o resumo por cliente e' buscado
+    pronto do backend em vez de recalculado a partir do bruto.
 
     Nas linhas tratadas (DESC PAGO = SIM ou origem SOPAG), valor e
     valor_associacao ja foram igualados, entao o saldo fica zerado e nao
@@ -35,9 +41,12 @@ def _calcular_abatimento_por_codigo(registros: list[dict]) -> dict[str, float]:
         if not base:
             continue
         codigo = formatar_codigo(base, loja, prefixo="C")
-        valor = float(linha.get("valor") or 0)
-        valor_associacao = float(linha.get("valor_associacao") or 0)
-        saldo = valor - valor_associacao
+        if "saldo" in linha:
+            saldo = float(linha.get("saldo") or 0)
+        else:
+            valor = float(linha.get("valor") or 0)
+            valor_associacao = float(linha.get("valor_associacao") or 0)
+            saldo = valor - valor_associacao
         abatimento[codigo] = abatimento.get(codigo, 0.0) + saldo
     return abatimento
 

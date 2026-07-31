@@ -17,6 +17,46 @@ montado pelo Protheus):
 from typing import Any
 
 
+def agrupar_croms051_por_cliente(registros_tratados: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Agrega os registros do CROMS051 (ja tratados por aplicar_tratativas_croms051)
+    por cliente/loja, somando o saldo (valor - valor_associacao) de cada linha e
+    descartando as demais ~20 colunas do relatorio bruto (modalidade, vendedor,
+    historico, acordo, etc.).
+
+    Usado para reduzir a carga (centenas de milhares de linhas de transacao) a
+    um resumo por cliente (poucos milhares de linhas) antes de sair do backend
+    -- so' o saldo liquido por cliente importa para o abatimento em
+    abate_croms051.py::_calcular_abatimento_por_codigo.
+    """
+    agregados: dict[tuple[str, str], dict[str, Any]] = {}
+
+    for linha in registros_tratados:
+        base = str(linha.get("codigo_cliente", "")).strip()
+        loja = str(linha.get("loja", "")).strip()
+        if not base:
+            continue
+        chave = (base, loja)
+        item = agregados.get(chave)
+        if item is None:
+            item = {
+                "codigo_cliente": base,
+                "loja": loja,
+                "cliente": str(linha.get("cliente", "")).strip(),
+                "saldo": 0.0,
+            }
+            agregados[chave] = item
+        valor = float(linha.get("valor") or 0)
+        valor_associacao = float(linha.get("valor_associacao") or 0)
+        item["saldo"] += valor - valor_associacao
+
+    resultado = list(agregados.values())
+    for item in resultado:
+        item["saldo"] = round(item["saldo"], 2)
+
+    return resultado
+
+
 def aplicar_tratativas_croms051(registros: list[dict[str, Any]]) -> list[dict[str, Any]]:
     resultado: list[dict[str, Any]] = []
 

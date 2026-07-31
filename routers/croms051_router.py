@@ -5,7 +5,13 @@ import logging
 from sqlalchemy.orm import Session
 
 from db import get_db
+from models.protheus_carga import ProtheusCargaRegistro
 from services.croms051_service import Croms051Service
+from services import protheus_carga_service
+from services.estrategias.rancheiro.croms051_tratativas import (
+    agrupar_croms051_por_cliente,
+    aplicar_tratativas_croms051,
+)
 from core.protheus import resolve_protheus_config
 from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
 
@@ -58,3 +64,56 @@ async def get_conta_corrente_desconto(
     except Exception as exc:
         logger.exception("Erro ao consultar ZCROMS051API")
         raise HTTPException(status_code=502, detail=f"Erro ao consultar Protheus: {exc}")
+
+
+@router.get(
+    "/carga/{carga_id}/resumo",
+    summary="Resumo do CROMS051 agregado por cliente, a partir de uma carga concluida",
+    description=(
+        "Le os registros brutos (uma linha por transacao, ja com as tratativas de "
+        "negocio aplicadas) de uma carga CROMS051 concluida, agrupa por cliente/loja "
+        "somando valor e valor_associacao, e retorna somente esse resumo. "
+        "Evita que o frontend precise baixar e reenviar centenas de milhares de "
+        "linhas -- o abatimento por codigo depende apenas do total agregado por cliente."
+    ),
+)
+def get_resumo_carga_croms051(
+    carga_id: int,
+    empresa_id: Optional[int] = Query(None, description="ID da empresa"),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    resolved_id = resolve_empresa_id(context, empresa_id)
+    carga = protheus_carga_service.obter_carga(db, resolved_id, carga_id)
+
+    if carga.tipo_relatorio.upper() != "CROMS051":
+        raise HTTPException(status_code=400, detail="Carga informada nao e do tipo CROMS051")
+    if carga.status != "concluido":
+        raise HTTPException(status_code=409, detail=f"Carga ainda nao concluida (status={carga.status})")
+
+    registros_raw = (
+        db.query(ProtheusCargaRegistro)
+        .filter(ProtheusCargaRegistro.carga_id == carga.id)
+        .order_by(ProtheusCargaRegistro.sequencia)
+        .all()
+    )
+    dados = [r.dados_json for r in registros_raw]
+
+    # Os dados gravados na carga ja passaram por aplicar_tratativas_croms051
+    # (ver Croms051Service.buscar_pagina/buscar_extrato), mas reaplicar aqui e'
+    # idempotente e barato -- protege contra cargas antigas gravadas antes
+    # dessa etapa existir.
+    tratados = aplicar_tratativas_croms051(dados)
+    agregados = agrupar_croms051_por_cliente(tratados)
+
+    logger.info(
+        "CROMS051 resumo -> carga_id=%s bruto=%s agregado_por_cliente=%s",
+        carga.id, len(dados), len(agregados),
+    )
+
+    return {
+        "carga_id": carga.id,
+        "total_bruto": len(dados),
+        "total_codigos": len(agregados),
+        "registros": agregados,
+    }

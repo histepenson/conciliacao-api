@@ -76,7 +76,15 @@ class BaseCroms051(BaseModel):
     Conta Corrente Desconto (CROMS051) - particularidade exclusiva da
     Rancheiro. Quando presente, o valor abate o saldo financeiro antes do
     calculo de diferencas (ver services/estrategias/abate_croms051.py).
+
+    Duas formas de fornecer os dados:
+    - carga_id: referencia a uma carga CROMS051 ja concluida (protheus_carga) --
+      o backend le e agrega os registros direto do banco, sem o frontend
+      precisar baixar/reenviar centenas de milhares de linhas.
+    - registros: lista ja pronta (bruta ou agregada por cliente), para uso
+      manual/legado.
     """
+    carga_id: Optional[int] = None
     registros: List[Dict[str, Any]] = Field(default_factory=list)
 
 

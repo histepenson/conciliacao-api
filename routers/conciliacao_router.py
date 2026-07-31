@@ -4,11 +4,17 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from models.protheus_carga import ProtheusCargaRegistro
 from schemas.conciliacao_schema import RequestConciliacao
 from services.conciliacao_service import ConciliacaoService
 from services.ctbr140_service import Ctbr140Service
 from services.empresa_configuracao_service import obter_valor
+from services import protheus_carga_service
 from services.estrategias.rancheiro.abate_croms051 import ConciliacaoServiceRancheiro
+from services.estrategias.rancheiro.croms051_tratativas import (
+    agrupar_croms051_por_cliente,
+    aplicar_tratativas_croms051,
+)
 from core.config import settings
 from core.particularidades import ChaveParticularidade
 from core.protheus import ProtheusConfig, resolve_protheus_config
@@ -60,6 +66,52 @@ async def _resolver_base_contabil(
         update={"registros": registros}
     )
     return request.model_copy(update={"base_contabil_filtrada": base_filtrada})
+
+
+def _resolver_base_croms051(
+    request: RequestConciliacao, empresa_id: int, db: Session
+) -> RequestConciliacao:
+    """
+    Se base_croms051.carga_id estiver preenchido, le os registros da carga
+    CROMS051 ja concluida direto do banco (protheus_carga_registro), aplica
+    as tratativas de negocio e agrega por cliente -- substitui
+    base_croms051.registros. Evita que o frontend precise baixar e reenviar
+    centenas de milhares de linhas (o CROMS051 pode passar de 300 mil).
+    Precisa rodar enquanto o `db` desta requisicao ainda esta aberto.
+    """
+    base = request.base_croms051
+    if not base or not base.carga_id:
+        return request
+
+    carga = protheus_carga_service.obter_carga(db, empresa_id, base.carga_id)
+    if carga.tipo_relatorio.upper() != "CROMS051":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="base_croms051.carga_id nao referencia uma carga do tipo CROMS051",
+        )
+    if carga.status != "concluido":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Carga CROMS051 informada ainda nao esta concluida (status={carga.status})",
+        )
+
+    registros_raw = (
+        db.query(ProtheusCargaRegistro)
+        .filter(ProtheusCargaRegistro.carga_id == carga.id)
+        .order_by(ProtheusCargaRegistro.sequencia)
+        .all()
+    )
+    dados = [r.dados_json for r in registros_raw]
+    tratados = aplicar_tratativas_croms051(dados)
+    agregados = agrupar_croms051_por_cliente(tratados)
+
+    logger.info(
+        " CROMS051 resolvido via carga_id=%s: %s registros brutos -> %s codigos agregados",
+        carga.id, len(dados), len(agregados),
+    )
+
+    base_resolvida = base.model_copy(update={"registros": agregados})
+    return request.model_copy(update={"base_croms051": base_resolvida})
 
 
 @router.post("/contabil")
@@ -121,6 +173,11 @@ async def processar_conciliacao(
         # Particularidade exclusiva (ex: Rancheiro) resolvida enquanto o banco
         # ainda esta aberto -- decide so' qual classe de service usar abaixo.
         tem_croms051 = bool(obter_valor(db, ctx.empresa_id, ChaveParticularidade.TEM_CROMS051.value))
+
+        # Resolve base_croms051 via carga_id (le do banco) -- precisa acontecer
+        # com o `db` ainda aberto, antes de libera-lo abaixo.
+        if tem_croms051:
+            request = _resolver_base_croms051(request, ctx.empresa_id, db)
 
         # A partir daqui o processamento e' CPU-bound (pandas) e/ou chamadas HTTP ao
         # Protheus, sem mais acesso ao banco -- libera a conexao de volta ao pool

@@ -484,7 +484,18 @@
       "Bash(python -c \"import pandas; print\\(pandas.__version__\\)\")",
       "Bash(./venv/Scripts/python.exe -c \"import fastapi, pydantic; print\\('ok'\\)\")",
       "Bash(./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/repro_croms051.py\")",
-      "Bash(APP_ENV=develop ./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/repro_croms051.py\")"
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/repro_croms051.py\")",
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/valida_agregacao_croms051.py\")",
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe -c ' *)",
+      "Bash(rm \"C:/conciliacao-app/src/services/croms051Service.js\")",
+      "Bash(node --check src/hooks/useCargaProtheus.js)",
+      "Bash(node --check src/pages/Conciliacoes.jsx)",
+      "Bash(./node_modules/.bin/esbuild.cmd --loader=jsx src/pages/Conciliacoes.jsx --bundle --outfile=/dev/null --format=esm)",
+      "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacoes.jsx --bundle --outfile=/tmp/out.js --format=esm)",
+      "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacaoconta.jsx --bundle --outfile=/tmp/out3.js --format=esm)",
+      "Bash(ls \"C:/conciliacao-app/src/pages/\" | grep -i conciliacaoconta)",
+      "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacaoconta.jsx --loader:.css=empty --bundle --outfile=/tmp/out4.js --format=esm)",
+      "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacaoconta.jsx --outfile=/tmp/out5.js)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
