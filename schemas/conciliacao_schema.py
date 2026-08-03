@@ -166,6 +166,8 @@ class AnaliseDiferencaDetalhada(BaseModel):
     lancamentos_financeiro_detalhes: List[OrigemLancamento] = []
     sem_lancamentos_razao: bool = False
     nota_razao: str = ""
+    # Exclusivo Rancheiro (CROMS051) -- 0.0 para empresas sem essa particularidade.
+    valor_abatido_croms051: float = 0.0
 
 
 class ResumoAnaliseDetalhada(BaseModel):

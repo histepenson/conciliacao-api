@@ -84,6 +84,7 @@ class AnaliseDiferencasService:
         df_razao_geral: Optional[pd.DataFrame] = None,
         data_base: Optional[str] = None,
         saldo_ant_map: Optional[Dict[str, float]] = None,
+        abatimento_croms051: Optional[Dict[str, float]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Consolida valores por codigo e gera uma analise detalhada financeira.
@@ -1072,6 +1073,10 @@ class AnaliseDiferencasService:
                     "registros_match_contabilidade": registros_match_contabilidade,
                     "sem_lancamentos_razao": sem_lancamentos_razao,
                     "nota_razao": nota_razao,
+                    # Exclusivo Rancheiro (CROMS051) -- valor de desconto ja abatido
+                    # do financeiro deste codigo antes do calculo de diferencas.
+                    # Fica 0.0 para qualquer empresa que nao usa essa particularidade.
+                    "valor_abatido_croms051": round(abatimento_croms051.get(codigo, 0.0), 2) if abatimento_croms051 else 0.0,
                 }
             )
 

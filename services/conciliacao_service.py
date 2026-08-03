@@ -222,13 +222,16 @@ class ConciliacaoService:
         request: RequestConciliacao,
         financeiro_norm: pd.DataFrame,
         df_fin_mes: Optional[pd.DataFrame],
-    ) -> tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+    ) -> tuple[pd.DataFrame, Optional[pd.DataFrame], dict]:
         """
         Ponto de extensao: por padrao nao faz nada. Empresas com regra de
         calculo diferente (via particularidade em empresa_configuracao) usam
         uma subclasse que sobrescreve isso (ver services/estrategias/).
+
+        O terceiro item do retorno e' um dict {codigo: valor_abatido},
+        exposto na analise detalhada (0.0/vazio para empresas sem ajuste).
         """
-        return financeiro_norm, df_fin_mes
+        return financeiro_norm, df_fin_mes, {}
 
     # ==================================================
     # EXECUCAO PRINCIPAL
@@ -303,7 +306,7 @@ class ConciliacaoService:
                 float(df_fin_mes["valor"].sum()) if not df_fin_mes.empty else 0.0,
             )
 
-        financeiro_norm, df_fin_mes = self._aplicar_ajuste_financeiro(request, financeiro_norm, df_fin_mes)
+        financeiro_norm, df_fin_mes, abatimento_croms051 = self._aplicar_ajuste_financeiro(request, financeiro_norm, df_fin_mes)
 
         # ==========================
         # 2 NORMALIZAR CONTABILIDADE
@@ -454,6 +457,7 @@ class ConciliacaoService:
                 conta_contabil=conta_contabil,
                 data_base=request.parametros.get("data_base"),
                 saldo_ant_map=saldo_ant_map if saldo_ant_map else None,
+                abatimento_croms051=abatimento_croms051 if abatimento_croms051 else None,
             )
 
             logger.info("[TEMPO] Etapa 7 (analise detalhada): %.3fs -> %d codigos", time.perf_counter() - _t0, len(analise_detalhada))

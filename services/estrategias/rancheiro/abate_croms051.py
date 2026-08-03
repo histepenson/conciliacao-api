@@ -67,13 +67,13 @@ class ConciliacaoServiceRancheiro(ConciliacaoService):
         request: RequestConciliacao,
         financeiro_norm: pd.DataFrame,
         df_fin_mes: Optional[pd.DataFrame],
-    ) -> tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+    ) -> tuple[pd.DataFrame, Optional[pd.DataFrame], dict]:
         if not request.base_croms051 or not request.base_croms051.registros:
-            return financeiro_norm, df_fin_mes
+            return financeiro_norm, df_fin_mes, {}
 
         abatimento = _calcular_abatimento_por_codigo(request.base_croms051.registros)
         financeiro_norm = _aplicar_abatimento(financeiro_norm, abatimento)
         if df_fin_mes is not None and not df_fin_mes.empty:
             df_fin_mes = _aplicar_abatimento(df_fin_mes, abatimento)
 
-        return financeiro_norm, df_fin_mes
+        return financeiro_norm, df_fin_mes, abatimento

@@ -495,7 +495,10 @@
       "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacaoconta.jsx --bundle --outfile=/tmp/out3.js --format=esm)",
       "Bash(ls \"C:/conciliacao-app/src/pages/\" | grep -i conciliacaoconta)",
       "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacaoconta.jsx --loader:.css=empty --bundle --outfile=/tmp/out4.js --format=esm)",
-      "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacaoconta.jsx --outfile=/tmp/out5.js)"
+      "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacaoconta.jsx --outfile=/tmp/out5.js)",
+      "Read(//c/conciliacao-app/src/components/DetailedAnalysisTable/**)",
+      "Read(//c/conciliacao-app/src/components/ResultDisplay/**)",
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/valida_valor_abatido.py\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -527,7 +530,9 @@
       "C:\\conciliacao-app\\src\\components\\Layout",
       "C:\\conciliacao-app\\src\\components\\Croms051ParamsDialog",
       "C:\\conciliacao-app\\src\\utils",
-      "C:\\conciliacao-app\\src\\components\\TipoFilterDialog"
+      "C:\\conciliacao-app\\src\\components\\TipoFilterDialog",
+      "C:\\conciliacao-app\\src\\components\\ResultDisplay",
+      "C:\\conciliacao-app\\src\\components\\DetailedAnalysisTable"
     ]
   }
 }
