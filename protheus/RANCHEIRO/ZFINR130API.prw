@@ -126,7 +126,6 @@ Local aArea          := GetArea()
 Local oResp          := JsonObject():New()
 Local oParams        := JsonObject():New()
 Local aTitulos       := {}
-Local aAllTitulos    := {}
 Local oItem          := Nil
 Local oError         := Nil
 Local cSql           := ""
@@ -665,18 +664,11 @@ Begin Sequence
 			oItem["codigo_cli"]     := cCodigoCli
 
 			nTotalReg++
-			If nTotalReg > (nOffset + nPageSize)
-				lHasMore := .T.
-				FreeObj(oItem)
-			ElseIf nTotalReg > nOffset
+			If nTotalReg > nOffset .And. Len(aTitulos) < nPageSize
 				aAdd(aTitulos, oItem)
 			Else
 				FreeObj(oItem)
 			EndIf
-		EndIf
-
-		If lHasMore
-			Exit
 		EndIf
 
 		(cAlias)->(DbSkip())
@@ -888,18 +880,11 @@ EndIf
 				oItem["codigo_cli"]     := cCodigoCli
 
 				nTotalReg++
-				If nTotalReg > (nOffset + nPageSize)
-					lHasMore := .T.
-					FreeObj(oItem)
-				ElseIf nTotalReg > nOffset
+				If nTotalReg > nOffset .And. Len(aTitulos) < nPageSize
 					aAdd(aTitulos, oItem)
 				Else
 					FreeObj(oItem)
 				EndIf
-			EndIf
-
-			If lHasMore
-				Exit
 			EndIf
 
 			(cAliasAbat)->(DbSkip())
@@ -1098,18 +1083,11 @@ EndIf
 				oItem["codigo_cli"]     := cCodigoCli
 
 				nTotalReg++
-				If nTotalReg > (nOffset + nPageSize)
-					lHasMore := .T.
-					FreeObj(oItem)
-				ElseIf nTotalReg > nOffset
+				If nTotalReg > nOffset .And. Len(aTitulos) < nPageSize
 					aAdd(aTitulos, oItem)
 				Else
 					FreeObj(oItem)
 				EndIf
-			EndIf
-
-			If lHasMore
-				Exit
 			EndIf
 
 			(cAliasFJU)->(DbSkip())
@@ -1137,9 +1115,10 @@ EndIf
 		__oTBxCanc := Nil
 	EndIf
 
-    // Paginacao real: nTotalReg representa os registros validos processados
-    // ate preencher a pagina solicitada e detectar se existe proxima pagina.
-    nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
+    // Paginacao real: o loop percorre o cursor inteiro (sem sair
+    // antecipadamente), entao nTotalReg reflete o total de titulos filtrados.
+    nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
+    lHasMore    := (nPage < nTotalPages)
 
 Recover Using oError
     If Select(cAlias) > 0
@@ -1167,7 +1146,7 @@ Recover Using oError
         "Erro interno ao consultar titulos a receber", oError:Description)
     FreeObj(oResp)
     FreeObj(oParams)
-    AEval(aAllTitulos, {|o| FreeObj(o)})
+    AEval(aTitulos, {|o| FreeObj(o)})
     RestArea(aArea)
 Return .T.
 End Sequence
@@ -1193,6 +1172,8 @@ oResp["titulos"]         := aTitulos
 
 Self:SetResponse( oResp:ToJson() )
 FreeObj(oResp)
+FreeObj(oParams)
+AEval(aTitulos, {|o| FreeObj(o)})
 
 // Destroi cache do SaldoTit() — identico ao original FINR130 linha 86/146
 If Select("SE1") > 0 .And. lAbriuSE1

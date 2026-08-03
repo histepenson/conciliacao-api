@@ -107,6 +107,7 @@ class SelectEmpresaResponse(BaseModel):
     expires_in: int
     empresa: "EmpresaInfo"
     permissoes: List[str]
+    particularidades: List[str] = []
 
 
 # ============================================================
@@ -136,6 +137,7 @@ class UserMe(BaseModel):
     last_login: Optional[datetime]
     empresa_atual: Optional["EmpresaInfo"]
     permissoes: List[str]
+    particularidades: List[str] = []
     empresas: List["EmpresaInfo"]
 
     class Config:

@@ -163,6 +163,13 @@ class ConciliacaoBancariaService:
             )
             return alertas
 
+        if resumo.get("qtd_conciliados_por_compensacao"):
+            alertas.append(
+                f"{resumo['qtd_conciliados_por_compensacao']} dia(s) com diferenca de entrada "
+                "igual a diferenca de saida (provavel lancamento classificado como entrada/saida "
+                "trocado) - consideradas OK por se anularem no total do dia"
+            )
+
         if resumo["qtd_divergentes"] > 0:
             alertas.append(
                 f"ATENCAO: {resumo['qtd_divergentes']} dia(s) com divergencia"

@@ -26,6 +26,7 @@ from routers.finr470_router import router as finr470_router
 from routers.ctbr400_router import router as ctbr400_router
 from routers.matr900_router import router as matr900_router
 from routers.finr150_router import router as finr150_router
+from routers.croms051_router import router as croms051_router
 from routers.protheus_carga_router import router as protheus_carga_router
 from routers.produto_router import router as produto_router
 from routers.produto_fornecedor_router import router as produto_fornecedor_router
@@ -129,6 +130,7 @@ app.include_router(finr470_router, prefix="/api")
 app.include_router(ctbr400_router, prefix="/api")
 app.include_router(matr900_router, prefix="/api")
 app.include_router(finr150_router, prefix="/api")
+app.include_router(croms051_router, prefix="/api")
 app.include_router(protheus_carga_router, prefix="/api")
 app.include_router(produto_router, prefix="/api")
 app.include_router(produto_fornecedor_router, prefix="/api")

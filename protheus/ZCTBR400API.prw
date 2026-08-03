@@ -73,7 +73,6 @@ wsmethod GET getRazao WSRESTFUL ZCTBR400API
 Local aArea         := GetArea()
 Local oResp         := JsonObject():New()
 Local oParams       := JsonObject():New()
-Local aAllLinhas    := {}
 Local aLinhas       := {}
 Local oLinha        := Nil
 Local oError        := Nil
@@ -324,11 +323,7 @@ Begin Sequence
 				oLinha := JsonObject():New()
 				CTB400ApiPreencheLinha(oLinha, cArqTmp, cContaAnt, cDescConta, cNormalCta, nSaldoAtu, nTipoRel)
 				nTotalReg++
-				If nTotalReg > (nOffset + nPageSize)
-					lHasMore := .T.
-					FreeObj(oLinha)
-					Exit
-				ElseIf nTotalReg > nOffset
+				If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
 					AAdd(aLinhas, oLinha)
 				Else
 					FreeObj(oLinha)
@@ -360,20 +355,13 @@ Begin Sequence
 				oLinha["normal_cta"]         := cNormalCta
 				oLinha["ct2_key"]            := ""
 				nTotalReg++
-				If nTotalReg > (nOffset + nPageSize)
-					lHasMore := .T.
-					FreeObj(oLinha)
-					Exit
-				ElseIf nTotalReg > nOffset
+				If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
 					AAdd(aLinhas, oLinha)
 				Else
 					FreeObj(oLinha)
 				EndIf
 			EndIf
 		EndDo
-		If lHasMore
-			Exit
-		EndIf
 	EndDo
 
 	If !Empty(cArqTmp) .And. Select(cArqTmp) > 0
@@ -389,15 +377,18 @@ Recover Using oError
 	Self:SetResponse(CTB400ApiMontaErro("INTERNAL_ERROR", "Erro interno ao consultar razao contabil", oError:Description))
 	FreeObj(oResp)
 	FreeObj(oParams)
-	AEval(aAllLinhas, {|oObj| FreeObj(oObj)})
+	AEval(aLinhas, {|oObj| FreeObj(oObj)})
 	RestArea(aArea)
 Return .T.
 End Sequence
+// Paginacao real: os loops acima percorrem o cursor inteiro (sem sair
+// antecipadamente), entao nTotalReg reflete o total de linhas filtradas.
+nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
+lHasMore    := (nPage < nTotalPages)
+
 ConOut("[ZCTBR400] fim montagem linhas | linhas_pagina=" + cValToChar(Len(aLinhas)) + ;
 	" total_processado=" + cValToChar(nTotalReg) + ;
 	" hasMore=" + IIf(lHasMore, "S", "N"))
-
-nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
 
 oParams["data_ini"]     := DtoS(dDataIni)
 oParams["data_fim"]     := DtoS(dDataFim)
@@ -431,6 +422,7 @@ Self:SetResponse(oResp:ToJson())
 
 FreeObj(oResp)
 FreeObj(oParams)
+AEval(aLinhas, {|oObj| FreeObj(oObj)})
 RestArea(aArea)
 
 Return .T.

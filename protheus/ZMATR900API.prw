@@ -30,7 +30,6 @@ wsmethod GET getKardex WSRESTFUL ZMATR900API
 Local aArea := GetArea()
 Local oResp := JsonObject():New()
 Local oParams := JsonObject():New()
-Local aAllLinhas := {}
 Local aLinhas := {}
 Local oLinha := Nil
 Local cAliasTop := GetNextAlias()
@@ -291,11 +290,7 @@ Begin Sequence
         oLinha := MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim)
         nTotalReg++
 
-        If nTotalReg > (nOffset + nPageSize)
-            lHasMore := .T.
-            FreeObj(oLinha)
-            Exit
-        ElseIf nTotalReg > nOffset
+        If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
             AAdd(aLinhas, oLinha)
         Else
             FreeObj(oLinha)
@@ -304,7 +299,10 @@ Begin Sequence
         (cAliasTop)->(DbSkip())
     EndDo
 
-    nTotalPages := IIf(lHasMore, nPage + 1, Max(1, nPage))
+    // Paginacao real: o loop percorre o cursor inteiro (sem sair
+    // antecipadamente), entao nTotalReg reflete o total de linhas filtradas.
+    nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
+    lHasMore    := (nPage < nTotalPages)
 
     // LOG: registros retornados nesta pagina
     ConOut(cLogPrefix + "Pagina montada | registros_retornados=" + cValToChar(Len(aLinhas)) + ;
@@ -349,14 +347,14 @@ Recover Using oError
         " | ClassName=" + oError:ClassName + ;
         " | SubCode=" + cValToChar(oError:SubCode))
     Self:SetResponse(MTR900ApiErro("INTERNAL_ERROR", "Erro interno ao consultar Kardex", oError:Description))
-    AEval(aAllLinhas, {|o| FreeObj(o)})
+    AEval(aLinhas, {|o| FreeObj(o)})
     FreeObj(oResp)
     FreeObj(oParams)
     RestArea(aArea)
 Return .T.
 End Sequence
 
-AEval(aAllLinhas, {|o| FreeObj(o)})
+AEval(aLinhas, {|o| FreeObj(o)})
 FreeObj(oResp)
 FreeObj(oParams)
 RestArea(aArea)

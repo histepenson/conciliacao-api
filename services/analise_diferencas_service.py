@@ -84,6 +84,7 @@ class AnaliseDiferencasService:
         df_razao_geral: Optional[pd.DataFrame] = None,
         data_base: Optional[str] = None,
         saldo_ant_map: Optional[Dict[str, float]] = None,
+        abatimento_croms051: Optional[Dict[str, float]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Consolida valores por codigo e gera uma analise detalhada financeira.
@@ -93,6 +94,11 @@ class AnaliseDiferencasService:
         df_fin = df_financeiro[["codigo", "cliente", "valor"]].copy()
         df_cont = df_contabilidade_filtrada[["codigo", "cliente", "valor"]].copy()
         df_razao = df_razao_contabil.copy()
+
+        # Indice O(1) por codigo para df_cont -- evita reescanear o
+        # dataframe inteiro a cada codigo dentro do loop principal.
+        df_cont["_codigo_stripped"] = df_cont["codigo"].astype(str).str.strip()
+        _grupos_cont = df_cont.groupby("_codigo_stripped", sort=False).groups
 
         fin_agg = df_fin.groupby("codigo", as_index=False).agg(
             nome_fin=("cliente", "first"),
@@ -304,10 +310,20 @@ class AnaliseDiferencasService:
         financeiro_match_map: Dict[tuple[str, str], List[float]] = {}
         # valor_fin_periodo_map: soma do financeiro apenas no periodo, por codigo (para status verde/vermelho)
         valor_fin_periodo_map: Dict[str, float] = {}
+        # Indices O(1) por codigo para df_financeiro_detalhado -- evitam
+        # reescanear o dataframe inteiro a cada codigo dentro do loop principal.
+        # Duas variantes porque o codigo historicamente era comparado ora raw
+        # ora com strip() em pontos diferentes desta funcao.
+        _grupos_fin_raw: Dict[str, Any] = {}
+        _grupos_fin_stripped: Dict[str, Any] = {}
+        df_fin_match = pd.DataFrame()
         if df_financeiro_detalhado is not None and not df_financeiro_detalhado.empty:
             if "codigo" in df_financeiro_detalhado.columns:
                 df_fin_match = df_financeiro_detalhado.copy()
-                df_fin_match["codigo"] = df_fin_match["codigo"].astype(str).str.strip()
+                df_fin_match["_codigo_raw_str"] = df_fin_match["codigo"].astype(str)
+                df_fin_match["codigo"] = df_fin_match["_codigo_raw_str"].str.strip()
+                _grupos_fin_raw = df_fin_match.groupby("_codigo_raw_str", sort=False).groups
+                _grupos_fin_stripped = df_fin_match.groupby("codigo", sort=False).groups
                 if "data_emissao" in df_fin_match.columns:
                     df_fin_match["data_match"] = df_fin_match["data_emissao"].apply(
                         self._formatar_data
@@ -575,7 +591,7 @@ class AnaliseDiferencasService:
             if tipo == "DIVERGENTE_VALOR" and df_razao_geral_norm is not None and col_itemconta_geral:
                 codigo_norm_div = self._normalizar_codigo_numerico(codigo)
                 matches_div = _filtrar_razao_por_codigo_idx(codigo_norm_div)
-                logger.warning("[DIV_VALOR] codigo=%s norm=%s matches=%d", codigo, codigo_norm_div, len(matches_div))
+                logger.debug("[DIV_VALOR] codigo=%s norm=%s matches=%d", codigo, codigo_norm_div, len(matches_div))
                 _div_skipped = 0
                 for _, r in matches_div.iterrows():
                     valor_debito = 0.0
@@ -620,7 +636,7 @@ class AnaliseDiferencasService:
                     )
                     if _tem_match_financeiro(codigo, data_lanc, valor_lancamento):
                         _div_skipped += 1
-                        logger.warning("[DIV_VALOR] SKIP exact match: codigo=%s data=%s valor=%.2f", codigo, data_lanc, valor_lancamento)
+                        logger.debug("[DIV_VALOR] SKIP exact match: codigo=%s data=%s valor=%.2f", codigo, data_lanc, valor_lancamento)
                         continue
                     nome_cliente = codigo_nome_map.get(codigo, "")
                     lancamentos_razao_detalhes.append({
@@ -641,7 +657,7 @@ class AnaliseDiferencasService:
                         "valor_financeiro_match": vlr_fin_div,
                         "dentro_periodo": self._dentro_periodo(data_lanc, periodo),
                     })
-                logger.warning("[DIV_VALOR] codigo=%s: %d adicionados, %d skipped (match exato), detalhes=%d", codigo, len(matches_div) - _div_skipped, _div_skipped, len(lancamentos_razao_detalhes))
+                logger.debug("[DIV_VALOR] codigo=%s: %d adicionados, %d skipped (match exato), detalhes=%d", codigo, len(matches_div) - _div_skipped, _div_skipped, len(lancamentos_razao_detalhes))
 
             if (
                 valor_cont > valor_fin
@@ -739,9 +755,10 @@ class AnaliseDiferencasService:
 
             if tipo == "SO_FINANCEIRO" and df_financeiro_detalhado is not None and not df_financeiro_detalhado.empty:
                 if "codigo" in df_financeiro_detalhado.columns:
-                    matches_fin = df_financeiro_detalhado[
-                        df_financeiro_detalhado["codigo"].astype(str) == codigo
-                    ]
+                    _idx_fin = _grupos_fin_raw.get(codigo)
+                    matches_fin = (
+                        df_fin_match.loc[_idx_fin] if _idx_fin is not None else df_fin_match.iloc[0:0]
+                    )
                 else:
                     matches_fin = pd.DataFrame()
 
@@ -913,9 +930,10 @@ class AnaliseDiferencasService:
             # Financeiro detalhado
             if df_financeiro_detalhado is not None and not df_financeiro_detalhado.empty:
                 if "codigo" in df_financeiro_detalhado.columns:
-                    matches_fin_det = df_financeiro_detalhado[
-                        df_financeiro_detalhado["codigo"].astype(str).str.strip() == codigo
-                    ]
+                    _idx_fin_det = _grupos_fin_stripped.get(codigo)
+                    matches_fin_det = (
+                        df_fin_match.loc[_idx_fin_det] if _idx_fin_det is not None else df_fin_match.iloc[0:0]
+                    )
 
                     # Para DIVERGENTE_VALOR: construir pool de valores do razao para matching individual.
                     # Cada registro financeiro sera comparado ao razao por valor para identificar
@@ -1010,7 +1028,8 @@ class AnaliseDiferencasService:
                         registros_match_financeiro.append(entry)
 
             # Contabilidade
-            matches_cont_det = df_cont[df_cont["codigo"].astype(str).str.strip() == codigo]
+            _idx_cont = _grupos_cont.get(codigo)
+            matches_cont_det = df_cont.loc[_idx_cont] if _idx_cont is not None else df_cont.iloc[0:0]
             for _, r in matches_cont_det.iterrows():
                 registros_match_contabilidade.append({
                     "descricao": str(r.get("cliente", "")).strip(),
@@ -1054,6 +1073,10 @@ class AnaliseDiferencasService:
                     "registros_match_contabilidade": registros_match_contabilidade,
                     "sem_lancamentos_razao": sem_lancamentos_razao,
                     "nota_razao": nota_razao,
+                    # Exclusivo Rancheiro (CROMS051) -- valor de desconto ja abatido
+                    # do financeiro deste codigo antes do calculo de diferencas.
+                    # Fica 0.0 para qualquer empresa que nao usa essa particularidade.
+                    "valor_abatido_croms051": round(abatimento_croms051.get(codigo, 0.0), 2) if abatimento_croms051 else 0.0,
                 }
             )
 
@@ -1701,7 +1724,21 @@ class AnaliseDiferencasService:
             amostra = (
                 df_razao[[col_codigo, "codigo_normalizado"]].head(10).to_dict("records")
             )
-            logger.info("[ANALISE PROFUNDA] Amostra de codigos no razao: %s", amostra)
+            logger.debug("[ANALISE PROFUNDA] Amostra de codigos no razao: %s", amostra)
+
+        # Indices construidos uma unica vez (O(linhas)) em vez de escanear o
+        # razao inteiro para cada codigo SO_CONTABILIDADE (O(codigos x linhas),
+        # que com dezenas de milhares de codigos levava minutos). Os lookups
+        # abaixo viram O(1) medio por prioridade de match.
+        idx_por_codigo = (
+            df_razao.groupby("codigo_normalizado", sort=False).groups if col_codigo else {}
+        )
+        idx_por_itemconta = (
+            df_razao.groupby("itemconta_normalizado", sort=False).groups if col_conta else {}
+        )
+        idx_por_codigo_original = (
+            df_razao.groupby("codigo_original", sort=False).groups if col_codigo else {}
+        )
 
         resultados = []
 
@@ -1710,7 +1747,7 @@ class AnaliseDiferencasService:
             nome = str(registro.get("nome", codigo)).strip()
             valor_cont = float(registro.get("valor_contabilidade", 0))
 
-            logger.info(
+            logger.debug(
                 "[ANALISE PROFUNDA] Analisando codigo %s, valor %.2f",
                 codigo,
                 valor_cont,
@@ -1724,11 +1761,11 @@ class AnaliseDiferencasService:
             # Buscar TODOS os lancamentos no razao geral para ITEMCONTA = CODIGO
             # Prioridade 1: COD CL VAL (novo formato CTBR480, "codigo_normalizado")
             matches_codigo = pd.DataFrame()
-            if col_codigo and "codigo_normalizado" in df_razao.columns:
-                matches_codigo = df_razao[
-                    df_razao["codigo_normalizado"] == codigo_normalizado
-                ]
-                logger.info(
+            if col_codigo:
+                linhas = idx_por_codigo.get(codigo_normalizado)
+                if linhas is not None and len(linhas) > 0:
+                    matches_codigo = df_razao.loc[linhas]
+                logger.debug(
                     "[ANALISE PROFUNDA] Registros encontrados por COD CL VAL=%s: %d",
                     codigo_normalizado,
                     len(matches_codigo),
@@ -1736,10 +1773,10 @@ class AnaliseDiferencasService:
 
             # Prioridade 2: ITEM CONTA (formato antigo CTBR480, "itemconta_normalizado")
             if matches_codigo.empty and col_conta:
-                matches_codigo = df_razao[
-                    df_razao["itemconta_normalizado"] == codigo_normalizado
-                ]
-                logger.info(
+                linhas = idx_por_itemconta.get(codigo_normalizado)
+                if linhas is not None and len(linhas) > 0:
+                    matches_codigo = df_razao.loc[linhas]
+                logger.debug(
                     "[ANALISE PROFUNDA] Registros encontrados por ITEMCONTA=%s: %d",
                     codigo_normalizado,
                     len(matches_codigo),
@@ -1748,20 +1785,21 @@ class AnaliseDiferencasService:
             # Prioridade 3: Busca flexivel por variacoes no campo de codigo original
             if matches_codigo.empty and col_codigo:
                 variacoes = self._gerar_variacoes_codigo(codigo)
-                logger.info(
+                logger.debug(
                     "[ANALISE PROFUNDA] Variacoes do codigo %s: %s", codigo, variacoes
                 )
 
                 for var in variacoes:
-                    matches_codigo = df_razao[df_razao["codigo_original"] == var]
-                    if not matches_codigo.empty:
-                        logger.info(
+                    linhas = idx_por_codigo_original.get(var)
+                    if linhas is not None and len(linhas) > 0:
+                        matches_codigo = df_razao.loc[linhas]
+                        logger.debug(
                             "[ANALISE PROFUNDA] Match encontrado com variacao '%s'",
                             var,
                         )
                         break
 
-                logger.info(
+                logger.debug(
                     "[ANALISE PROFUNDA] Registros encontrados para %s: %d",
                     codigo,
                     len(matches_codigo),

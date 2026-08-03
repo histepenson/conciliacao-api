@@ -28,12 +28,11 @@ COLUNAS_IMPOSTO_SFT = {
     "difal": "Difal ICMS",
 }
 
-# No papel de Saida, alguns impostos somam um campo complementar do SFT:
-# ICMS soma "Vlr ICMS Com" (icmscom); Difal soma "Vlr FCP Difal" (vfcpdif,
-# FT_VFCPDIF) -- sem isso a Saida do Difal ICMS fica divergente do razao
-# quando a nota tem FCP Difal destacado.
+# No papel de Saida, Difal soma um campo complementar do SFT: "Vlr FCP
+# Difal" (vfcpdif, FT_VFCPDIF) -- sem isso a Saida do Difal ICMS fica
+# divergente do razao quando a nota tem FCP Difal destacado. Valor ICMS
+# (valicm) NAO soma nada -- Entrada e Saida usam sempre o FT_VALICM puro.
 CAMPOS_EXTRA_SAIDA = {
-    "valicm": "icmscom",
     "difal": "vfcpdif",
 }
 
@@ -42,9 +41,7 @@ def _classificar_tipo_mov(registro: Dict[str, Any]) -> str:
     """
     Classifica um registro do SFT como "ENTRADA" ou "SAIDA" pela natureza
     fiscal da nota (campo "tipomov" - FT_TIPOMOV do Protheus - se preenchido,
-    senao 1o digito do CFOP: 1/2/3 = Entrada, 5/6/7 = Saida). Essa
-    classificacao nunca muda -- veja _eh_entrada_tambem_saida_icms para o
-    caso especial do ICMS.
+    senao 1o digito do CFOP: 1/2/3 = Entrada, 5/6/7 = Saida).
     """
     valor = str(registro.get("tipomov") or registro.get("tipo_mov") or "").strip().upper()
     if valor in ("ENTRADA", "E", "1"):
@@ -58,21 +55,6 @@ def _classificar_tipo_mov(registro: Dict[str, Any]) -> str:
     if cfop[:1] in ("5", "6", "7"):
         return "SAIDA"
     return ""
-
-
-def _eh_entrada_tambem_saida_icms(registro: Dict[str, Any], campo_imposto: str) -> bool:
-    """
-    Para ICMS: uma nota de Entrada com "Estado Ref" == "EX" (operacao com o
-    exterior) ou com "Vlr ICMS Com" (icmscom) > 0 continua sendo Entrada
-    (nao sai dessa lista), mas TAMBEM compoe o lado da Saida -- nesse papel
-    de Saida, soma "Valor ICMS" + "Vlr ICMS Com"; no papel de Entrada usa so
-    o "Valor ICMS" (sem somar).
-    """
-    if campo_imposto != "valicm" or _classificar_tipo_mov(registro) != "ENTRADA":
-        return False
-    estado = str(registro.get("estado") or "").strip().upper()
-    icmscom = float(registro.get("icmscom") or 0)
-    return estado == "EX" or icmscom > 0
 
 
 class ConciliacaoImpostosService:
@@ -157,8 +139,7 @@ class ConciliacaoImpostosService:
         considerar_exportacao = (request.parametros.considerar_exportacao or "").strip().upper()
         if considerar_exportacao == "NAO":
             # Remove do calculo as notas com Estado Ref "EX" (movimento de
-            # exportacao) -- inclusive do papel duplo Entrada/Saida do ICMS,
-            # ja que elas deixam de existir para esta conciliacao.
+            # exportacao).
             sft_raw = [r for r in sft_raw if str(r.get("estado") or "").strip().upper() != "EX"]
             logger.info(f"      SFT apos remover Estado Ref EX (nao considera exportacao): {len(sft_raw)} registros")
         elif considerar_exportacao == "APENAS_EXPORTACAO":
@@ -176,20 +157,13 @@ class ConciliacaoImpostosService:
             }
 
         if tipo_mov_filtro == "ENTRADA":
-            # Papel de Entrada: todas as notas de Entrada (incluindo as que
-            # tambem compoem a Saida do ICMS), sempre com o valor puro (Valor
-            # ICMS ou Difal ICMS), sem somar o campo complementar.
+            # Papel de Entrada: notas de Entrada, valor puro (sem somar campo
+            # complementar).
             sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r) == "ENTRADA"]
             logger.info(f"      SFT filtrado por Tipo Mov=ENTRADA: {len(sft_raw)} registros")
         elif tipo_mov_filtro == "SAIDA":
-            # Papel de Saida: notas de Saida de verdade + entradas de ICMS que
-            # tambem compoem a Saida (Estado Ref EX ou Vlr ICMS Com > 0) --
-            # essas continuam aparecendo na lista de Entrada em outra execucao,
-            # nao somem dali.
-            sft_raw = [
-                r for r in sft_raw
-                if _classificar_tipo_mov(r) == "SAIDA" or _eh_entrada_tambem_saida_icms(r, campo_imposto)
-            ]
+            # Papel de Saida: notas de Saida de verdade.
+            sft_raw = [r for r in sft_raw if _classificar_tipo_mov(r) == "SAIDA"]
             if campo_imposto in CAMPOS_EXTRA_SAIDA:
                 sft_raw = [_somar_campo_extra_saida(r) for r in sft_raw]
             logger.info(f"      SFT filtrado por Tipo Mov=SAIDA: {len(sft_raw)} registros")

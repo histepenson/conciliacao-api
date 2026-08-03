@@ -5,9 +5,15 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
+from middleware.empresa_config import require_configuracao
+from core.particularidades import ChaveParticularidade
 from services import pre_conferencia_service as service
 
-router = APIRouter(prefix="/v1/pre-conferencia", tags=["Pre Conferencia"])
+router = APIRouter(
+    prefix="/v1/pre-conferencia",
+    tags=["Pre Conferencia"],
+    dependencies=[Depends(require_configuracao(ChaveParticularidade.TEM_PRE_CONFERENCIA))],
+)
 
 
 @router.get(
