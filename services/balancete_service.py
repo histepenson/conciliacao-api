@@ -8,7 +8,6 @@ anterior/atual no cabecalho e validar o calculo do periodo.
 """
 
 import logging
-import re
 from datetime import date
 from typing import Any
 
@@ -16,6 +15,7 @@ import pandas as pd
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from core.data_base import parse_ano_mes
 from models.balancete import BalanceteConta
 from models.planodecontas import PlanoDeContas
 from tools.balancete import normalizar_balancete, normalizar_codigo_conta
@@ -24,15 +24,9 @@ logger = logging.getLogger(__name__)
 
 
 def _primeiro_dia_mes_de_data_base(data_base: str) -> date:
-    """Converte data-base DD/MM/YYYY (ou MM/YYYY) para o primeiro dia do mes."""
-    partes = data_base.strip().split("/")
-    if len(partes) == 3:
-        _, mes, ano = partes
-    elif len(partes) == 2:
-        mes, ano = partes
-    else:
-        raise ValueError(f"data_base invalida: {data_base}")
-    return date(int(ano), int(mes), 1)
+    """Converte data-base (DD/MM/YYYY, MM/YYYY ou YYYYMMDD) para o primeiro dia do mes."""
+    ano, mes = parse_ano_mes(data_base)
+    return date(ano, mes, 1)
 
 
 def importar_balancete(

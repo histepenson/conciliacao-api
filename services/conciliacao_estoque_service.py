@@ -11,6 +11,7 @@ from typing import Dict, Any
 
 import pandas as pd
 
+from core.data_base import parse_ano_mes
 from schemas.conciliacao_estoque_schema import RequestConciliacaoEstoque
 from tools.estoque.kardex import normalizar_kardex
 from tools.estoque.razao_estoque import normalizar_razao_estoque
@@ -36,11 +37,11 @@ class ConciliacaoEstoqueService:
         return True, ""
 
     def _extrair_ano_base(self, data_base: str) -> int:
-        """Extrai o ano da data_base (DD/MM/YYYY)."""
+        """Extrai o ano da data_base (DD/MM/YYYY, MM/YYYY ou YYYYMMDD)."""
         try:
-            partes = data_base.split("/")
-            return int(partes[2])
-        except (IndexError, ValueError):
+            ano, _mes = parse_ano_mes(data_base)
+            return ano
+        except ValueError:
             return datetime.now().year
 
     def executar(self, request: RequestConciliacaoEstoque) -> Dict[str, Any]:
