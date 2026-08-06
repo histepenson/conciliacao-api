@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
+from core.data_base import parse_ano_mes
 from models import Conciliacao, PlanoDeContas, Empresa
 from schemas.efetivacao_schema import StatusConciliacao
 from middleware.auth import CurrentUser
@@ -24,12 +25,8 @@ class ConciliacaoBancariaEfetivacaoService:
         self.file_storage = FileStorageService()
 
     def _parse_periodo(self, data_base: str) -> Tuple[int, int]:
-        """Converte data-base DD/MM/YYYY para (ano, mes)."""
-        try:
-            dia, mes, ano = data_base.split("/")
-            return int(ano), int(mes)
-        except Exception:
-            raise ValueError(f"Formato de data_base invalido: {data_base}")
+        """Converte data-base (DD/MM/YYYY, MM/YYYY ou YYYYMMDD) para (ano, mes)."""
+        return parse_ano_mes(data_base)
 
     def _normalize_periodo(self, data_base: str) -> str:
         ano, mes = self._parse_periodo(data_base)

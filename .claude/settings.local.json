@@ -498,7 +498,27 @@
       "Bash(./node_modules/.bin/esbuild.cmd src/pages/Conciliacaoconta.jsx --outfile=/tmp/out5.js)",
       "Read(//c/conciliacao-app/src/components/DetailedAnalysisTable/**)",
       "Read(//c/conciliacao-app/src/components/ResultDisplay/**)",
-      "Bash(APP_ENV=develop ./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/valida_valor_abatido.py\")"
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe \"C:/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/cf33f728-edc9-4dc9-95c5-9ea8b8829145/scratchpad/valida_valor_abatido.py\")",
+      "Bash(curl -sS -o /dev/null -w \"HTTP_STATUS:%{http_code} TIME:%{time_total}s\\\\n\" --max-time 15 \"https://back-smart-conciliacoes.onrender.com/\")",
+      "Bash(curl -sS -o /dev/null -w \"HTTP_STATUS:%{http_code} TIME:%{time_total}s\\\\n\" --max-time 15 \"https://back-smart-conciliacao-prod-prodution.up.railway.app/api/docs\")",
+      "Bash(curl -sS -i --max-time 15 \"https://back-smart-conciliacao-prod-prodution.up.railway.app/api\")",
+      "Bash(curl -sS -i --max-time 20 -X POST \"https://back-smart-conciliacao-prod-prodution.up.railway.app/api/auth/select-empresa\" -H \"Content-Type: application/json\" -d '{\"empresa_id\":1}')",
+      "Bash(echo \"---exit:$?---\")",
+      "Bash(curl -sS -i --max-time 20 -X OPTIONS \"https://back-smart-conciliacao-prod-prodution.up.railway.app/api/auth/select-empresa\" -H \"Origin: https://app.smartconciliacoes.com.br\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: content-type,authorization\")",
+      "Bash(railway logs *)",
+      "Bash(railway list *)",
+      "Bash(railway run -- python -c ' *)",
+      "Bash(railway run *)",
+      "Bash(python -c \"import psycopg2; print\\('psycopg2 ok'\\)\")",
+      "Read(//c/Users/histepenson/Desktop/RIMAQ/RELATORIO PERSONALIZADOS/**)",
+      "Bash(ls -la \"/c/Users/histepenson/Desktop/Nova pasta\")",
+      "Read(//c/Users/histepenson/Desktop/Nova pasta/**)",
+      "Bash(python -c \"from PIL import Image; print\\('ok'\\)\")",
+      "Bash(python \"C:\\\\Users\\\\HISTEP~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--conciliacao-api\\\\604bf04a-57cf-4a49-b601-00fda9d77f44\\\\scratchpad\\\\build_excel.py\")",
+      "Bash(ls -la \"/c/Users/histepenson/Desktop/Nova pasta/Relatorio_Movimentacao_Contabil_Padronizado.xlsx\")",
+      "Bash(ls -la \"/c/Users/histepenson/Desktop/Nova pasta/Outros\")",
+      "Read(//c/Users/histepenson/Desktop/Nova pasta/Outros/**)",
+      "Bash(python \"C:\\\\Users\\\\HISTEP~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--conciliacao-api\\\\604bf04a-57cf-4a49-b601-00fda9d77f44\\\\scratchpad\\\\unificar_relatorios.py\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
@@ -532,7 +552,8 @@
       "C:\\conciliacao-app\\src\\utils",
       "C:\\conciliacao-app\\src\\components\\TipoFilterDialog",
       "C:\\conciliacao-app\\src\\components\\ResultDisplay",
-      "C:\\conciliacao-app\\src\\components\\DetailedAnalysisTable"
+      "C:\\conciliacao-app\\src\\components\\DetailedAnalysisTable",
+      "C:\\Users\\histepenson\\Desktop\\RIMAQ\\RELATORIO PERSONALIZADOS"
     ]
   }
 }
