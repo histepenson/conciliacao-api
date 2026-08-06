@@ -177,6 +177,10 @@ class Permissions:
     ESTOQUE_READ = "estoque:read"
     ESTOQUE_WRITE = "estoque:write"
 
+    # Operacao Financeira (cadastro de naturezas - Conferencia LEASING)
+    OPERACAO_FINANCEIRA_READ = "operacao_financeira:read"
+    OPERACAO_FINANCEIRA_WRITE = "operacao_financeira:write"
+
     # Wildcard
     ALL = "*"
 
@@ -202,5 +206,7 @@ ALL_PERMISSIONS = [
     Permissions.RELATORIO_EXPORT,
     Permissions.ESTOQUE_READ,
     Permissions.ESTOQUE_WRITE,
+    Permissions.OPERACAO_FINANCEIRA_READ,
+    Permissions.OPERACAO_FINANCEIRA_WRITE,
     Permissions.ALL,
 ]

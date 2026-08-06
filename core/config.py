@@ -1,11 +1,29 @@
 # core/config.py
 import json
+import os
 import secrets
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
+from dotenv import load_dotenv
 from pydantic import Field, AliasChoices, field_validator
 from pydantic_settings import BaseSettings, NoDecode
+
+# Carrega o .env correto (.env.develop | .env) ANTES da classe Settings ser
+# definida/instanciada. Nao pode depender de db.py ter sido importado
+# primeiro para popular os.environ -- main.py importa core.config antes de
+# qualquer router (e portanto antes de db.py), entao sem isso aqui o
+# Settings() do lru_cache abaixo fica com um snapshot de ambiente
+# incompleto (faltando tudo que so' existe no .env.develop) pelo resto do
+# processo, independente do que rodar depois.
+_BASE_DIR = Path(__file__).resolve().parent.parent
+_APP_ENV = os.getenv("APP_ENV", "production")
+_env_file = f".env.{_APP_ENV}" if _APP_ENV != "production" else ".env"
+_env_path = _BASE_DIR / _env_file
+if not _env_path.exists():
+    _env_path = _BASE_DIR / ".env"
+load_dotenv(dotenv_path=_env_path, override=True)
 
 
 class Settings(BaseSettings):
@@ -81,6 +99,9 @@ class Settings(BaseSettings):
     # SmartConciliacoes IA (engine externa de matching/diagnostico de divergencias)
     SMARTCONCILIACOES_IA_URL: str = ""
     SMARTCONCILIACOES_IA_API_KEY: str = ""
+
+    # Anthropic (extracao de dados de imagem - Conferencia LEASING, relatorios via print/OCR)
+    ANTHROPIC_API_KEY: str = ""
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod

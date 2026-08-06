@@ -36,3 +36,6 @@ rq>=1.16.0
 
 # Storage S3-compatible (Railway Bucket Storage)
 boto3>=1.34.0
+
+# IA (extracao de dados de imagem - Conferencia LEASING)
+anthropic>=0.40.0
