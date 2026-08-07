@@ -80,5 +80,8 @@ class RelatorioConciliacaoImpostos(BaseModel):
     # Notas do SFT sem correspondencia no razao
     diferencas_so_sft: List[Dict[str, Any]] = []
 
+    # Matches manuais confirmados pelo usuario e reaplicados nesta execucao
+    matches_manuais_aplicados: List[Dict[str, Any]] = []
+
     observacoes: List[str] = []
     alertas: List[str] = []

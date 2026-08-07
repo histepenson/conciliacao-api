@@ -17,9 +17,10 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from core.data_base import parse_ano_mes
 from models.protheus_carga import ProtheusCarga, ProtheusCargaRegistro
 from models.lancamento_padrao import LancamentoPadrao
-from services import analise_ia_service
+from services import analise_ia_service, matching_manual_fiscal_service
 from tools.fiscal.match_ct2_sft import match_ct2_sft as _match_ct2_sft_impl
 
 logger = logging.getLogger(__name__)
@@ -401,6 +402,18 @@ def conferir(
     def _match_ct2_sft(ct2_recs: list, sft_recs: list) -> tuple:
         return _match_ct2_sft_impl(ct2_recs, sft_recs, campo_valor_sft="_valor_calc", tolerancia=0.10)
 
+    # ── Matches manuais ja confirmados (ver matching_manual_fiscal_service) ──
+    # Casos em que o CT2_KEY veio vazio do Protheus e o algoritmo automatico
+    # nao teve como desambiguar sozinho (mais de um fornecedor candidato na
+    # mesma NF/filial/data). Busca uma vez para o periodo inteiro e agrupa por
+    # (lp_codigo, descricao) -- grupo usa lp_codigo=None e descricao=nome do
+    # grupo, LP individual usa (lp_codigo, descricao) igual ao resto da tela.
+    ano_periodo, mes_periodo = parse_ano_mes(carga_ct2.data_base)
+    periodo = f"{ano_periodo}-{mes_periodo:02d}"
+    matches_manuais_por_contexto: dict[tuple, list] = {}
+    for m in matching_manual_fiscal_service.listar(db, empresa_id=empresa_id, tipo="pre_conferencia", periodo=periodo):
+        matches_manuais_por_contexto.setdefault((m.lp_codigo, m.lp_descricao), []).append(m)
+
     # ── Processar GRUPOS ─────────────────────────────────────────────────────
     grupos_configs: dict[str, list[LancamentoPadrao]] = {}
     for lp in todos_lps:
@@ -464,13 +477,21 @@ def conferir(
         diferenca = round(total_ct2 - total_sft, 2)
 
         ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
+
+        matches_deste = matches_manuais_por_contexto.get((None, grupo_nome), [])
+        matches_manuais_aplicados: list = []
+        if matches_deste:
+            ct2_matched, sft_matched, matches_manuais_aplicados = matching_manual_fiscal_service.aplicar_matches_manuais(
+                ct2_matched, sft_matched, matches_deste, campo_valor_ct2="debito", campo_valor_sft="_valor_calc",
+            )
+
         nf_cruzamento = _nf_cruzamento(ct2_recs, sft_lp)
 
         ct2_detalhes = sorted(
             [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
               "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
               "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
-              "matched": r["matched"]}
+              "matched": r["matched"], "matched_manual": r.get("matched_manual", False)}
              for r in ct2_matched],
             key=lambda x: x["data"],
         )
@@ -480,7 +501,7 @@ def conferir(
               "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
               "valcont": round(float(s.get("valcont") or 0), 2),
               "valor_calculado": round(float(s.get("_valor_calc", s.get("valcont")) or 0), 2),
-              "matched": s["matched"]}
+              "matched": s["matched"], "matched_manual": s.get("matched_manual", False)}
              for s in sft_matched],
             key=lambda x: (x["filial"], x["nf"]),
         )
@@ -490,6 +511,7 @@ def conferir(
             "total_ct2": total_ct2, "total_sft": total_sft, "diferenca": diferenca,
             "qt_ct2": len(ct2_recs), "qt_sft": len(sft_lp),
             "ct2_detalhes": ct2_detalhes, "sft_detalhes": sft_detalhes,
+            "matches_manuais_aplicados": matches_manuais_aplicados,
             "nf_cruzamento": nf_cruzamento,
         })
 
@@ -525,13 +547,21 @@ def conferir(
         lp_status = "ok" if abs(diferenca) <= 0.01 else "diferente"
 
         ct2_matched, sft_matched = _match_ct2_sft(ct2_recs, sft_lp)
+
+        matches_deste = matches_manuais_por_contexto.get((lp_codigo, descricao), [])
+        matches_manuais_aplicados: list = []
+        if matches_deste:
+            ct2_matched, sft_matched, matches_manuais_aplicados = matching_manual_fiscal_service.aplicar_matches_manuais(
+                ct2_matched, sft_matched, matches_deste, campo_valor_ct2="debito", campo_valor_sft="_valor_calc",
+            )
+
         nf_cruzamento = _nf_cruzamento(ct2_recs, sft_lp)
 
         ct2_detalhes = sorted(
             [{"data": str(r.get("data") or ""), "lote": str(r.get("lote_sub_doc_linha") or ""),
               "historico": str(r.get("historico") or "")[:80], "debito": round(float(r.get("debito") or 0), 2),
               "credito": round(float(r.get("credito") or 0), 2), "conta": str(r.get("conta") or ""),
-              "matched": r["matched"]}
+              "matched": r["matched"], "matched_manual": r.get("matched_manual", False)}
              for r in ct2_matched],
             key=lambda x: x["data"],
         )
@@ -541,7 +571,7 @@ def conferir(
               "cfop": str(s.get("cfop") or ""), "tes": str(s.get("tes") or ""),
               "valcont": round(float(s.get("valcont") or 0), 2),
               "valor_calculado": round(float(s.get("_valor_calc", s.get("valcont")) or 0), 2),
-              "matched": s["matched"]}
+              "matched": s["matched"], "matched_manual": s.get("matched_manual", False)}
              for s in sft_matched],
             key=lambda x: (x["filial"], x["nf"]),
         )
@@ -553,6 +583,7 @@ def conferir(
             "total_ct2":    total_ct2,
             "total_sft":    total_sft,
             "diferenca":    diferenca,
+            "matches_manuais_aplicados": matches_manuais_aplicados,
             "qt_ct2":       len(ct2_recs),
             "qt_sft":       len(sft_lp),
             "ct2_detalhes": ct2_detalhes,

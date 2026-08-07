@@ -10,9 +10,13 @@ na Pre-Conferencia (tools/fiscal/match_ct2_sft.py).
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
+from sqlalchemy.orm import Session
+
+from core.data_base import parse_ano_mes
 from schemas.conciliacao_impostos_schema import RequestConciliacaoImpostos
+from services import matching_manual_fiscal_service
 from tools.fiscal.match_ct2_sft import match_ct2_sft
 
 logger = logging.getLogger(__name__)
@@ -77,7 +81,7 @@ class ConciliacaoImpostosService:
 
         return True, ""
 
-    def executar(self, request: RequestConciliacaoImpostos) -> Dict[str, Any]:
+    def executar(self, request: RequestConciliacaoImpostos, db: Optional[Session] = None) -> Dict[str, Any]:
         """
         Executa a conciliacao de impostos.
 
@@ -183,6 +187,30 @@ class ConciliacaoImpostosService:
             razao_filtrado, sft_raw, campo_valor_sft=campo_imposto, campo_valor_ct2=coluna_razao
         )
 
+        # Reaplica matches manuais ja confirmados pelo usuario para este
+        # periodo/conta/campo -- cobre os casos em que o CT2_KEY veio vazio
+        # do Protheus e o algoritmo automatico nao teve como desambiguar
+        # sozinho (ver services/matching_manual_fiscal_service.py).
+        matches_manuais_aplicados: list = []
+        if db is not None and request.parametros.empresa_id:
+            ano_periodo, mes_periodo = parse_ano_mes(request.parametros.data_base)
+            periodo = f"{ano_periodo}-{mes_periodo:02d}"
+            matches_ativos = matching_manual_fiscal_service.listar(
+                db,
+                empresa_id=request.parametros.empresa_id,
+                tipo="impostos",
+                periodo=periodo,
+                conta_contabil=conta_contabil,
+                campo_imposto=campo_imposto,
+            )
+            if matches_ativos:
+                razao_resultado, sft_resultado, matches_manuais_aplicados = (
+                    matching_manual_fiscal_service.aplicar_matches_manuais(
+                        razao_resultado, sft_resultado, matches_ativos,
+                        campo_valor_ct2=coluna_razao, campo_valor_sft=campo_imposto,
+                    )
+                )
+
         total_lancamento_razao = round(sum(float(r.get(coluna_razao) or 0) for r in razao_resultado), 2)
         total_sft = round(sum(float(s.get(campo_imposto) or 0) for s in sft_resultado), 2)
         diferenca = round(total_lancamento_razao - total_sft, 2)
@@ -199,6 +227,7 @@ class ConciliacaoImpostosService:
             campo_imposto,
         )
         qtd_matched = sum(1 for r in razao_resultado if r["matched"])
+        qtd_matched_manual = sum(1 for r in razao_resultado if r.get("matched_manual"))
 
         resumo = {
             "campo_imposto": campo_imposto,
@@ -216,6 +245,7 @@ class ConciliacaoImpostosService:
             "qtd_lancamentos_razao": len(razao_resultado),
             "qtd_registros_sft": len(sft_resultado),
             "qtd_matched": qtd_matched,
+            "qtd_matched_manual": qtd_matched_manual,
             "qtd_so_razao": len(diferencas_so_razao),
             "qtd_so_sft": len(diferencas_so_sft),
         }
@@ -224,6 +254,7 @@ class ConciliacaoImpostosService:
             "resumo": resumo,
             "diferencas_so_razao": diferencas_so_razao,
             "diferencas_so_sft": diferencas_so_sft,
+            "matches_manuais_aplicados": matches_manuais_aplicados,
             "observacoes": [
                 f"Conciliacao de impostos da conta {conta_contabil}",
                 f"Coluna SFT considerada: {COLUNAS_IMPOSTO_SFT.get(campo_imposto, campo_imposto)}",

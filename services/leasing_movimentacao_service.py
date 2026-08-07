@@ -58,6 +58,13 @@ def registrar_lote(
     """
     Grava o lote de importacao + as movimentacoes e retorna um resumo.
 
+    Reimportar o mesmo tipo de relatorio SUBSTITUI a importacao anterior
+    (apaga o(s) lote(s) anteriores desse `tipo_relatorio` pra essa
+    empresa antes de gravar o novo) -- confirmado com o usuario: clicar
+    em "Processar" varias vezes nao pode duplicar valores na conferencia.
+    O cascade de LeasingLoteImportacao -> LeasingMovimentacao
+    (ondelete=CASCADE) cuida de apagar as movimentacoes junto.
+
     Naturezas cadastradas em Operacao Financeira com `ativo=False` sao
     barradas aqui -- nao entram na base unificada mesmo vindo no arquivo
     (confirmado com o usuario: "Considera=Nao" bloqueia, nao e' so' um
@@ -93,6 +100,11 @@ def registrar_lote(
     if naturezas_inativas and "natureza_codigo" in df.columns:
         df = df[~df["natureza_codigo"].isin(naturezas_inativas)]
     linhas_ignoradas_natureza_inativa = total_linhas_arquivo - len(df)
+
+    db.query(LeasingLoteImportacao).filter(
+        LeasingLoteImportacao.empresa_id == empresa_id,
+        LeasingLoteImportacao.tipo_relatorio == tipo_relatorio,
+    ).delete(synchronize_session=False)
 
     lote = LeasingLoteImportacao(
         empresa_id=empresa_id,

@@ -49,7 +49,10 @@ from .lancamento_padrao import LancamentoPadrao
 from .balancete import BalanceteConta
 from .empresa_configuracao import EmpresaConfiguracao
 
-# 9. Conferencia LEASING (BBC)
+# 9. Matching manual fiscal (Impostos / Pre-Conferencia)
+from .matching_manual_fiscal import MatchingManualFiscal, MatchingManualFiscalItem
+
+# 10. Conferencia LEASING (BBC)
 from .operacao_financeira import OperacaoFinanceira
 from .leasing_lote_importacao import LeasingLoteImportacao
 from .leasing_movimentacao import LeasingMovimentacao
@@ -93,6 +96,9 @@ __all__ = [
     "BalanceteConta",
     # Particularidades por empresa
     "EmpresaConfiguracao",
+    # Matching manual fiscal (Impostos / Pre-Conferencia)
+    "MatchingManualFiscal",
+    "MatchingManualFiscalItem",
     # Conferencia LEASING (BBC)
     "OperacaoFinanceira",
     "LeasingLoteImportacao",

@@ -39,6 +39,17 @@ def registrar_lote_razao(
     usuario_id: Optional[int],
     df: pd.DataFrame,
 ) -> dict:
+    """
+    Reimportar o razao SUBSTITUI a importacao anterior (apaga o(s)
+    lote(s) "RAZAO" anteriores dessa empresa antes de gravar o novo) --
+    mesma regra de registrar_lote() em leasing_movimentacao_service.py,
+    pra reimportar nao duplicar valores na conferencia.
+    """
+    db.query(LeasingLoteImportacao).filter(
+        LeasingLoteImportacao.empresa_id == empresa_id,
+        LeasingLoteImportacao.tipo_relatorio == "RAZAO",
+    ).delete(synchronize_session=False)
+
     lote = LeasingLoteImportacao(
         empresa_id=empresa_id,
         tipo_relatorio="RAZAO",
