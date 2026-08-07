@@ -141,4 +141,5 @@ async def post_divergencia(
     payload["config"] = {}
     payload["candidatos_brutos_b"] = []
     payload["gerar_explicacao_ia"] = True
+    payload["empresa_id"] = resolve_empresa_id(context, body.contexto.get("empresa_id"))
     return analise_ia_service.chamar_diagnostico(payload)

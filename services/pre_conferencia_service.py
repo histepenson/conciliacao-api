@@ -736,6 +736,7 @@ def analisar_divergencia(
 
     payload = {
         "dominio": "fiscal",
+        "empresa_id": empresa_id,
         "contexto": {
             "lp_codigo": lp_codigo,
             "descricao": descricao,
@@ -911,6 +912,7 @@ def diagnosticar_nota(
         "cliefor_sft": cliefor,
         "valor_sft": valor,
         "carga_id_ct2": carga_id_ct2,
+        "empresa_id": empresa_id,
         "diagnostico": diagnostico,
     }
     try:
