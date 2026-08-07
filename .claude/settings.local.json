@@ -521,7 +521,13 @@
       "Bash(python \"C:\\\\Users\\\\HISTEP~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--conciliacao-api\\\\604bf04a-57cf-4a49-b601-00fda9d77f44\\\\scratchpad\\\\unificar_relatorios.py\")",
       "Bash(ls -la \"/c/Users/histepenson/Desktop/Nova pasta/\" 2>&1)",
       "Read(//c/Users/histepenson/Desktop/Nova pasta//**)",
-      "Bash(python -c \"import pandas, openpyxl; print\\('ok', pandas.__version__, openpyxl.__version__\\)\")"
+      "Bash(python -c \"import pandas, openpyxl; print\\('ok', pandas.__version__, openpyxl.__version__\\)\")",
+      "Bash(where python *)",
+      "Bash(python -m pip list)",
+      "Bash(where psql *)",
+      "Bash(find /c -maxdepth 4 -iname \"psql.exe\")",
+      "Bash(docker compose *)",
+      "Bash(railway add *)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
