@@ -19,6 +19,7 @@ from routers.dashboard_router import router as dashboard_router
 from routers.conciliacao_bancaria_router import router as conciliacao_bancaria_router
 from routers.conciliacao_estoque_router import router as conciliacao_estoque_router
 from routers.conciliacao_impostos_router import router as conciliacao_impostos_router
+from routers.matching_manual_fiscal_router import router as matching_manual_fiscal_router
 from routers.finr130_router import router as finr130_router
 from routers.ctbr140_router import router as ctbr140_router
 from routers.ctbr480_router import router as ctbr480_router
@@ -38,6 +39,8 @@ from routers.analise_ia_router import router as analise_ia_router
 from routers.lancamento_padrao_router import router as lancamento_padrao_router
 from routers.ativo_fixo_router import router as ativo_fixo_router
 from routers.balancete_router import router as balancete_router
+from routers.operacao_financeira_router import router as operacao_financeira_router
+from routers.conferencia_leasing_router import router as conferencia_leasing_router
 
 
 @asynccontextmanager
@@ -123,6 +126,7 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(conciliacao_bancaria_router, prefix="/api")
 app.include_router(conciliacao_estoque_router, prefix="/api")
 app.include_router(conciliacao_impostos_router, prefix="/api")
+app.include_router(matching_manual_fiscal_router, prefix="/api")
 app.include_router(finr130_router, prefix="/api")
 app.include_router(ctbr140_router, prefix="/api")
 app.include_router(ctbr480_router, prefix="/api")
@@ -142,3 +146,5 @@ app.include_router(analise_ia_router, prefix="/api")
 app.include_router(ativo_fixo_router, prefix="/api")
 app.include_router(lancamento_padrao_router, prefix="/api")
 app.include_router(balancete_router, prefix="/api")
+app.include_router(operacao_financeira_router, prefix="/api")
+app.include_router(conferencia_leasing_router, prefix="/api")

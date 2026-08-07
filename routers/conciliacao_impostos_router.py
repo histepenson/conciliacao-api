@@ -61,7 +61,7 @@ def processar_conciliacao_impostos(request: RequestConciliacaoImpostos, db: Sess
         raise HTTPException(status_code=400, detail=mensagem)
 
     try:
-        resultado = service.executar(request)
+        resultado = service.executar(request, db)
 
         # Validar saldo calculado contra balancete importado (se houver)
         # Movimentos do periodo vem do proprio razao da conta: debito - credito.
