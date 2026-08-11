@@ -34,6 +34,10 @@ class PlanoDeContas(Base):
     # SEM FK | apenas referencia logica (ex: "1", "1.01", "1.01.02")
     conta_superior = Column(String(50), nullable=True, index=True)
 
+    # SEM FK | slug de core.situacoes_folha.SituacaoConferenciaFolha, quando a
+    # conta participa da Conferencia Folha (Rancheiro/Ander)
+    situacao_conferencia_folha = Column(String(40), nullable=True, index=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

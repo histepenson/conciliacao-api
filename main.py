@@ -41,6 +41,8 @@ from routers.ativo_fixo_router import router as ativo_fixo_router
 from routers.balancete_router import router as balancete_router
 from routers.operacao_financeira_router import router as operacao_financeira_router
 from routers.conferencia_leasing_router import router as conferencia_leasing_router
+from routers.folha_pagamento_router import router as folha_pagamento_router
+from routers.conferencia_folha_router import router as conferencia_folha_router
 
 
 @asynccontextmanager
@@ -148,3 +150,5 @@ app.include_router(lancamento_padrao_router, prefix="/api")
 app.include_router(balancete_router, prefix="/api")
 app.include_router(operacao_financeira_router, prefix="/api")
 app.include_router(conferencia_leasing_router, prefix="/api")
+app.include_router(folha_pagamento_router, prefix="/api")
+app.include_router(conferencia_folha_router, prefix="/api")
