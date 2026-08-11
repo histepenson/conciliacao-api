@@ -14,9 +14,12 @@ tabela fora do escopo de qualquer relatorio de contas a pagar existente,
 e porque os filtros de cada situacao nao cabem no formato generico do
 FINR150 (E2_BAIXA nem eh retornado por ele hoje).
 
-Tabela fisica e filial NUNCA sao hardcoded (RetSqlName/xFilial) porque a
-mesma API roda para duas empresas (Rancheiro e Ander) com o mesmo conjunto
-de contas/naturezas - so tabela fisica e filial mudam por tenant.
+Tabela fisica NUNCA e' hardcoded (sempre via RetSqlName) porque a mesma API
+roda para duas empresas (Rancheiro e Ander) com o mesmo conjunto de
+contas/naturezas - so' a tabela fisica muda por tenant. Sem filtro de
+filial no WHERE: o acesso REST ja e' escopado por empresa, entao a consulta
+traz todas as filiais do grupo (filtrar por xFilial() so' devolveria a
+filial corrente da conexao).
 
 Cada wsmethod devolve LINHAS CRUAS (nao pre-somadas), agrupadas por fonte
 (SE2 e/ou SRD), para permitir drill-down no lado Python. As listas fixas de
@@ -802,8 +805,11 @@ Return .T.
 // =============================================================================
 // Static Function FOLSqlSE2Base
 // SELECT + FROM + WHERE inicial comuns a todas as situacoes baseadas em SE2.
-// Tabela e filial SEMPRE dinamicas (RetSqlName/xFilial) - nunca hardcoded,
-// pois a mesma API roda para Rancheiro e Ander.
+// Tabela SEMPRE dinamica (RetSqlName) - nunca hardcoded, pois a mesma API
+// roda para Rancheiro e Ander. SEM filtro de filial: o acesso ja e' escopado
+// por empresa na conexao REST, entao a consulta traz todas as filiais do
+// grupo (nao restringir a xFilial() aqui, senao so' retorna a filial
+// corrente da conexao).
 // =============================================================================
 Static Function FOLSqlSE2Base()
 Local cSql := ""
@@ -814,7 +820,6 @@ cSql += "        SE2.E2_EMISSAO, SE2.E2_VENCTO, SE2.E2_VENCREA, SE2.E2_BAIXA, "
 cSql += "        SE2.E2_VALOR, SE2.E2_SALDO, SE2.E2_HIST "
 cSql += " FROM " + RetSqlName("SE2") + " SE2 "
 cSql += " WHERE SE2.D_E_L_E_T_ = ' ' "
-cSql += "   AND SE2.E2_FILIAL  = '" + xFilial("SE2") + "' "
 
 Return cSql
 
@@ -822,7 +827,8 @@ Return cSql
 // =============================================================================
 // Static Function FOLSqlSRDBase
 // SELECT + FROM + WHERE inicial comuns a todas as situacoes baseadas em SRD
-// (ficha financeira de folha/RH). Tabela e filial dinamicas.
+// (ficha financeira de folha/RH). Tabela dinamica (RetSqlName). SEM filtro
+// de filial - mesmo racional de FOLSqlSE2Base.
 // =============================================================================
 Static Function FOLSqlSRDBase()
 Local cSql := ""
@@ -831,7 +837,6 @@ cSql := " SELECT SRD.RD_FILIAL, SRD.RD_MAT, SRD.RD_PD, SRD.RD_ROTEIR, "
 cSql += "        SRD.RD_DATARQ, SRD.RD_DATPGT, SRD.RD_VALOR "
 cSql += " FROM " + RetSqlName("SRD") + " SRD "
 cSql += " WHERE SRD.D_E_L_E_T_ = ' ' "
-cSql += "   AND SRD.RD_FILIAL  = '" + xFilial("SRD") + "' "
 
 Return cSql
 

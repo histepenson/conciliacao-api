@@ -527,7 +527,11 @@
       "Bash(where psql *)",
       "Bash(find /c -maxdepth 4 -iname \"psql.exe\")",
       "Bash(docker compose *)",
-      "Bash(railway add *)"
+      "Bash(railway add *)",
+      "Bash(tasklist //FI \"IMAGENAME eq python.exe\" //FI \"IMAGENAME eq node.exe\")",
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000)",
+      "Bash(tasklist //FI \"PID eq 7592\")",
+      "Bash(taskkill //F //PID 7592)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

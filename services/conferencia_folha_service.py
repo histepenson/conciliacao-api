@@ -151,6 +151,11 @@ class ConferenciaFolhaService:
             "data_fim": data_fim,
             "conta_de": conta_contabil,
             "conta_ate": conta_contabil,
+            # consid_filiais=1 sem filial_de/filial_ate = todas as filiais da
+            # empresa (default do ZCT2RAZAPI e' 2 = so' filial corrente da
+            # conexao, o que ficaria inconsistente com o lado financeiro do
+            # ZFOLPAGAPI, que tambem nao restringe por filial).
+            "consid_filiais": "1",
         })
 
         registros_da_conta = [
