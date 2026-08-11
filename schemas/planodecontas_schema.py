@@ -11,6 +11,7 @@ class PlanoDeContasBase(BaseModel):
     tipo_conta: str
     conciliavel: bool = False
     conta_superior: Optional[str] = None
+    situacao_conferencia_folha: Optional[str] = None
 
 
 class PlanoDeContasCreate(PlanoDeContasBase):
@@ -25,6 +26,7 @@ class PlanoDeContasUpdate(BaseModel):
     descricao: Optional[str] = None
     conciliavel: Optional[bool] = None
     conta_superior: Optional[str] = None
+    situacao_conferencia_folha: Optional[str] = None
 
 
 class PlanoDeContasResponse(PlanoDeContasBase):

@@ -10,7 +10,7 @@ class AnalisarDivergenciaBody(BaseModel):
     config removendo candidatos antes do match, diferente do fiscal), por
     isso so' reencaminha os registros nao-conciliados de cada lado.
     """
-    dominio: Literal["financeiro", "bancario", "estoque", "impostos"]
+    dominio: Literal["financeiro", "bancario", "estoque", "impostos", "folha"]
     contexto: dict[str, Any] = {}
     registros_nao_conciliados_a: list[dict[str, Any]] = []
     registros_nao_conciliados_b: list[dict[str, Any]] = []
