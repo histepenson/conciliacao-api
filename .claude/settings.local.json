@@ -545,7 +545,8 @@
       "Bash(xargs -I{} ls -la {})",
       "Bash(sort -k6,7)",
       "Bash(tail -150 \"/c/Users/histepenson/AppData/Local/Temp/claude/c--conciliacao-api/56b66443-3bb5-4e71-87ae-0dae0dde3800/tasks/b7yycjpxt.output\")",
-      "Bash(APP_ENV=develop ./venv/Scripts/python.exe -c \"import tools.banco.calc_diferencas_banco; print\\('OK'\\)\")"
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe -c \"import tools.banco.calc_diferencas_banco; print\\('OK'\\)\")",
+      "Read(//c/conciliacao-app/src/api/**)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

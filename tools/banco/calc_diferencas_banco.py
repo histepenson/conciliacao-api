@@ -49,6 +49,18 @@ def _key_documento(df: pd.DataFrame) -> pd.Series:
 
 
 def _match_exato_doc_valor(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
+    """
+    FASE 1: documento + valor exatos.
+    Indexa o razao por _doc_key uma unica vez em vez de filtrar o DataFrame
+    inteiro (`df_raz[... & (df_raz["_doc_key"] == chave)]`) para cada linha
+    do extrato -- isso era O(N*M) e era o maior gargalo com milhares de
+    registros (roda antes de qualquer outra fase).
+    """
+    raz_por_chave: dict[str, list] = {}
+    for idx_raz, chave_raz in df_raz["_doc_key"].items():
+        if chave_raz:
+            raz_por_chave.setdefault(chave_raz, []).append(idx_raz)
+
     for idx_ext in df_ext.index:
         if df_ext.loc[idx_ext, "matched"]:
             continue
@@ -56,8 +68,9 @@ def _match_exato_doc_valor(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: 
         if not chave:
             continue
         valor_ext = df_ext.loc[idx_ext, col_ext]
-        candidatos = df_raz[~df_raz["matched"] & (df_raz["_doc_key"] == chave)]
-        for idx_raz in candidatos.index:
+        for idx_raz in raz_por_chave.get(chave, []):
+            if df_raz.loc[idx_raz, "matched"]:
+                continue
             valor_raz = df_raz.loc[idx_raz, col_raz]
             if abs(valor_ext - valor_raz) <= THRESHOLD_CONCILIACAO:
                 df_ext.loc[idx_ext, "matched"] = True
@@ -146,14 +159,32 @@ def _match_fallback_valor(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: s
     FASE 3: fallback por valor, sem exigir documento nem mesma data.
     Usado como ultimo recurso quando nao ha chave de documento que permita
     casar com seguranca - busca em todo o periodo (nao so no mesmo dia).
+
+    Indexa o razao por centavos do valor (dict) em vez de escanear TODAS as
+    linhas nao casadas do razao para cada linha do extrato -- O(N*M) e' o
+    pior gargalo desta fase justamente por nao ter chave de documento pra
+    restringir os candidatos. A tolerancia (THRESHOLD_CONCILIACAO=0.01, ou
+    seja 1 centavo) e' coberta olhando o centavo do valor do extrato e os
+    dois vizinhos (-1/+1).
     """
+    raz_por_centavo: dict[int, list] = {}
+    for idx_raz, valor_raz in df_raz.loc[~df_raz["matched"], col_raz].items():
+        centavos = round(valor_raz * 100)
+        raz_por_centavo.setdefault(centavos, []).append(idx_raz)
+
     for idx_ext in df_ext.index:
         if df_ext.loc[idx_ext, "matched"]:
             continue
         valor_ext = df_ext.loc[idx_ext, col_ext]
+        centavos_ext = round(valor_ext * 100)
 
-        candidatos = df_raz[~df_raz["matched"]]
-        for idx_raz in candidatos.index:
+        candidatos_idx = []
+        for delta in (0, -1, 1):
+            candidatos_idx.extend(raz_por_centavo.get(centavos_ext + delta, []))
+
+        for idx_raz in candidatos_idx:
+            if df_raz.loc[idx_raz, "matched"]:
+                continue
             valor_raz = df_raz.loc[idx_raz, col_raz]
             if abs(valor_ext - valor_raz) <= THRESHOLD_CONCILIACAO:
                 df_ext.loc[idx_ext, "matched"] = True
