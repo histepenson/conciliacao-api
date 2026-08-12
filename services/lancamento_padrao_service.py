@@ -24,7 +24,10 @@ def _sequencia_do_origem(origem) -> str:
 def listar(db: Session, empresa_id: int) -> list[LancamentoPadrao]:
     return (
         db.query(LancamentoPadrao)
-        .filter(LancamentoPadrao.empresa_id == empresa_id)
+        .filter(
+            LancamentoPadrao.empresa_id == empresa_id,
+            LancamentoPadrao.excluido.is_(False),
+        )
         .order_by(LancamentoPadrao.lp_codigo, LancamentoPadrao.descricao)
         .all()
     )
@@ -34,6 +37,7 @@ def obter(db: Session, lp_id: int, empresa_id: int) -> LancamentoPadrao:
     lp = db.query(LancamentoPadrao).filter(
         LancamentoPadrao.id == lp_id,
         LancamentoPadrao.empresa_id == empresa_id,
+        LancamentoPadrao.excluido.is_(False),
     ).first()
     if not lp:
         raise HTTPException(404, "Lancamento padrao nao encontrado")
@@ -104,6 +108,13 @@ def atualizar(db: Session, lp_id: int, empresa_id: int, dados: dict) -> Lancamen
     db.commit()
     db.refresh(lp)
     return lp
+
+
+def excluir(db: Session, lp_id: int, empresa_id: int) -> None:
+    """Exclusao logica -- mantem o registro no banco (historico/carga CT2), so' deixa de listar."""
+    lp = obter(db, lp_id, empresa_id)
+    lp.excluido = True
+    db.commit()
 
 
 def bulk_definir_grupo(db: Session, empresa_id: int, ids: list[int], grupo: str | None) -> int:
