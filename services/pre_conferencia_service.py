@@ -120,12 +120,19 @@ def conferir(
             if lp.lp_codigo in lp_codigos_filtro or (lp.grupo and lp.grupo in grupos_do_filtro)
         ]
 
+    # Chave (lp_codigo, sequencia) -- nao (lp_codigo, descricao). CT5_SEQUEN e'
+    # o campo que o proprio Protheus usa pra distinguir varios LPs com o mesmo
+    # lp_codigo (ver comentario em models/lancamento_padrao.py); a descricao
+    # (CT5_DESC) que vem no CT2 e' texto livre do historico e pode variar por
+    # lancamento mesmo dentro da MESMA sequencia -- usa-la como chave fazia
+    # grupos com sequencia certa nunca casarem no razao (ex.: grupo "AQUISICAO
+    # DE FRETE" ficando sempre vazio na empresa Ander).
     lp_configs: dict[tuple[str, str], LancamentoPadrao] = {
-        (lp.lp_codigo, lp.descricao or ""): lp for lp in todos_lps
+        (lp.lp_codigo, lp.sequencia or ""): lp for lp in todos_lps
     }
-    # Mapeia (lp_codigo, descricao) → nome do grupo
+    # Mapeia (lp_codigo, sequencia) → nome do grupo
     key_to_grupo: dict[tuple[str, str], str] = {
-        (lp.lp_codigo, lp.descricao or ""): lp.grupo
+        (lp.lp_codigo, lp.sequencia or ""): lp.grupo
         for lp in todos_lps
         if lp.grupo
     }
@@ -155,13 +162,13 @@ def conferir(
         if cfop:
             sft_por_cfop.setdefault(cfop, []).append(s)
 
-    # ── Agrupar CT2 por (LP, descricao) ─────────────────────────────────────
+    # ── Agrupar CT2 por (LP, sequencia) ──────────────────────────────────────
     ct2_por_lp: dict[tuple[str, str], list[dict]] = {}
     for rec in ct2_data:
         lp = str(rec.get("ct2_lp") or "").strip()
-        desc = str(rec.get("ct5_desc") or "").strip()
+        seq = str(rec.get("ct2_sequen") or "").strip()
         if lp:
-            ct2_por_lp.setdefault((lp, desc), []).append(rec)
+            ct2_por_lp.setdefault((lp, seq), []).append(rec)
 
     # ── Separar CT2: keys que pertencem a um grupo vs individuais ────────────
     ct2_por_grupo: dict[str, list[dict]] = {}
@@ -427,8 +434,11 @@ def conferir(
     for grupo_nome, members in sorted(grupos_configs.items()):
         ct2_recs = ct2_por_grupo.get(grupo_nome, [])
         total_ct2 = round(sum(float(r.get("debito") or 0) for r in ct2_recs), 2)
-        lp_codes = sorted({m.lp_codigo for m in members})
-        lp_codigo_display = lp_codes[0] if len(lp_codes) == 1 else f"{lp_codes[0]}+{len(lp_codes)-1}"
+        # Grupo pode reunir LPs de codigos diferentes (ex.: 650 + 651) -- em vez
+        # de tentar combinar os codigos numa unica string (confuso, ja gerou
+        # duvida com "650+1"), mostra so' "LP" fixo; quem identifica o grupo e'
+        # a descricao (nome do grupo), exibida ao lado.
+        lp_codigo_display = "LP"
 
         cfops_set = set()
         tes_parts: list[str] = []
@@ -520,13 +530,18 @@ def conferir(
         })
 
     # ── Processar INDIVIDUAIS (sem grupo) ────────────────────────────────────
-    for (lp_codigo, descricao), ct2_recs in sorted(ct2_individual.items()):
-        config = lp_configs.get((lp_codigo, descricao))
+    for (lp_codigo, sequencia), ct2_recs in sorted(ct2_individual.items()):
+        config = lp_configs.get((lp_codigo, sequencia))
 
         total_ct2 = round(sum(float(r.get("debito") or 0) for r in ct2_recs), 2)
 
-        if not descricao and config and config.descricao:
-            descricao = config.descricao
+        # Descricao exibida: sempre a do cadastro (config.descricao), que e' o
+        # nome estavel do LP -- nao o ct5_desc bruto do CT2 (texto de
+        # historico, pode variar por lancamento mesmo dentro da mesma
+        # sequencia). Sem config (sem_mapeamento), cai pra o ct5_desc do
+        # primeiro registro so' pra dar alguma referencia na lista de
+        # nao-mapeados.
+        descricao = config.descricao if config and config.descricao else str(ct2_recs[0].get("ct5_desc") or "").strip()
 
         if not config or not (config.cfops or config.tes_codes or config.especies or config.series):
             # LP sem nenhum filtro (CFOP/TES/Especie/Serie) configurado -- nao
