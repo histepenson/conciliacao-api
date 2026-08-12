@@ -30,6 +30,7 @@ class LancamentoPadrao(Base):
                                        # "valor do SFT" na pre-conferencia;
                                        # null/vazio = usa valcont (padrao)
     ativo = Column(Boolean, default=True, nullable=False)
+    excluido = Column(Boolean, default=False, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

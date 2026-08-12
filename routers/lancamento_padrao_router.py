@@ -54,6 +54,18 @@ def atualizar(
     return service.atualizar(db, lp_id, eid, body)
 
 
+@router.delete("/{lp_id}")
+def excluir(
+    lp_id: int,
+    empresa_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    context: EmpresaContext = Depends(get_empresa_context),
+):
+    eid = resolve_empresa_id(context, empresa_id)
+    service.excluir(db, lp_id, eid)
+    return {"ok": True}
+
+
 @router.put("/bulk/grupo")
 def bulk_grupo(
     body: dict[str, Any],

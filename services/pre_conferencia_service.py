@@ -93,7 +93,11 @@ def conferir(
     # ── Configuracoes de LP ──────────────────────────────────────────────────
     todos_lps = (
         db.query(LancamentoPadrao)
-        .filter(LancamentoPadrao.empresa_id == empresa_id, LancamentoPadrao.ativo.is_(True))
+        .filter(
+            LancamentoPadrao.empresa_id == empresa_id,
+            LancamentoPadrao.ativo.is_(True),
+            LancamentoPadrao.excluido.is_(False),
+        )
         .all()
     )
 
@@ -649,7 +653,11 @@ def analisar_divergencia(
     if alvo.get("is_grupo"):
         membros = (
             db.query(LancamentoPadrao)
-            .filter(LancamentoPadrao.empresa_id == empresa_id, LancamentoPadrao.grupo == descricao)
+            .filter(
+                LancamentoPadrao.empresa_id == empresa_id,
+                LancamentoPadrao.grupo == descricao,
+                LancamentoPadrao.excluido.is_(False),
+            )
             .all()
         )
     else:
@@ -659,6 +667,7 @@ def analisar_divergencia(
                 LancamentoPadrao.empresa_id == empresa_id,
                 LancamentoPadrao.lp_codigo == lp_codigo,
                 LancamentoPadrao.descricao == descricao,
+                LancamentoPadrao.excluido.is_(False),
             )
             .all()
         )
