@@ -434,11 +434,11 @@ def conferir(
     for grupo_nome, members in sorted(grupos_configs.items()):
         ct2_recs = ct2_por_grupo.get(grupo_nome, [])
         total_ct2 = round(sum(float(r.get("debito") or 0) for r in ct2_recs), 2)
-        # Grupo pode reunir LPs de codigos diferentes (ex.: 650 + 651) -- em vez
-        # de tentar combinar os codigos numa unica string (confuso, ja gerou
-        # duvida com "650+1"), mostra so' "LP" fixo; quem identifica o grupo e'
-        # a descricao (nome do grupo), exibida ao lado.
-        lp_codigo_display = "LP"
+        # Grupo pode reunir LPs de codigos diferentes (ex.: 650 + 651) -- mostra
+        # o codigo do LP (o primeiro em ordem, quando ha mais de um distinto),
+        # sem sufixo "+N" (ja gerou duvida com "650+1"); a descricao do grupo
+        # ao lado ja identifica de qual grupo se trata.
+        lp_codigo_display = sorted({m.lp_codigo for m in members})[0]
 
         cfops_set = set()
         tes_parts: list[str] = []
