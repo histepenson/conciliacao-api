@@ -531,7 +531,21 @@
       "Bash(tasklist //FI \"IMAGENAME eq python.exe\" //FI \"IMAGENAME eq node.exe\")",
       "Bash(APP_ENV=develop ./venv/Scripts/python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000)",
       "Bash(tasklist //FI \"PID eq 7592\")",
-      "Bash(taskkill //F //PID 7592)"
+      "Bash(taskkill //F //PID 7592)",
+      "Bash(./venv/Scripts/python.exe -m alembic current)",
+      "Bash(export DATABASE_URL=\"postgresql+psycopg2://postgres:TEQdHCNkUipWQKsbesMbkvzPvPYfArkd@shinkansen.proxy.rlwy.net:54745/railway?sslmode=require\")",
+      "Bash(alembic current *)",
+      "Bash(APP_ENV=develop alembic heads)",
+      "Bash(ls -t \"/c/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/56b66443-3bb5-4e71-87ae-0dae0dde3800/tasks/\" | head -10)",
+      "Read(//c/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/56b66443-3bb5-4e71-87ae-0dae0dde3800/tasks//**)",
+      "Bash(tail -100 \"/c/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/56b66443-3bb5-4e71-87ae-0dae0dde3800/tasks/bsrae2znc.output\")",
+      "Read(//c/Users/HISTEP~1/AppData/Local/Temp/claude/c--conciliacao-api/56b66443-3bb5-4e71-87ae-0dae0dde3800/tasks/**)",
+      "Read(//c/Users/histepenson/AppData/Local/Temp/claude/c--conciliacao-api/56b66443-3bb5-4e71-87ae-0dae0dde3800/tasks/**)",
+      "Read(//c/Users/histepenson/AppData/Local/Temp/claude/c--conciliacao-api/**)",
+      "Bash(xargs -I{} ls -la {})",
+      "Bash(sort -k6,7)",
+      "Bash(tail -150 \"/c/Users/histepenson/AppData/Local/Temp/claude/c--conciliacao-api/56b66443-3bb5-4e71-87ae-0dae0dde3800/tasks/b7yycjpxt.output\")",
+      "Bash(APP_ENV=develop ./venv/Scripts/python.exe -c \"import tools.banco.calc_diferencas_banco; print\\('OK'\\)\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

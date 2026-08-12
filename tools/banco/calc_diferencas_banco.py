@@ -91,11 +91,21 @@ def _match_soma_documentos_relacionados(df_ext: pd.DataFrame, df_raz: pd.DataFra
     FASE 2.5: Match por soma de documentos relacionados.
     Ex: Extrato 63616055 (10931.97) vs Razao 63616055 (10665.89) + 63616 (266.08)
     Busca no razao documentos cujo numero base esta contido no numero do extrato.
+
+    Indexa o razao por _doc_key (prefixo -> indices) em vez de comparar cada
+    linha do extrato contra TODAS as linhas pendentes do razao via .apply()
+    -- isso era O(N*M) e virava o gargalo com milhares de registros. Como so'
+    interessam prefixos de 3+ caracteres da chave do extrato, o lookup por
+    linha fica O(len(chave)) em vez de O(M).
     """
-    pend_ext = df_ext[~df_ext["matched"] & (df_ext["_doc_key"].str.len() > 0)].copy()
-    pend_raz = df_raz[~df_raz["matched"] & (df_raz["_doc_key"].str.len() > 0)].copy()
+    pend_ext = df_ext[~df_ext["matched"] & (df_ext["_doc_key"].str.len() > 0)]
+    pend_raz = df_raz[~df_raz["matched"] & (df_raz["_doc_key"].str.len() > 0)]
     if pend_ext.empty or pend_raz.empty:
         return
+
+    raz_por_chave: dict[str, list] = {}
+    for idx_raz, chave_raz in pend_raz["_doc_key"].items():
+        raz_por_chave.setdefault(chave_raz, []).append(idx_raz)
 
     for idx_ext in pend_ext.index:
         if df_ext.loc[idx_ext, "matched"]:
@@ -108,10 +118,15 @@ def _match_soma_documentos_relacionados(df_ext: pd.DataFrame, df_raz: pd.DataFra
         # Buscar documentos relacionados no razao:
         # 1. Chave exata (63616055)
         # 2. Chave base contida na chave do extrato (63616 em 63616055, 555 em 555032)
-        mask_relacionados = pend_raz["_doc_key"].apply(
-            lambda x: x == chave_ext or (len(x) >= 3 and chave_ext.startswith(x))
-        )
-        relacionados = pend_raz[mask_relacionados & ~df_raz.loc[pend_raz.index, "matched"]]
+        # Ambos os casos sao prefixos de chave_ext de tamanho >= 3.
+        candidatos_idx = []
+        for tam in range(3, len(chave_ext) + 1):
+            candidatos_idx.extend(raz_por_chave.get(chave_ext[:tam], []))
+        if not candidatos_idx:
+            continue
+
+        relacionados = df_raz.loc[candidatos_idx]
+        relacionados = relacionados[~relacionados["matched"]]
 
         if relacionados.empty:
             continue
@@ -123,7 +138,7 @@ def _match_soma_documentos_relacionados(df_ext: pd.DataFrame, df_raz: pd.DataFra
             df_ext.loc[idx_ext, "data_correspondencia"] = datas_raz
             df_raz.loc[relacionados.index, "matched"] = True
             df_raz.loc[relacionados.index, "data_correspondencia"] = df_ext.loc[idx_ext, "data"]
-            logger.info(f"[FASE 2.5] Match doc relacionados: {chave_ext} = {valor_ext} vs soma({list(relacionados['_doc_key'].values)}) = {soma_raz}")
+            logger.debug(f"[FASE 2.5] Match doc relacionados: {chave_ext} = {valor_ext} vs soma({list(relacionados['_doc_key'].values)}) = {soma_raz}")
 
 
 def _match_fallback_valor(df_ext: pd.DataFrame, df_raz: pd.DataFrame, col_ext: str, col_raz: str) -> None:
