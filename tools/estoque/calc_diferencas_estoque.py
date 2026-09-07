@@ -51,8 +51,9 @@ def _normalizar_data_chave(valor: Any) -> str:
     if not texto:
         return ""
 
-    # Ja no formato esperado
-    if re.match(r"^\d{2}/\d{2}/\d{4}$", texto):
+    # Ja no formato esperado -- valida faixa de dia/mes para nao aceitar
+    # datas quebradas do tipo "01/00/2026" como chave de matching valida.
+    if re.match(r"^(0[1-9]|[12]\d|3[01])/(0[1-9]|1[0-2])/\d{4}$", texto):
         return texto
 
     # ISO: YYYY-MM-DD (opcionalmente com hora)
@@ -67,8 +68,8 @@ def _normalizar_data_chave(valor: Any) -> str:
     if pd.notna(dt):
         return dt.strftime("%d/%m/%Y")
 
-    # Fallback: extrair primeira data DD/MM/YYYY do texto
-    m = re.search(r"(\d{2}/\d{2}/\d{4})", texto)
+    # Fallback: extrair primeira data DD/MM/YYYY valida do texto
+    m = re.search(r"((0[1-9]|[12]\d|3[01])/(0[1-9]|1[0-2])/\d{4})", texto)
     return m.group(1) if m else texto
 
 

@@ -194,8 +194,12 @@ def formatar_data(data: Any) -> str:
     # Atalho: ja esta no formato final (ex: vem assim de cargas MATR900/CTBR400
     # importadas manualmente) -- evita chamar pd.to_datetime() escalar por linha,
     # que e' extremamente lento quando aplicado em milhares de linhas (cada
-    # chamada individual tem overhead de parsing significativo).
-    if isinstance(data, str) and re.fullmatch(r"\d{2}/\d{2}/\d{4}", data.strip()):
+    # chamada individual tem overhead de parsing significativo). Valida faixa
+    # de dia/mes (nao so o formato) para nao aceitar datas quebradas do tipo
+    # "01/00/2026" que corrompem o ct2_key usado no matching Kardex x Razao.
+    if isinstance(data, str) and re.fullmatch(
+        r"(0[1-9]|[12]\d|3[01])/(0[1-9]|1[0-2])/\d{4}", data.strip()
+    ):
         return data.strip()
 
     try:

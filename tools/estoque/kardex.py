@@ -115,11 +115,22 @@ def _cf_lookup_key(cf_texto: str) -> str:
 
 
 def _data_br_para_dtos(data_br: str) -> str:
-    """Converte DD/MM/YYYY (formato ja' normalizado por formatar_data) para YYYYMMDD."""
+    """Converte DD/MM/YYYY (formato ja' normalizado por formatar_data) para YYYYMMDD.
+
+    Retorna "" quando dia/mes estao fora de faixa (ex.: "01/00/2026") em vez
+    de montar um ct2_key corrompido -- uma data invalida nao pode virar chave
+    de matching, senao o movimento nunca casa com o lancamento correto no
+    Razao (ou, por acidente, casa com outro registro errado).
+    """
     partes = str(data_br or "").strip().split("/")
     if len(partes) != 3:
         return ""
     dia, mes, ano = partes
+    if not (dia.isdigit() and mes.isdigit() and ano.isdigit()):
+        return ""
+    if not (1 <= int(mes) <= 12) or not (1 <= int(dia) <= 31):
+        logger.warning(f"[KARDEX] Data invalida para ct2_key: {data_br!r}")
+        return ""
     return f"{ano}{mes.zfill(2)}{dia.zfill(2)}"
 
 
