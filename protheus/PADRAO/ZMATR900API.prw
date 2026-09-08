@@ -199,6 +199,7 @@ BeginSql Alias cAliasTop
             D1_LOCAL ARMAZEM,
             D1_FORNECE PARCEIRO,
             D1_LOJA LOJA,
+            D1_ITEM ITEM,
             D1_TIPO TIPONF,
             %Exp:cSelectD1%
             D1_LOTECTL LOTE,
@@ -232,6 +233,7 @@ BeginSql Alias cAliasTop
             D2_LOCAL,
             D2_CLIENTE,
             D2_LOJA,
+            D2_ITEM,
             D2_TIPO,
             %Exp:cSelectD2%
             D2_LOTECTL,
@@ -264,6 +266,7 @@ BeginSql Alias cAliasTop
             D3_QTSEGUM,
             D3_LOCAL,
             D3_CC,
+            ' ',
             ' ',
             ' ',
             %Exp:cSelectD3%
@@ -438,6 +441,11 @@ oLinha["ARM"] := AllTrim((cAliasTop)->ARMLOC)
 oLinha["TES"] := AllTrim((cAliasTop)->TES)
 oLinha["CF"] := AllTrim((cAliasTop)->CF)
 oLinha["Documento Numero"] := cDocNumero
+oLinha["Doc"] := AllTrim((cAliasTop)->DOCUMENTO)
+oLinha["Serie"] := AllTrim((cAliasTop)->SERIE)
+oLinha["Loja"] := AllTrim((cAliasTop)->LOJA)
+oLinha["Item"] := AllTrim((cAliasTop)->ITEM)
+oLinha["Sequencia"] := AllTrim((cAliasTop)->SEQUENCIA)
 oLinha["Entradas Quantidade"] := Round(nEntQtd, 2)
 oLinha["Entradas Custo Total"] := Round(nEntCus, 2)
 oLinha["Custo Medio do Movimento"] := IIf((cAliasTop)->QUANTIDADE != 0, Round((cAliasTop)->CUSTO / (cAliasTop)->QUANTIDADE, 2), 0)

@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 # Todos os movimentos sao aglutinados em ENTRADAS ou SAIDAS
 MAPEAMENTO_CODIGO_RAZAO = {
     "CPV": "CPV",
+    "CMV": "CPV",  # mesma coisa que CPV, so' nomenclatura diferente por empresa
     "BON": "CPV",
     "DEV": "DEV",
     "DE0": "DE0",
@@ -62,7 +63,9 @@ def _extrair_codigo_base_historico(historico: str) -> str:
 
     texto = str(historico).strip().upper()
     # Aceita variacoes com separadores: "PR 0", "PR-0", "DE 7", "RE/0", "CPV/PD/BO"
-    match = re.search(r"(CPV|BON|DEV|DE\D*[0-7]|RE\D*[0-7]|PR\D*0)", texto)
+    # CMV e' a mesma coisa que CPV (nomenclatura diferente por empresa -- ver
+    # MAPEAMENTO_CODIGO_RAZAO), ja' normalizado aqui pra "CPV".
+    match = re.search(r"(CPV|CMV|BON|DEV|DE\D*[0-7]|RE\D*[0-7]|PR\D*0)", texto)
     if match:
         bruto = match.group(1)
         normalizado = re.sub(r"\D", "", bruto)
@@ -72,7 +75,7 @@ def _extrair_codigo_base_historico(historico: str) -> str:
             return f"RE{normalizado[-1]}"
         if bruto.startswith("PR") and normalizado:
             return "PR0"
-        if bruto.startswith("CPV"):
+        if bruto.startswith("CPV") or bruto.startswith("CMV"):
             return "CPV"
         if bruto.startswith("BON"):
             return "BON"
@@ -136,7 +139,15 @@ def extrair_data_historico(historico: str, ano_base: int = None) -> str:
 
     texto = str(historico).strip()
 
+    def _dia_mes_validos(d: str, m: str) -> bool:
+        try:
+            return 1 <= int(d) <= 31 and 1 <= int(m) <= 12
+        except ValueError:
+            return False
+
     def _fmt_dmy(d: str, m: str, y: str) -> str:
+        if not _dia_mes_validos(d, m):
+            return ""
         return f"{d.zfill(2)}/{m.zfill(2)}/{y}"
 
     def _resolver_ano(y_extraido: str) -> str:
@@ -146,53 +157,77 @@ def extrair_data_historico(historico: str, ano_base: int = None) -> str:
         return y_extraido
 
     def _fmt_dmy_ano_base(d: str, m: str) -> str:
-        if ano_base:
-            return f"{d.zfill(2)}/{m.zfill(2)}/{ano_base}"
-        return ""
+        if not ano_base or not _dia_mes_validos(d, m):
+            return ""
+        return f"{d.zfill(2)}/{m.zfill(2)}/{ano_base}"
+
+    # Os fallbacks soltos (5-8) procuram DD/MM em qualquer trecho do texto
+    # -- em historicos sem "DATA:" (ex.: "NFE. 1/000000360-FORNECEDOR"), a
+    # serie/numero da NF ("1/000000360") pode casar por acidente, gerando
+    # dia/mes invalidos tipo "01/00". Cada padrao abaixo so' retorna se o
+    # dia/mes extraido for uma data valida (_dia_mes_validos); senao,
+    # continua tentando os proximos padroes -- se nenhum bater, cai no
+    # fallback de normalizar_razao_estoque que usa a coluna DATA real.
 
     # Padrao 1: DATA: DD/MM/YYYY (ano completo)
     match = re.search(r'DATA:\s*(\d{1,2})/(\d{1,2})/(\d{4})', texto)
     if match:
-        return _fmt_dmy(match.group(1), match.group(2), _resolver_ano(match.group(3)))
+        resultado = _fmt_dmy(match.group(1), match.group(2), _resolver_ano(match.group(3)))
+        if resultado:
+            return resultado
 
     # Padrao 2: DATA: DD/MM/YY (ano curto)
     match = re.search(r'DATA:\s*(\d{1,2})/(\d{1,2})/(\d{2})\b', texto)
     if match:
         ano_curto = int(match.group(3))
         ano = 2000 + ano_curto if ano_curto < 50 else 1900 + ano_curto
-        return _fmt_dmy(match.group(1), match.group(2), _resolver_ano(str(ano)))
+        resultado = _fmt_dmy(match.group(1), match.group(2), _resolver_ano(str(ano)))
+        if resultado:
+            return resultado
 
     # Padrao 3: DATA: DD/MM/ (sem ano - trailing slash)
     match = re.search(r'DATA:\s*(\d{1,2})/(\d{1,2})/', texto)
     if match:
-        return _fmt_dmy_ano_base(match.group(1), match.group(2))
+        resultado = _fmt_dmy_ano_base(match.group(1), match.group(2))
+        if resultado:
+            return resultado
 
     # Padrao 4: DATA: DD/MM (sem barra final, sem ano)
     match = re.search(r'DATA:\s*(\d{1,2})/(\d{1,2})(?:\s|$|[^/\d])', texto)
     if match:
-        return _fmt_dmy_ano_base(match.group(1), match.group(2))
+        resultado = _fmt_dmy_ano_base(match.group(1), match.group(2))
+        if resultado:
+            return resultado
 
     # Fallback 5: DD/MM/YYYY em qualquer trecho do historico
     match = re.search(r'(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4})(?!\d)', texto)
     if match:
-        return _fmt_dmy(match.group(1), match.group(2), _resolver_ano(match.group(3)))
+        resultado = _fmt_dmy(match.group(1), match.group(2), _resolver_ano(match.group(3)))
+        if resultado:
+            return resultado
 
     # Fallback 6: DD/MM/YY em qualquer trecho do historico
     match = re.search(r'(?<!\d)(\d{1,2})/(\d{1,2})/(\d{2})(?!\d)', texto)
     if match:
         ano_curto = int(match.group(3))
         ano = 2000 + ano_curto if ano_curto < 50 else 1900 + ano_curto
-        return _fmt_dmy(match.group(1), match.group(2), _resolver_ano(str(ano)))
+        resultado = _fmt_dmy(match.group(1), match.group(2), _resolver_ano(str(ano)))
+        if resultado:
+            return resultado
 
     # Fallback 7: DD/MM/ sem ano em qualquer trecho
     match = re.search(r'(?<!\d)(\d{1,2})/(\d{1,2})/(?!\d)', texto)
     if match:
-        return _fmt_dmy_ano_base(match.group(1), match.group(2))
+        resultado = _fmt_dmy_ano_base(match.group(1), match.group(2))
+        if resultado:
+            return resultado
 
     # Fallback 8: DD/MM sem ano em qualquer trecho
     match = re.search(r'(?<!\d)(\d{1,2})/(\d{1,2})(?!/\d)', texto)
     if match:
-        return _fmt_dmy_ano_base(match.group(1), match.group(2))
+        resultado = _fmt_dmy_ano_base(match.group(1), match.group(2))
+        if resultado:
+            return resultado
 
     return ""
 
@@ -249,6 +284,7 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
     col_saldo = obter_coluna(df, ["saldo_atual", "saldo", "saldo_final"])
     col_lote_doc = obter_coluna(df, ["lote_sub_doc_linha", "lote", "documento", "doc"])
     col_ct2_key = obter_coluna(df, ["ct2_key"])
+    col_ct2_lp = obter_coluna(df, ["ct2_lp"])
 
     logger.info(f"[RAZAO ESTOQUE] Coluna DATA: {col_data}")
     logger.info(f"[RAZAO ESTOQUE] Coluna HISTORICO: {col_historico}")
@@ -285,6 +321,14 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
         df_norm["ct2_key"] = df[col_ct2_key].astype(str).str.strip()
     else:
         df_norm["ct2_key"] = ""
+
+    # ct2_lp: LP (lancamento padrao) que gerou o lancamento na CT2 -- usado
+    # pra escolher qual formula de ct2_key aplicar do lado do Kardex (a
+    # formula varia por LP). Ausente em cargas antigas.
+    if col_ct2_lp:
+        df_norm["ct2_lp"] = df[col_ct2_lp].astype(str).str.strip()
+    else:
+        df_norm["ct2_lp"] = ""
 
     # Extrair CF original (3 primeiros caracteres do historico, sem mapeamento)
     df_norm["cf_original"] = df_norm["historico"].apply(extrair_cf_original)

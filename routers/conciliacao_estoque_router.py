@@ -16,6 +16,7 @@ from schemas.conciliacao_estoque_schema import (
 from services.conciliacao_estoque_service import ConciliacaoEstoqueService
 from services.conciliacao_estoque_efetivacao_service import ConciliacaoEstoqueEfetivacaoService
 from services import balancete_service
+from services import lancamento_padrao_ct2_service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
 from db import get_db
@@ -54,7 +55,10 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
         raise HTTPException(status_code=400, detail=mensagem)
 
     try:
-        resultado = service.executar(request)
+        mapa_lp_tipo = lancamento_padrao_ct2_service.obter_mapa_tipo_chave(
+            db, request.parametros.empresa_id
+        )
+        resultado = service.executar(request, mapa_lp_tipo=mapa_lp_tipo)
 
         # Validar saldo calculado contra balancete importado (se houver)
         # Movimentos do periodo vem da ORIGEM (Kardex): entradas = debito, saidas = credito
