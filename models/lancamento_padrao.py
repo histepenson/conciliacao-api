@@ -35,3 +35,27 @@ class LancamentoPadrao(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     empresa = relationship("Empresa")
+
+
+class LancamentoPadraoCt2Layout(Base):
+    """Mapeia, por empresa, qual familia de formula de CT2_KEY um LP usa --
+    o Protheus grava a chave nativa (CT2_KEY) com layouts diferentes
+    dependendo da origem do lancamento (estoque puro x compra x venda), e
+    esse cadastro permite ao matching de conciliacao de estoque escolher a
+    formula certa do lado do Kardex pra cada linha do Razao (ver ct2_lp)."""
+
+    __tablename__ = "lancamento_padrao_ct2_layout"
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "lp_codigo", name="uq_lp_ct2_layout_empresa_codigo"),
+        {"schema": "concilia"},
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    empresa_id = Column(Integer, ForeignKey("concilia.empresa.id", ondelete="CASCADE"), nullable=False, index=True)
+    lp_codigo = Column(String(10), nullable=False)
+    tipo_chave = Column(String(20), nullable=False)  # "ESTOQUE" | "COMPRA" | "VENDA"
+    descricao = Column(String(200))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    empresa = relationship("Empresa")

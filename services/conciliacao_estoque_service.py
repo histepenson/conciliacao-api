@@ -44,7 +44,11 @@ class ConciliacaoEstoqueService:
         except ValueError:
             return datetime.now().year
 
-    def executar(self, request: RequestConciliacaoEstoque) -> Dict[str, Any]:
+    def executar(
+        self,
+        request: RequestConciliacaoEstoque,
+        mapa_lp_tipo: Dict[str, str] | None = None,
+    ) -> Dict[str, Any]:
         """
         Executa a conciliacao de estoque.
 
@@ -53,6 +57,10 @@ class ConciliacaoEstoqueService:
         2. Normaliza Razao Contabil de Estoque (CTBR400)
         3. Agrupa por (data, codigo_movimento) e calcula diferencas
         4. Gera relatorio
+
+        mapa_lp_tipo: {lp_codigo: tipo_chave}, resolvido pelo chamador via
+        services/lancamento_padrao_ct2_service.py -- usado no matching
+        exato por familia de Lancamento Padrao (ver calc_diferencas_estoque).
 
         Returns:
             Dict com relatorio completo da conciliacao
@@ -102,7 +110,8 @@ class ConciliacaoEstoqueService:
 
         resultado = calcular_diferencas_estoque(
             df_kardex=df_kardex,
-            df_razao=df_razao
+            df_razao=df_razao,
+            mapa_lp_tipo=mapa_lp_tipo,
         )
 
         resumo = resultado["resumo"]

@@ -42,7 +42,7 @@ Retorno JSON:
 Campos por linha (compativel com CTBR400 / CTBR480):
   data, lote_sub_doc_linha, historico, xpartida,
   c_custo, item_conta, cod_cl_val,
-  debito, credito, saldo_atual, conta, ct2_key
+  debito, credito, saldo_atual, conta, ct2_key, ct2_lp
 
 @author Equipe Desenvolvimento
 @since 21/05/2026
@@ -194,7 +194,8 @@ If lIncCred
     cSql += "     CT2_CLVLCR AS cod_cl_val,"
     cSql += "     0          AS debito,"
     cSql += "     CT2_VALOR  AS credito,"
-    cSql += "     CT2_KEY"
+    cSql += "     CT2_KEY,"
+    cSql += "     CT2_LP"
     cSql += " FROM " + cTabela
     cSql += " WHERE " + cWhere
     cSql += "   AND CT2_DC IN ('2','3')"
@@ -223,7 +224,8 @@ If lIncDeb
     cSql += "     CT2_CLVLDB AS cod_cl_val,"
     cSql += "     CT2_VALOR  AS debito,"
     cSql += "     0          AS credito,"
-    cSql += "     CT2_KEY"
+    cSql += "     CT2_KEY,"
+    cSql += "     CT2_LP"
     cSql += " FROM " + cTabela
     cSql += " WHERE " + cWhere
     cSql += "   AND CT2_DC IN ('1','3')"
@@ -277,6 +279,7 @@ Begin Sequence
         oLinha["saldo_atual"]        := 0
         oLinha["conta"]              := AllTrim((cAlias)->conta)
         oLinha["ct2_key"]            := AllTrim((cAlias)->CT2_KEY)
+        oLinha["ct2_lp"]             := AllTrim((cAlias)->CT2_LP)
         AAdd(aLinhas, oLinha)
         (cAlias)->(DbSkip())
     EndDo

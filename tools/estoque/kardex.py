@@ -226,6 +226,15 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
     col_descricao = obter_coluna(df, ["descricao", "desc"])
     col_codigo = obter_coluna(df, ["codigo", "cod"])
     col_arm = obter_coluna(df, ["arm", "armazem"])
+    # Match exato (nao usar obter_coluna): "doc" e "serie" sao substrings de
+    # outras colunas existentes (ex.: "documento_numero"), e o fallback por
+    # substring de obter_coluna pegaria a coluna errada.
+    col_doc = "doc" if "doc" in df.columns else None
+    col_serie = "serie" if "serie" in df.columns else None
+    col_loja = "loja" if "loja" in df.columns else None
+    col_item = "item" if "item" in df.columns else None
+    col_sequencia = "sequencia" if "sequencia" in df.columns else None
+    col_parceiro = obter_coluna(df, ["cli_for_cc_pj_op_os"])
 
     logger.info(f"[KARDEX] Coluna DATA: {col_data}")
     logger.info(f"[KARDEX] Coluna CF: {col_cf}")
@@ -264,6 +273,46 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
         df_norm["documento_numero"] = df[col_documento].astype(str).str.strip()
     else:
         df_norm["documento_numero"] = ""
+
+    # Doc/Serie normalizados (D1_DOC/D1_SERIE, D2_DOC/D2_SERIE, D3_DOC) --
+    # opcionais, ausentes em cargas antigas processadas antes do ZMATR900API
+    # passar a exportar esses campos.
+    if col_doc:
+        df_norm["doc"] = df[col_doc].astype(str).str.strip()
+    else:
+        df_norm["doc"] = ""
+
+    if col_serie:
+        df_norm["serie"] = df[col_serie].astype(str).str.strip()
+    else:
+        df_norm["serie"] = ""
+
+    if col_loja:
+        df_norm["loja"] = df[col_loja].astype(str).str.strip()
+    else:
+        df_norm["loja"] = ""
+
+    if col_item:
+        df_norm["item"] = df[col_item].astype(str).str.strip()
+    else:
+        df_norm["item"] = ""
+
+    if col_sequencia:
+        df_norm["sequencia"] = df[col_sequencia].astype(str).str.strip()
+    else:
+        df_norm["sequencia"] = ""
+
+    # Parceiro (fornecedor/cliente) sem o prefixo "C-"/"F-"/"CC" que o
+    # ADVPL adiciona ao campo CLI/FOR/CC/PJ/OP/OS -- usado (junto de doc,
+    # serie, loja, item) pra comparar contra o ct2_key decodificado do
+    # Razao nos LPs de familia COMPRA/VENDA.
+    if col_parceiro:
+        df_norm["parceiro"] = (
+            df[col_parceiro].astype(str).str.strip()
+            .str.replace(r"^(C-|F-|CC)", "", regex=True)
+        )
+    else:
+        df_norm["parceiro"] = ""
 
     if col_descricao:
         df_norm["descricao"] = df[col_descricao].astype(str).str.strip()
@@ -316,14 +365,25 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
         round(float(df_norm.loc[df_norm["codigo_movimento"] == "DEV", "valor"].sum()), 2),
     )
 
-    # ct2_key: mesma chave que o Protheus grava na CT2 ao gerar o lancamento
-    # contabil a partir do movimento de estoque -- permite matching exato
-    # contra o ct2_key do Razao (CTBR400), em vez de so' (data, cf) agregado.
-    df_norm["ct2_key"] = (
+    # ct2_key_estoque: mesma chave que o Protheus grava na CT2 quando o
+    # lancamento contabil vem de um LP de familia "ESTOQUE" (movimento de
+    # estoque puro, sem documento fiscal) -- Codigo+Armazem+Data(AAAAMMDD)+
+    # Sequencia (NUMSEQ). Usa "sequencia", nao "documento_numero" (bug da
+    # versao anterior: "documento_numero" e' o campo exibido na tela,
+    # dependente do parametro documento_por, nao o NUMSEQ que a formula
+    # real do Protheus usa).
+    #
+    # Para LPs de familia COMPRA/VENDA (documento fiscal), a chave nativa
+    # do Razao e' decodificada por posicao (ver
+    # calc_diferencas_estoque.py::_decodificar_ct2_key) e comparada campo-
+    # a-campo contra doc/serie/loja/item/parceiro/codigo_produto, em vez de
+    # remontada aqui -- largura fixa de cada campo (SX3) e' informacao do
+    # Protheus que nao temos como confirmar deste lado.
+    df_norm["ct2_key_estoque"] = (
         df_norm["codigo_produto"].astype(str).str.strip()
         + df_norm["armazem"].astype(str).str.strip()
         + df_norm["data"].apply(_data_br_para_dtos)
-        + df_norm["documento_numero"].astype(str).str.strip()
+        + df_norm["sequencia"].astype(str).str.strip()
     )
 
     return df_norm

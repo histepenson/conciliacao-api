@@ -107,6 +107,67 @@ def _normalizar_cf_por_movimento(cf: Any, codigo_movimento: Any) -> str:
     return _normalizar_cf_chave(cf)
 
 
+def _norm_campo_fiscal(valor: Any, largura: int) -> str:
+    """Normaliza um campo pra comparacao: numerico -> zero a esquerda ate a
+    largura do campo no Protheus; texto -> so' upper (evita falso mismatch
+    por diferenca de zero a esquerda entre o valor cru do Kardex e o
+    trecho decodificado do ct2_key nativo)."""
+    v = str(valor or "").strip()
+    if v.isdigit():
+        return v.zfill(largura)
+    return v.upper()
+
+
+def _decodificar_ct2_key_fiscal(ct2_key: Any) -> dict | None:
+    """
+    Decodifica o CT2_KEY nativo do Protheus por posicao fixa, pra
+    lancamentos originados de documento fiscal (LP de familia
+    COMPRA/VENDA): DOC(6:15) + SERIE(15:16) + CLIFOR/PARCEIRO(18:26) +
+    LOJA(27:31) + PRODUTO(31:46) + ITEM(46:50). Posicao 0:6 (prefixo
+    empresa/filial) e' ignorada -- Kardex e Razao de uma mesma conciliacao
+    sempre pertencem a mesma empresa/filial, entao esse prefixo nao
+    discrimina nada dentro de uma execucao.
+
+    Larguras confirmadas empiricamente nesta sessao contra 3 ct2_key reais
+    de lancamentos de compra (historico "NFE...") da empresa piloto,
+    cruzando o numero da NF (do historico) e o codigo do produto (contra o
+    Kardex real da mesma carga) pra achar os offsets exatos -- NAO veio de
+    suposicao nem do dicionario SX3 (largura de campo pode variar por LP/
+    empresa; ainda falta confirmar contra um LP de VENDA e contra um
+    ct2_lp real, ja que o CTBR400/ZCT2RAZAPI so' passou a exportar ct2_lp
+    depois dessa validacao -- ver plano desta etapa).
+
+    Implementacao independente (nao importa de tools/fiscal/match_ct2_sft.py,
+    que usa layout parecido mas com offsets diferentes pra outro cenario --
+    ver memoria feedback_isolamento_entre_processos).
+
+    Retorna None quando a chave e' curta demais pra decodificar.
+    """
+    key = str(ct2_key or "").strip()
+    if len(key) < 50:
+        return None
+    return {
+        "doc": key[6:15].strip(),
+        "serie": key[15:16].strip(),
+        "parceiro": key[18:26].strip(),
+        "loja": key[27:31].strip(),
+        "codigo_produto": key[31:46].strip(),
+        "item": key[46:50].strip(),
+    }
+
+
+def _chave_fiscal(reg: dict) -> tuple:
+    """Tupla de comparacao pra familia COMPRA/VENDA -- mesmos nomes de
+    campo tanto pro registro normalizado do Kardex quanto pro dict
+    decodificado de _decodificar_ct2_key_fiscal."""
+    return (
+        _norm_campo_fiscal(reg.get("doc", ""), 9),
+        _norm_campo_fiscal(reg.get("serie", ""), 3),
+        _norm_campo_fiscal(reg.get("parceiro", ""), 6),
+        str(reg.get("codigo_produto", "") or "").strip().upper(),
+    )
+
+
 def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list:
     """
     Seleciona subconjunto de registros cuja soma de 'valor' fecha o total_alvo.
@@ -195,7 +256,8 @@ def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list
 
 def calcular_diferencas_estoque(
     df_kardex: pd.DataFrame,
-    df_razao: pd.DataFrame
+    df_razao: pd.DataFrame,
+    mapa_lp_tipo: Dict[str, str] | None = None,
 ) -> Dict[str, Any]:
     """
     Calcula diferencas entre Kardex e Razao Contabil de Estoque
@@ -210,6 +272,13 @@ def calcular_diferencas_estoque(
     df_razao : pd.DataFrame
         DataFrame normalizado do Razao de Estoque (saida de normalizar_razao_estoque)
         Colunas esperadas: data_movimento, codigo_movimento, debito, credito, tipo
+
+    mapa_lp_tipo : dict[str, str], opcional
+        {lp_codigo: tipo_chave} -- de onde vem qual formula de ct2_key usar
+        por Lancamento Padrao na passada 0 do matching (ver
+        services/lancamento_padrao_ct2_service.py::obter_mapa_tipo_chave).
+        LPs ausentes do mapa nao entram na passada exata e caem no fallback
+        (data, cf) normal.
 
     Retorna:
     --------
@@ -344,6 +413,7 @@ def calcular_diferencas_estoque(
                 "credito": round(float(reg.get("credito", 0)), 2),
                 "codigo_movimento": cm,
                 "ct2_key": str(reg.get("ct2_key", "") or "").strip(),
+                "ct2_lp": str(reg.get("ct2_lp", "") or "").strip(),
                 "_origem": "razao",
             })
         return registros
@@ -362,23 +432,27 @@ def calcular_diferencas_estoque(
                 "descricao": str(reg.get("descricao", "")),
                 "codigo_produto": str(reg.get("codigo_produto", "")),
                 "codigo_movimento": cm,
-                "ct2_key": str(reg.get("ct2_key", "") or "").strip(),
+                "ct2_key_estoque": str(reg.get("ct2_key_estoque", "") or "").strip(),
+                "doc": str(reg.get("doc", "") or "").strip(),
+                "serie": str(reg.get("serie", "") or "").strip(),
+                "loja": str(reg.get("loja", "") or "").strip(),
+                "item": str(reg.get("item", "") or "").strip(),
+                "parceiro": str(reg.get("parceiro", "") or "").strip(),
                 "_origem": "kardex",
             })
         return registros
 
-    def _agrupar_para_matching(registros, usar_cf=True):
+    def _agrupar_para_matching(registros, usar_cf=True, usar_data=True):
         """
-        Aglutina registros por:
-        - data + cf (quando usar_cf=True)
-        - data (quando usar_cf=False)
-        Somando os valores.
+        Aglutina registros por combinacao de data/cf -- cada dimensao pode
+        ser desligada (usar_cf=False / usar_data=False), agrupando tudo num
+        unico bucket pra aquela dimensao.
         """
         mapa = {}
         for reg in registros:
-            data = _normalizar_data_chave(reg.get("data", ""))
+            data = _normalizar_data_chave(reg.get("data", "")) if usar_data else ""
             cf = _normalizar_cf_chave(reg.get("cf", "")) if usar_cf else ""
-            chave = (data, cf) if usar_cf else (data,)
+            chave = (data, cf)
             if chave not in mapa:
                 mapa[chave] = {"data": data, "cf": cf, "valor": 0.0, "registros": []}
             mapa[chave]["valor"] += float(reg.get("valor", 0) or 0)
@@ -396,33 +470,71 @@ def calcular_diferencas_estoque(
     def _skip_cf_match(codigo_movimento):
         return codigo_movimento in {"CPV", "DEV"}
 
-    def _matching_por_ct2_key(regs_kardex, regs_razao):
+    # DEV e CPV: o Kardex sempre traz o ultimo dia do mes como "Operacao
+    # Data" desses movimentos (nao a data real do lancamento), entao nunca
+    # bate com a data real do Razao -- desliga a dimensao de data pra esses
+    # codigo_movimento, comparando so' o valor total do grupo.
+    def _skip_data_match(codigo_movimento):
+        return codigo_movimento in {"DEV", "CPV"}
+
+    def _matching_por_ct2_key(regs_kardex, regs_razao, mapa_lp_tipo):
         """
         Passada 0 (antes do matching agregado por data+cf): casa Kardex x
-        Razao pelo ct2_key -- mesma chave que o Protheus grava na CT2 ao
-        gerar o lancamento contabil a partir do movimento de estoque
-        (Codigo+ARM+Data+Documento no Kardex; CT2_KEY nativo no Razao).
-        So' consome o par quando chave E valor batem (tolerancia de R$ 0,01)
-        -- sem fallback global, mesmo principio de tools/fiscal/match_ct2_sft.py
-        (evita falso positivo por colisao de chave). O que nao casar aqui
-        (sem ct2_key de um dos lados, ou chave sem par) segue no fluxo
-        existente de matching por (data, cf).
+        Razao pela chave nativa que o Protheus grava na CT2 -- mas essa
+        chave tem formato diferente conforme o Lancamento Padrao (LP) que
+        gerou o lancamento, entao a familia (ESTOQUE/COMPRA/VENDA) e'
+        resolvida por LP via mapa_lp_tipo ({lp_codigo: tipo_chave}).
+
+        - ESTOQUE (movimento de estoque puro, sem doc fiscal): compara
+          ct2_key_estoque do Kardex (Codigo+ARM+Data+Sequencia) contra o
+          ct2_key nativo do Razao, igualdade de string.
+        - COMPRA/VENDA (origem em documento fiscal): decodifica o ct2_key
+          nativo por posicao fixa (_decodificar_ct2_key_fiscal) e compara
+          campo-a-campo (doc, serie, parceiro, codigo_produto) contra os
+          valores ja normalizados do Kardex.
+
+        Linhas do Razao cujo ct2_lp nao esta em mapa_lp_tipo (LP nao
+        configurado) nao entram em nenhuma das duas passadas e seguem pro
+        fluxo existente de matching por (data, cf). So' consome o par
+        quando chave E valor batem (tolerancia de R$ 0,01) -- sem fallback
+        global, mesmo principio de tools/fiscal/match_ct2_sft.py (evita
+        falso positivo por colisao de chave; implementacao independente
+        aqui, ver memoria feedback_isolamento_entre_processos).
         """
-        por_chave_razao: dict = {}
+        mapa_lp_tipo = mapa_lp_tipo or {}
+
+        por_estoque_razao: dict = {}
+        por_fiscal_razao: dict = {}
         for idx, reg in enumerate(regs_razao):
-            chave = reg.get("ct2_key") or ""
-            if chave:
-                por_chave_razao.setdefault(chave, []).append(idx)
+            tipo = mapa_lp_tipo.get(str(reg.get("ct2_lp") or "").strip())
+            if tipo == "ESTOQUE":
+                chave = reg.get("ct2_key") or ""
+                if chave:
+                    por_estoque_razao.setdefault(chave, []).append(idx)
+            elif tipo in ("COMPRA", "VENDA"):
+                decoded = _decodificar_ct2_key_fiscal(reg.get("ct2_key") or "")
+                if decoded:
+                    por_fiscal_razao.setdefault(_chave_fiscal(decoded), []).append(idx)
 
         usados_kardex = set()
         usados_razao = set()
         for idx_k, reg_k in enumerate(regs_kardex):
-            chave = reg_k.get("ct2_key") or ""
-            if not chave:
-                continue
-            candidatos = [i for i in por_chave_razao.get(chave, []) if i not in usados_razao]
+            candidatos = []
+
+            chave_estoque = reg_k.get("ct2_key_estoque") or ""
+            if chave_estoque:
+                candidatos = [i for i in por_estoque_razao.get(chave_estoque, []) if i not in usados_razao]
+
+            if not candidatos:
+                chave_fiscal = _chave_fiscal(reg_k)
+                # so' tenta a familia fiscal quando ha' doc ou parceiro --
+                # evita casar por acidente registros totalmente vazios
+                if chave_fiscal[0] or chave_fiscal[2]:
+                    candidatos = [i for i in por_fiscal_razao.get(chave_fiscal, []) if i not in usados_razao]
+
             if not candidatos:
                 continue
+
             valor_k = float(reg_k.get("valor", 0) or 0)
             for idx_r in candidatos:
                 valor_r = float(regs_razao[idx_r].get("valor", 0) or 0)
@@ -438,20 +550,21 @@ def calcular_diferencas_estoque(
         regs_razao_restantes = [r for i, r in enumerate(regs_razao) if i not in usados_razao]
         return regs_kardex_restantes, regs_razao_restantes
 
-    def _matching_registros(regs_kardex, regs_razao, match_cf=True):
+    def _matching_registros(regs_kardex, regs_razao, match_cf=True, match_data=True, mapa_lp_tipo=None):
         """
         Matching aglutinado:
-        - passada 0: chave exata por ct2_key (quando disponivel)
-        - por (data, cf_normalizado) quando match_cf=True
-        - por (data) quando match_cf=False
+        - passada 0: chave exata por familia de LP (quando disponivel)
+        - por (data, cf_normalizado), cada dimensao ligada/desligada
+          conforme match_cf/match_data (DEV desliga data -- ver
+          _skip_data_match)
         Compara soma de valor por chave.
         """
-        regs_kardex, regs_razao = _matching_por_ct2_key(regs_kardex, regs_razao)
-        k_ag = _agrupar_para_matching(regs_kardex, usar_cf=match_cf)
-        r_ag = _agrupar_para_matching(regs_razao, usar_cf=match_cf)
+        regs_kardex, regs_razao = _matching_por_ct2_key(regs_kardex, regs_razao, mapa_lp_tipo)
+        k_ag = _agrupar_para_matching(regs_kardex, usar_cf=match_cf, usar_data=match_data)
+        r_ag = _agrupar_para_matching(regs_razao, usar_cf=match_cf, usar_data=match_data)
 
-        k_map = {((r["data"], r["cf"]) if match_cf else (r["data"],)): r for r in k_ag}
-        r_map = {((r["data"], r["cf"]) if match_cf else (r["data"],)): r for r in r_ag}
+        k_map = {(r["data"], r["cf"]): r for r in k_ag}
+        r_map = {(r["data"], r["cf"]): r for r in r_ag}
 
         chaves = set(k_map.keys()) | set(r_map.keys())
         so_kardex = []
@@ -565,7 +678,8 @@ def calcular_diferencas_estoque(
         grupo_info["qtd_registros_razao"] = len(regs_r)
 
         match_cf = not _skip_cf_match(cm)
-        so_k, so_r = _matching_registros(regs_k, regs_r, match_cf=match_cf)
+        match_data = not _skip_data_match(cm)
+        so_k, so_r = _matching_registros(regs_k, regs_r, match_cf=match_cf, match_data=match_data, mapa_lp_tipo=mapa_lp_tipo)
         grupo_info["so_kardex"] = so_k
         grupo_info["so_razao"] = so_r
         grupo_info["total_so_kardex"] = round(sum(float(r.get("valor", 0) or 0) for r in so_k), 2)
