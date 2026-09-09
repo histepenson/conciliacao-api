@@ -48,6 +48,8 @@ class ConciliacaoEstoqueService:
         self,
         request: RequestConciliacaoEstoque,
         mapa_lp_tipo: Dict[str, str] | None = None,
+        mapa_lp_movimento_ct2_vazio: Dict[str, str] | None = None,
+        mapa_lp_layout_campos: Dict[str, list] | None = None,
     ) -> Dict[str, Any]:
         """
         Executa a conciliacao de estoque.
@@ -61,6 +63,16 @@ class ConciliacaoEstoqueService:
         mapa_lp_tipo: {lp_codigo: tipo_chave}, resolvido pelo chamador via
         services/lancamento_padrao_ct2_service.py -- usado no matching
         exato por familia de Lancamento Padrao (ver calc_diferencas_estoque).
+
+        mapa_lp_movimento_ct2_vazio: {lp_codigo: codigo_movimento}, resolvido
+        pelo chamador via lancamento_padrao_ct2_service.py::
+        obter_mapa_movimento_ct2_vazio -- usado quando o LP grava CT2_KEY
+        vazio no Razao (sem chave nativa pra decodificar).
+
+        mapa_lp_layout_campos: {lp_codigo: layout_campos}, resolvido pelo
+        chamador via lancamento_padrao_ct2_service.py::
+        obter_mapa_layout_campos -- layout generico de posicoes do CT2_KEY
+        cadastrado por LP (matching generico, ver calc_diferencas_estoque).
 
         Returns:
             Dict com relatorio completo da conciliacao
@@ -112,6 +124,8 @@ class ConciliacaoEstoqueService:
             df_kardex=df_kardex,
             df_razao=df_razao,
             mapa_lp_tipo=mapa_lp_tipo,
+            mapa_lp_movimento_ct2_vazio=mapa_lp_movimento_ct2_vazio,
+            mapa_lp_layout_campos=mapa_lp_layout_campos,
         )
 
         resumo = resultado["resumo"]

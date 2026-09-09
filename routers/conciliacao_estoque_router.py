@@ -58,7 +58,18 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
         mapa_lp_tipo = lancamento_padrao_ct2_service.obter_mapa_tipo_chave(
             db, request.parametros.empresa_id
         )
-        resultado = service.executar(request, mapa_lp_tipo=mapa_lp_tipo)
+        mapa_lp_movimento_ct2_vazio = lancamento_padrao_ct2_service.obter_mapa_movimento_ct2_vazio(
+            db, request.parametros.empresa_id
+        )
+        mapa_lp_layout_campos = lancamento_padrao_ct2_service.obter_mapa_layout_campos(
+            db, request.parametros.empresa_id
+        )
+        resultado = service.executar(
+            request,
+            mapa_lp_tipo=mapa_lp_tipo,
+            mapa_lp_movimento_ct2_vazio=mapa_lp_movimento_ct2_vazio,
+            mapa_lp_layout_campos=mapa_lp_layout_campos,
+        )
 
         # Validar saldo calculado contra balancete importado (se houver)
         # Movimentos do periodo vem da ORIGEM (Kardex): entradas = debito, saidas = credito

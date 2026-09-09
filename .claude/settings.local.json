@@ -550,7 +550,9 @@
       "Bash(APP_ENV=develop .venv/Scripts/python -c ' *)",
       "Bash(APP_ENV=develop venv/Scripts/python.exe -m alembic revision --autogenerate -m \"add lancamento_padrao_ct2_layout\")",
       "Bash(APP_ENV=develop venv/Scripts/python.exe -m alembic upgrade head)",
-      "Bash(venv/Scripts/python.exe --version)"
+      "Bash(venv/Scripts/python.exe --version)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('tools/estoque/calc_diferencas_estoque.py', encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('tools/estoque/kardex.py', encoding='utf-8'\\).read\\(\\)\\)\")"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",
