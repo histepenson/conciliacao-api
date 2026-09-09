@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -53,7 +54,20 @@ class LancamentoPadraoCt2Layout(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     empresa_id = Column(Integer, ForeignKey("concilia.empresa.id", ondelete="CASCADE"), nullable=False, index=True)
     lp_codigo = Column(String(10), nullable=False)
-    tipo_chave = Column(String(20), nullable=False)  # "ESTOQUE" | "COMPRA" | "VENDA"
+    tipo_chave = Column(String(20), nullable=True)  # "ESTOQUE" | "COMPRA" | "VENDA" -- usado quando o CT2_KEY vem preenchido
+    # Quando o CT2_KEY vem vazio (LP nao gera chave nativa), nao ha' como decodificar
+    # produto/armazem/data -- usa direto o codigo_movimento do Kardex configurado aqui
+    # (ex.: LP 666 -> "RE1"), casando por valor+data em vez de chave.
+    codigo_movimento_ct2_vazio = Column(String(20), nullable=True)
+    # Layout generico de campos do CT2_KEY pra este LP (matching generico da
+    # Conciliacao de Estoque, ver calc_diferencas_estoque.py::
+    # _decodificar_ct2_key_por_layout). Lista de
+    # {"campo": <nome canonico>, "inicio": int, "tamanho": int}. "campo"
+    # precisa ser um dos nomes em CAMPOS_CT2_CANONICOS -- o formato de
+    # comparacao de cada campo (texto / data / numseq-base36 / doc-serie-
+    # parceiro com zero a esquerda) e' inferido desse catalogo fixo pelo
+    # NOME, nao configurado aqui.
+    layout_campos = Column(JSONB, nullable=True)
     descricao = Column(String(200))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

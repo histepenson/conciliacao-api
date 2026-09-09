@@ -114,26 +114,6 @@ def _cf_lookup_key(cf_texto: str) -> str:
     return digitos
 
 
-def _data_br_para_dtos(data_br: str) -> str:
-    """Converte DD/MM/YYYY (formato ja' normalizado por formatar_data) para YYYYMMDD.
-
-    Retorna "" quando dia/mes estao fora de faixa (ex.: "01/00/2026") em vez
-    de montar um ct2_key corrompido -- uma data invalida nao pode virar chave
-    de matching, senao o movimento nunca casa com o lancamento correto no
-    Razao (ou, por acidente, casa com outro registro errado).
-    """
-    partes = str(data_br or "").strip().split("/")
-    if len(partes) != 3:
-        return ""
-    dia, mes, ano = partes
-    if not (dia.isdigit() and mes.isdigit() and ano.isdigit()):
-        return ""
-    if not (1 <= int(mes) <= 12) or not (1 <= int(dia) <= 31):
-        logger.warning(f"[KARDEX] Data invalida para ct2_key: {data_br!r}")
-        return ""
-    return f"{ano}{mes.zfill(2)}{dia.zfill(2)}"
-
-
 def classificar_movimento_kardex(cf: str) -> tuple:
     """
     Classifica um registro do Kardex pelo CF.
@@ -193,8 +173,6 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
     - documento_numero: Numero do documento
     - descricao: Descricao do item
     - armazem: Armazem (ARM)
-    - ct2_key: Codigo + Armazem + Data (AAAAMMDD) + Documento Numero -- mesma
-      chave gravada pelo Protheus na CT2 ao lancar o movimento contabil
     """
     logger.info("[KARDEX] Iniciando normalizacao")
 
@@ -363,27 +341,6 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
         "[KARDEX] Total DEV (qtd=%s, valor=%s)",
         int((df_norm["codigo_movimento"] == "DEV").sum()),
         round(float(df_norm.loc[df_norm["codigo_movimento"] == "DEV", "valor"].sum()), 2),
-    )
-
-    # ct2_key_estoque: mesma chave que o Protheus grava na CT2 quando o
-    # lancamento contabil vem de um LP de familia "ESTOQUE" (movimento de
-    # estoque puro, sem documento fiscal) -- Codigo+Armazem+Data(AAAAMMDD)+
-    # Sequencia (NUMSEQ). Usa "sequencia", nao "documento_numero" (bug da
-    # versao anterior: "documento_numero" e' o campo exibido na tela,
-    # dependente do parametro documento_por, nao o NUMSEQ que a formula
-    # real do Protheus usa).
-    #
-    # Para LPs de familia COMPRA/VENDA (documento fiscal), a chave nativa
-    # do Razao e' decodificada por posicao (ver
-    # calc_diferencas_estoque.py::_decodificar_ct2_key) e comparada campo-
-    # a-campo contra doc/serie/loja/item/parceiro/codigo_produto, em vez de
-    # remontada aqui -- largura fixa de cada campo (SX3) e' informacao do
-    # Protheus que nao temos como confirmar deste lado.
-    df_norm["ct2_key_estoque"] = (
-        df_norm["codigo_produto"].astype(str).str.strip()
-        + df_norm["armazem"].astype(str).str.strip()
-        + df_norm["data"].apply(_data_br_para_dtos)
-        + df_norm["sequencia"].astype(str).str.strip()
     )
 
     return df_norm

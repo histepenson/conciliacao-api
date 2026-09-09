@@ -156,6 +156,68 @@ def _decodificar_ct2_key_fiscal(ct2_key: Any) -> dict | None:
     }
 
 
+def _decodificar_ct2_key_estoque_numseq(ct2_key: Any) -> dict | None:
+    """
+    Decodifica o CT2_KEY nativo por posicao fixa, pra LPs de familia
+    ESTOQUE cujo layout e' FILIAL(4) + PRODUTO(30, com espacos a direita)
+    + ARMAZEM(2) + DATA AAAAMMDD(8) + NUMSEQ em base36 (6).
+
+    Layout confirmado empiricamente nesta sessao contra CT2_KEY reais do
+    LP 666 (Rancheiro, "BX INSUMOS"/"ABASTECIMENTO"): produto+armazem+data
+    batem contra o Kardex da mesma carga, e o sufixo em base36 cresce em
+    +1 exato entre lancamentos consecutivos do mesmo lote (confirma que e'
+    a propria SEQUENCIA/NUMSEQ do movimento de origem, soh que compactada
+    em base36 em vez de decimal). Diferente do layout de
+    _decodificar_ct2_key_fiscal (familia COMPRA/VENDA) -- LPs de familia
+    ESTOQUE puro nao tem documento fiscal, entao o CT2_KEY usa outro layout.
+
+    Retorna None quando a chave e' curta demais ou o sufixo nao e' base36
+    valido (nesses casos o chamador cai no fluxo normal de matching por
+    data+cf).
+    """
+    key = str(ct2_key or "").strip()
+    if len(key) < 50:
+        return None
+    sufixo = key[44:50]
+    try:
+        numseq = int(sufixo, 36)
+    except ValueError:
+        return None
+    return {
+        "codigo_produto": key[4:34].strip(),
+        "armazem": key[34:36].strip(),
+        "data_aaaammdd": key[36:44],
+        "numseq": numseq,
+    }
+
+
+def _chave_estoque_numseq(reg: dict) -> tuple:
+    """Tupla de comparacao pra familia NUMSEQ -- mesmos nomes
+    de campo tanto pro registro normalizado do Kardex (com "sequencia" em
+    decimal, "data" em DD/MM/YYYY) quanto pro dict decodificado de
+    _decodificar_ct2_key_estoque_numseq (com "numseq" ja convertido de
+    base36 pra inteiro, "data_aaaammdd" ja no formato AAAAMMDD)."""
+    if "numseq" in reg:
+        # dict decodificado do ct2_key (Razao)
+        numseq = reg.get("numseq")
+        data_aaaammdd = str(reg.get("data_aaaammdd", "") or "")
+    else:
+        # registro normalizado do Kardex
+        try:
+            numseq = int(str(reg.get("sequencia", "") or "").strip())
+        except ValueError:
+            numseq = None
+        partes = str(reg.get("data", "") or "").split("/")
+        data_aaaammdd = f"{partes[2]}{partes[1]}{partes[0]}" if len(partes) == 3 else ""
+
+    return (
+        str(reg.get("codigo_produto", "") or "").strip().upper(),
+        str(reg.get("armazem", "") or "").strip().upper(),
+        data_aaaammdd,
+        numseq,
+    )
+
+
 def _chave_fiscal(reg: dict) -> tuple:
     """Tupla de comparacao pra familia COMPRA/VENDA -- mesmos nomes de
     campo tanto pro registro normalizado do Kardex quanto pro dict
@@ -165,6 +227,85 @@ def _chave_fiscal(reg: dict) -> tuple:
         _norm_campo_fiscal(reg.get("serie", ""), 3),
         _norm_campo_fiscal(reg.get("parceiro", ""), 6),
         str(reg.get("codigo_produto", "") or "").strip().upper(),
+    )
+
+
+def _normalizar_texto_ct2(valor: Any) -> str:
+    return str(valor or "").strip().upper()
+
+
+def _data_kardex_para_aaaammdd(data_br: Any) -> str:
+    """Converte data DD/MM/YYYY (formato ja' normalizado por
+    _normalizar_data_chave) pra AAAAMMDD, pra comparar contra o trecho de
+    data decodificado (ja' nesse formato) do ct2_key."""
+    partes = str(data_br or "").strip().split("/")
+    if len(partes) != 3 or not all(p.isdigit() for p in partes):
+        return ""
+    dia, mes, ano = partes
+    return f"{ano}{mes.zfill(2)}{dia.zfill(2)}"
+
+
+def _normalizar_numseq_ct2(valor_base36: Any) -> int | None:
+    try:
+        return int(str(valor_base36 or "").strip(), 36)
+    except ValueError:
+        return None
+
+
+def _normalizar_numseq_kardex(valor_decimal: Any) -> int | None:
+    try:
+        return int(str(valor_decimal or "").strip())
+    except ValueError:
+        return None
+
+
+# Campo canonico (nome cadastrado no layout_campos de cada LP, ver
+# models/lancamento_padrao.py::LancamentoPadraoCt2Layout) -> coluna
+# correspondente no Kardex normalizado (tools/estoque/kardex.py::
+# normalizar_kardex) + normalizador de cada lado da comparacao (ct2_key
+# decodificado vs registro do Kardex). Catalogo fixo: o cadastro por LP so'
+# escolhe QUAIS campos e EM QUE POSICAO existem na chave desse LP, o
+# formato de comparacao de cada campo (texto simples / data / numseq em
+# base36 / doc-serie-parceiro com zero a esquerda) vem daqui, pelo nome.
+CAMPOS_CT2_CANONICOS: Dict[str, Dict[str, Any]] = {
+    "produto": {"coluna_kardex": "codigo_produto", "norm_ct2": _normalizar_texto_ct2, "norm_kardex": _normalizar_texto_ct2},
+    "armazem": {"coluna_kardex": "armazem", "norm_ct2": _normalizar_texto_ct2, "norm_kardex": _normalizar_texto_ct2},
+    "loja": {"coluna_kardex": "loja", "norm_ct2": _normalizar_texto_ct2, "norm_kardex": _normalizar_texto_ct2},
+    "item": {"coluna_kardex": "item", "norm_ct2": _normalizar_texto_ct2, "norm_kardex": _normalizar_texto_ct2},
+    "doc": {"coluna_kardex": "doc", "norm_ct2": lambda v: _norm_campo_fiscal(v, 9), "norm_kardex": lambda v: _norm_campo_fiscal(v, 9)},
+    "serie": {"coluna_kardex": "serie", "norm_ct2": lambda v: _norm_campo_fiscal(v, 3), "norm_kardex": lambda v: _norm_campo_fiscal(v, 3)},
+    "parceiro": {"coluna_kardex": "parceiro", "norm_ct2": lambda v: _norm_campo_fiscal(v, 6), "norm_kardex": lambda v: _norm_campo_fiscal(v, 6)},
+    "data": {"coluna_kardex": "data", "norm_ct2": _normalizar_texto_ct2, "norm_kardex": _data_kardex_para_aaaammdd},
+    "numseq": {"coluna_kardex": "sequencia", "norm_ct2": _normalizar_numseq_ct2, "norm_kardex": _normalizar_numseq_kardex},
+}
+
+
+def _decodificar_ct2_key_por_layout(ct2_key: Any, layout_campos: list) -> dict | None:
+    """Decodifica CT2_KEY por posicao fixa usando o layout cadastrado pra
+    esse LP (ver LancamentoPadraoCt2Layout.layout_campos). Retorna
+    {campo: substring_bruta_strip} ou None se a chave for curta demais ou
+    o layout estiver vazio."""
+    if not layout_campos:
+        return None
+    key = str(ct2_key or "").strip()
+    largura_min = max((c["inicio"] + c["tamanho"] for c in layout_campos), default=0)
+    if largura_min == 0 or len(key) < largura_min:
+        return None
+    return {
+        c["campo"]: key[c["inicio"]: c["inicio"] + c["tamanho"]].strip()
+        for c in layout_campos
+        if c["campo"] in CAMPOS_CT2_CANONICOS
+    }
+
+
+def _chave_ct2_decodificada_por_layout(decoded: dict, campos_ordem: list) -> tuple:
+    return tuple(CAMPOS_CT2_CANONICOS[c]["norm_ct2"](decoded.get(c, "")) for c in campos_ordem)
+
+
+def _chave_kardex_por_layout(reg_kardex: dict, campos_ordem: list) -> tuple:
+    return tuple(
+        CAMPOS_CT2_CANONICOS[c]["norm_kardex"](reg_kardex.get(CAMPOS_CT2_CANONICOS[c]["coluna_kardex"], ""))
+        for c in campos_ordem
     )
 
 
@@ -258,6 +399,8 @@ def calcular_diferencas_estoque(
     df_kardex: pd.DataFrame,
     df_razao: pd.DataFrame,
     mapa_lp_tipo: Dict[str, str] | None = None,
+    mapa_lp_movimento_ct2_vazio: Dict[str, str] | None = None,
+    mapa_lp_layout_campos: Dict[str, list] | None = None,
 ) -> Dict[str, Any]:
     """
     Calcula diferencas entre Kardex e Razao Contabil de Estoque
@@ -275,10 +418,34 @@ def calcular_diferencas_estoque(
 
     mapa_lp_tipo : dict[str, str], opcional
         {lp_codigo: tipo_chave} -- de onde vem qual formula de ct2_key usar
-        por Lancamento Padrao na passada 0 do matching (ver
+        por Lancamento Padrao (ver
         services/lancamento_padrao_ct2_service.py::obter_mapa_tipo_chave).
-        LPs ausentes do mapa nao entram na passada exata e caem no fallback
-        (data, cf) normal.
+        LPs ausentes do mapa nao entram em nenhuma passada especial e caem
+        no fallback (data, cf) normal. Valores aceitos pra tipo_chave:
+        "ESTOQUE" | "COMPRA" | "VENDA" (passada 0 dentro de cada grupo, ver
+        _matching_por_ct2_key).
+
+    mapa_lp_movimento_ct2_vazio : dict[str, str], opcional
+        {lp_codigo: codigo_movimento} -- pra LPs que as vezes gravam CT2_KEY
+        vazio (sem chave nativa pra decodificar produto/armazem/data). Linha
+        do Razao com CT2_KEY vazio e ct2_lp presente nesse mapa e' reclassificada
+        pro codigo_movimento configurado (ex.: LP 666 -> "RE1") ANTES do
+        agrupamento, e o matching individual desse grupo passa a ignorar CF
+        (casa so' por data+valor -- ver services/lancamento_padrao_ct2_service.py::
+        obter_mapa_movimento_ct2_vazio). Por empresa: LPs ausentes do mapa
+        seguem o fluxo normal (classificacao por texto do historico).
+
+    mapa_lp_layout_campos : dict[str, list], opcional
+        {lp_codigo: layout_campos} -- layout generico de posicoes do CT2_KEY
+        cadastrado por LP (ver LancamentoPadraoCt2Layout.layout_campos e
+        services/lancamento_padrao_ct2_service.py::obter_mapa_layout_campos).
+        Cada layout_campos e' uma lista de {"campo", "inicio", "tamanho"};
+        "campo" precisa ser um dos nomes em CAMPOS_CT2_CANONICOS. Linha do
+        Razao cujo ct2_lp estiver nesse mapa e CT2_KEY preenchido e'
+        reclassificada ANTES do agrupamento pro codigo_movimento do Kardex
+        que casar exatamente nos campos configurados (ver
+        _decodificar_ct2_key_por_layout / _chave_kardex_por_layout). LPs
+        ausentes do mapa nao entram nessa passada.
 
     Retorna:
     --------
@@ -310,6 +477,78 @@ def calcular_diferencas_estoque(
         df_k["cf"] = df_k["cf"].apply(lambda x: str(x or "").strip().upper())
     if "cf_original" in df_r.columns:
         df_r["cf_original"] = df_r["cf_original"].apply(lambda x: str(x or "").strip().upper())
+
+    # Reclassificacao por LP quando CT2_KEY vem vazio: o LP nao gera chave
+    # nativa nesses lancamentos, entao nao ha' como decodificar produto/
+    # armazem/data (ver _matching_por_ct2_key). Se o LP estiver configurado
+    # em mapa_lp_movimento_ct2_vazio, usa o codigo_movimento do Kardex
+    # conhecido de antemao em vez de classificar pelo texto do historico
+    # (que pode nao seguir o padrao RE0/RE1/etc esperado).
+    codigos_sem_cf_lp_vazio: set[str] = set()
+    mapa_lp_movimento_ct2_vazio = mapa_lp_movimento_ct2_vazio or {}
+    if mapa_lp_movimento_ct2_vazio and "ct2_lp" in df_r.columns and "ct2_key" in df_r.columns:
+        mask_key_vazio = df_r["ct2_key"].astype(str).str.strip() == ""
+        mask_lp_configurado = df_r["ct2_lp"].astype(str).str.strip().isin(mapa_lp_movimento_ct2_vazio.keys())
+        mask_reclassifica = mask_key_vazio & mask_lp_configurado
+        if mask_reclassifica.any():
+            novos_codigos = df_r.loc[mask_reclassifica, "ct2_lp"].astype(str).str.strip().map(mapa_lp_movimento_ct2_vazio)
+            df_r.loc[mask_reclassifica, "codigo_movimento"] = novos_codigos
+            codigos_sem_cf_lp_vazio = set(novos_codigos.unique())
+            logger.info(
+                "[CALC DIFERENCAS ESTOQUE] Reclassificados por LP (CT2_KEY vazio): %s lancamentos | codigos=%s",
+                int(mask_reclassifica.sum()), sorted(codigos_sem_cf_lp_vazio),
+            )
+
+    # Reclassificacao por LP com CT2_KEY preenchido, layout generico
+    # cadastrado (mapa_lp_layout_campos -- ver LancamentoPadraoCt2Layout.
+    # layout_campos e services/lancamento_padrao_ct2_service.py::
+    # obter_mapa_layout_campos): decodifica o ct2_key nativo pelos campos
+    # configurados pra esse LP e casa contra o Kardex pela mesma
+    # combinacao de campos. Layout validado empiricamente contra o LP 666
+    # da Rancheiro (produto+armazem+data+numseq): produto+armazem+data
+    # sozinho NAO e' unico (~65% dos lancamentos tem mais de um CF possivel
+    # no mesmo produto+armazem+dia), mas incluindo o numseq (decodificado
+    # do sufixo em base36 do ct2_key, comparado contra o campo "Sequencia"
+    # decimal do Kardex) a correspondencia fica exata -- confirmada 1:1
+    # contra dados reais (ver protheus/RANCHEIRO/ZMATR900API.prw p/
+    # exportar Sequencia). Outros LPs podem cadastrar layouts diferentes
+    # (menos ou mais campos, outras posicoes) sem precisar de codigo novo.
+    mapa_lp_layout_campos = mapa_lp_layout_campos or {}
+    lps_com_layout = {lp: campos for lp, campos in mapa_lp_layout_campos.items() if campos}
+    if lps_com_layout and "ct2_lp" in df_r.columns and "ct2_key" in df_r.columns:
+        for lp_codigo, layout_campos in lps_com_layout.items():
+            campos_ordem = [c["campo"] for c in layout_campos]
+
+            kardex_lookup: dict[tuple, str] = {}
+            for _, krow in df_k.iterrows():
+                chave_k = _chave_kardex_por_layout(krow, campos_ordem)
+                if any(v is None or v == "" for v in chave_k):
+                    continue
+                kardex_lookup[chave_k] = krow.get("codigo_movimento")
+
+            mask_lp = df_r["ct2_lp"].astype(str).str.strip() == lp_codigo
+            mask_key_preenchido = df_r["ct2_key"].astype(str).str.strip() != ""
+            mask_candidatos = mask_lp & mask_key_preenchido
+
+            qtd_reclassificados = 0
+            for idx in df_r.index[mask_candidatos]:
+                decoded = _decodificar_ct2_key_por_layout(df_r.at[idx, "ct2_key"], layout_campos)
+                if not decoded:
+                    continue
+                chave_r = _chave_ct2_decodificada_por_layout(decoded, campos_ordem)
+                if any(v is None or v == "" for v in chave_r):
+                    continue
+                novo_codigo = kardex_lookup.get(chave_r)
+                if novo_codigo:
+                    df_r.at[idx, "codigo_movimento"] = novo_codigo
+                    codigos_sem_cf_lp_vazio.add(novo_codigo)
+                    qtd_reclassificados += 1
+
+            if qtd_reclassificados:
+                logger.info(
+                    "[CALC DIFERENCAS ESTOQUE] Reclassificados por LP %s (layout generico): %s lancamentos",
+                    lp_codigo, qtd_reclassificados,
+                )
 
     # ===========================
     # 1. AGRUPAR KARDEX por codigo_movimento
@@ -433,6 +672,8 @@ def calcular_diferencas_estoque(
                 "codigo_produto": str(reg.get("codigo_produto", "")),
                 "codigo_movimento": cm,
                 "ct2_key_estoque": str(reg.get("ct2_key_estoque", "") or "").strip(),
+                "armazem": str(reg.get("armazem", "") or "").strip(),
+                "sequencia": str(reg.get("sequencia", "") or "").strip(),
                 "doc": str(reg.get("doc", "") or "").strip(),
                 "serie": str(reg.get("serie", "") or "").strip(),
                 "loja": str(reg.get("loja", "") or "").strip(),
@@ -466,9 +707,13 @@ def calcular_diferencas_estoque(
 
     # Grupos onde Kardex CF (CFOP numerico) difere do Razao CF (codigo texto)
     # Para esses, matching e por (data, valor) apenas, sem comparar CF
-    # Inclui DEV e CFOPs numericos (extraidos de CPV)
+    # Inclui DEV e CFOPs numericos (extraidos de CPV), alem dos codigos
+    # reclassificados por LP (CT2_KEY vazio ou NUMSEQ -- Razao
+    # nao tem um CF real de texto pra comparar contra o CF do Kardex nesses
+    # casos, so' o codigo_movimento reclassificado -- ver as duas
+    # reclassificacoes logo no inicio da funcao).
     def _skip_cf_match(codigo_movimento):
-        return codigo_movimento in {"CPV", "DEV"}
+        return codigo_movimento in {"CPV", "DEV"} or codigo_movimento in codigos_sem_cf_lp_vazio
 
     # DEV e CPV: o Kardex sempre traz o ultimo dia do mes como "Operacao
     # Data" desses movimentos (nao a data real do lancamento), entao nunca
@@ -492,6 +737,12 @@ def calcular_diferencas_estoque(
           nativo por posicao fixa (_decodificar_ct2_key_fiscal) e compara
           campo-a-campo (doc, serie, parceiro, codigo_produto) contra os
           valores ja normalizados do Kardex.
+
+        Ver tambem: reclassificacao por NUMSEQ no inicio de
+        calcular_diferencas_estoque (roda ANTES do agrupamento por
+        codigo_movimento, nao aqui -- essa passada 0 so' compara registros
+        que ja estao no mesmo grupo, mas a reclassificacao por numseq
+        precisa mover o registro do Razao pro grupo certo primeiro).
 
         Linhas do Razao cujo ct2_lp nao esta em mapa_lp_tipo (LP nao
         configurado) nao entram em nenhuma das duas passadas e seguem pro

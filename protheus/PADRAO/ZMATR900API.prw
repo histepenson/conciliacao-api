@@ -79,6 +79,7 @@ Local cOrder := ""
 Local lCusRep := SuperGetMv("MV_CUSREP", .F., .F.) .And. MA330AvRep() .And. cTipoCusto == "2"
 Local cProdImp := GetMV("MV_PRODIMP")
 Local cLogPrefix := "[ZMATR900] "
+Local aDevCache := {}
 
 Self:SetContentType("application/json")
 
@@ -290,7 +291,7 @@ Begin Sequence
         " EOF=" + IIf((cAliasTop)->(EoF()), "S", "N"))
 
     While !(cAliasTop)->(Eof())
-        oLinha := MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim)
+        oLinha := MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim, aDevCache)
         nTotalReg++
 
         If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
@@ -363,14 +364,10 @@ FreeObj(oParams)
 RestArea(aArea)
 Return .T.
 
-Static Function MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim)
+Static Function MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim, aDevCache)
 Local oLinha     := JsonObject():New()
-Local cLocalRec  := AllTrim((cAliasTop)->ARMLOC)
-Local cLocalCalc := IIf(Empty(cLocalRec), xFilial("SB2"), cLocalRec)
-Local aSaldo     := {}
 Local nSaldoQtd  := 0
 Local nSaldoVlr  := 0
-Local oErrCalc   := Nil
 Local nEntQtd    := 0
 Local nEntCus    := 0
 Local nSaiQtd    := 0
@@ -380,22 +377,14 @@ Local cDocNumero := IIf(cDocPor $ "Ss", AllTrim((cAliasTop)->SEQUENCIA), AllTrim
 Local cParceiro  := ""
 Local lDev       := .F.
 
-// CalcEst: CalcEst(cProduto, cLocal, dData, [nMoeda])
-// 3o parametro = DATA (nao moeda). Retorna array: [1]=qtd, [2..n]=valor por moeda
-Begin Sequence
-    aSaldo    := CalcEst((cAliasTop)->PRODUTO, cLocalCalc, dDataFim, nMoeda)
-    nSaldoQtd := IIf(Len(aSaldo) >= 1,          aSaldo[1], 0)
-    nSaldoVlr := IIf(Len(aSaldo) >= nMoeda + 1,  aSaldo[nMoeda + 1], 0)
-Recover Using oErrCalc
-    ConOut("[ZMATR900] CalcEst ERRO | produto=" + AllTrim((cAliasTop)->PRODUTO) + ;
-        " arq=" + cArq + " localCalc=[" + cLocalCalc + "]" + ;
-        " erro=" + oErrCalc:Description)
-    // saldo fica 0 — movimento registrado sem saldo calculado
-End Sequence
+// Saldo (CalcEst) nao e' calculado: a conciliacao de estoque usa apenas os
+// movimentos (entradas/saidas), nao o saldo projetado na data base. CalcEst
+// chamado por linha era o gargalo do Kardex em empresas de alto volume de
+// movimento (ex.: Rancheiro).
 
 Do Case
 Case cArq == "SD1"
-    lDev := MTR900Dev("SD1", cAliasTop)
+    lDev := MTR900Dev("SD1", cAliasTop, aDevCache)
     If (cAliasTop)->TES <= "500" .And. !lDev
         nEntQtd := (cAliasTop)->QUANTIDADE
         nEntCus := (cAliasTop)->CUSTO
@@ -405,7 +394,7 @@ Case cArq == "SD1"
     EndIf
     cParceiro := IIf(((cAliasTop)->TIPONF) == "C", "C-", "F-") + AllTrim((cAliasTop)->PARCEIRO)
 Case cArq == "SD2"
-    lDev := MTR900Dev("SD2", cAliasTop)
+    lDev := MTR900Dev("SD2", cAliasTop, aDevCache)
     If (cAliasTop)->TES <= "500" .Or. lDev
         nEntQtd := IIf(lDev, (cAliasTop)->QUANTIDADE * -1, (cAliasTop)->QUANTIDADE)
         nEntCus := IIf(lDev, (cAliasTop)->CUSTO * -1, (cAliasTop)->CUSTO)
@@ -462,14 +451,20 @@ Return oLinha
   SD2 (saida):   devolucao quando F4_DUPLIC = 'D' (devolucao de venda/saida)
   Replicado aqui pois MTR900Dev esta no matr900.prx e nao e visivel pela API REST.
 */
-Static Function MTR900Dev(cTabela, cAliasTop)
+Static Function MTR900Dev(cTabela, cAliasTop, aDevCache)
 Local lDev    := .F.
 Local cTES    := AllTrim((cAliasTop)->TES)
 Local cFilSF4 := xFilial("SF4")
 Local cChave  := cFilSF4 + cTES
+Local nPos    := AScan(aDevCache, {|x| x[1] == cChave})
 
-If Select("SF4") > 0
-    lDev := ( Posicione("SF4", 1, cChave, "F4_DUPLIC") == "D" )
+If nPos > 0
+    lDev := aDevCache[nPos][2]
+Else
+    If Select("SF4") > 0
+        lDev := ( Posicione("SF4", 1, cChave, "F4_DUPLIC") == "D" )
+    EndIf
+    AAdd(aDevCache, {cChave, lDev})
 EndIf
 
 Return lDev
