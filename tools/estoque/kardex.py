@@ -44,14 +44,14 @@ PR0_CFS = {"PR0"}
 
 # CFOPs de devolucao de entrada -> agrupados como "DEV"
 DEV_CFOPS = {
-    "1201", "1202", "1410", "1411",
-    "1949", "2201", "2202", "2410", "2411", "2949",
+    "1102", "1202", "1411", "1917", "1913",
+    "1949", "2202", "2411", "2913", "2949",
 }
 
 # CFOPs de devolucao de saida -> agrupados como "DEV"
 DEV_CFOPS_SAIDA = {
-    "5201", "5202", "5410", "5411",
-    "6201", "6202", "6410", "6411",
+    "5202", "5556", "5913", "5916", "5949",
+    "6202", "6411", "6556", "6913", "6918", "6921", "6949",
 }
 
 # CFOPs de venda/CPV -> agrupados como "CPV" (separado de SAIDAS genericas)
