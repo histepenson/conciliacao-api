@@ -373,7 +373,7 @@ def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list
             chaves = sorted(estados.keys(), key=lambda s: abs(alvo_cent - s))[: max_estados // 2]
             estados = {k: estados[k] for k in chaves}
 
-    def _reconstruir(soma_final: int) -> list:
+    def _reconstruir(soma_final: int) -> list | None:
         idxs = []
         soma = soma_final
         passo = estados.get(soma)
@@ -382,15 +382,30 @@ def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list
             idxs.append(idx_usado)
             soma = soma_anterior
             passo = estados.get(soma)
+        if soma != 0:
+            # A poda por proximidade ao alvo pode descartar um estado
+            # intermediario do caminho de um estado que sobreviveu -- a
+            # cadeia de back-pointers fica quebrada e a reconstrucao para
+            # no meio. Nao confiar nesse resultado parcial (ver bug real:
+            # 33 registros somando R$29.691,51, alvo R$20.408,56, cadeia
+            # quebrada devolvia so' 1 registro de R$86,36 como se fosse a
+            # composicao inteira).
+            return None
         return idxs
 
     for candidato in (alvo_cent, alvo_cent - 1, alvo_cent + 1):
         if candidato in estados:
-            return [registros[i] for i in _reconstruir(candidato)]
+            idxs = _reconstruir(candidato)
+            if idxs is not None:
+                return [registros[i] for i in idxs]
 
-    # fallback: melhor aproximacao
-    melhor = min(estados.keys(), key=lambda s: abs(alvo_cent - s))
-    return [registros[i] for i in _reconstruir(melhor)]
+    # Nenhuma combinacao exata (nem por 1 centavo de tolerancia) -- NAO
+    # retornar "melhor aproximacao" (um subconjunto qualquer sem relacao
+    # real com a diferenca, ex.: 1 registro de R$86 representando uma
+    # diferenca de R$20 mil). Vazio faz o chamador cair pra lista completa
+    # de registros ("composicao if composicao else regs_chave"), que e' o
+    # resultado honesto quando a decomposicao exata falha.
+    return []
 
 
 def calcular_diferencas_estoque(
