@@ -225,6 +225,7 @@ BeginSql Alias cAliasTop
                     D1_NUMSEQ SEQUENCIA,
                     D1_DOC DOCUMENTO,
                     D1_SERIE SERIE,
+                    D1_ITEM ITEM,
                     D1_QUANT QUANTIDADE,
                     D1_QTSEGUM QUANT2UM,
                     D1_LOCAL ARMAZEM,
@@ -265,6 +266,7 @@ BeginSql Alias cAliasTop
                     D2_NUMSEQ,
                     D2_DOC,
                     D2_SERIE,
+                    D2_ITEM,
                     D2_QUANT,
                     D2_QTSEGUM,
                     D2_LOCAL,
@@ -304,6 +306,7 @@ BeginSql Alias cAliasTop
                     D3_CF,
                     D3_NUMSEQ,
                     D3_DOC,
+                    ' ',
                     ' ',
                     D3_QUANT,
                     D3_QTSEGUM,
@@ -454,6 +457,10 @@ oLinha["TES"] := AllTrim((cAliasTop)->TES)
 oLinha["CF"] := AllTrim((cAliasTop)->CF)
 oLinha["Documento Numero"] := cDocNumero
 oLinha["Sequencia"] := AllTrim((cAliasTop)->SEQUENCIA)
+oLinha["Doc"] := AllTrim((cAliasTop)->DOCUMENTO)
+oLinha["Serie"] := AllTrim((cAliasTop)->SERIE)
+oLinha["Loja"] := AllTrim((cAliasTop)->LOJA)
+oLinha["Item"] := AllTrim((cAliasTop)->ITEM)
 oLinha["Entradas Quantidade"] := Round((cAliasTop)->ENTRADA_QTD, 2)
 oLinha["Entradas Custo Total"] := Round((cAliasTop)->ENTRADA_CUSTO, 2)
 oLinha["Custo Medio do Movimento"] := IIf((cAliasTop)->QUANTIDADE != 0, Round((cAliasTop)->CUSTO / (cAliasTop)->QUANTIDADE, 2), 0)
