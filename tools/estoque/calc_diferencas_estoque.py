@@ -19,6 +19,8 @@ from typing import Dict, Any
 from datetime import datetime
 import re
 
+from tools.estoque.razao_estoque import DEV_LP_COMPRA, DEV_LP_VENDA
+
 logger = logging.getLogger(__name__)
 
 THRESHOLD_CONCILIACAO = 1.0
@@ -245,18 +247,14 @@ def _data_kardex_para_aaaammdd(data_br: Any) -> str:
     return f"{ano}{mes.zfill(2)}{dia.zfill(2)}"
 
 
-def _normalizar_numseq_ct2(valor_base36: Any) -> int | None:
-    try:
-        return int(str(valor_base36 or "").strip(), 36)
-    except ValueError:
-        return None
-
-
-def _normalizar_numseq_kardex(valor_decimal: Any) -> int | None:
-    try:
-        return int(str(valor_decimal or "").strip())
-    except ValueError:
-        return None
+def _normalizar_numseq(valor: Any) -> str:
+    """Numseq e' um campo sequencial alfanumerico (string, 000000-ZZZZZZ),
+    nao um numero pra converter -- o Sequencia do Kardex ja' vem na MESMA
+    representacao do trecho do CT2_KEY, entao a comparacao e' string direta
+    (zero a esquerda ate 6 chars, maiuscula), sem base36->decimal. Vale pra
+    todos os LPs/empresas (confirmado tanto na Rancheiro quanto no grupo
+    RIMAVE)."""
+    return str(valor or "").strip().upper().zfill(6)
 
 
 # Campo canonico (nome cadastrado no layout_campos de cada LP, ver
@@ -276,7 +274,7 @@ CAMPOS_CT2_CANONICOS: Dict[str, Dict[str, Any]] = {
     "serie": {"coluna_kardex": "serie", "norm_ct2": lambda v: _norm_campo_fiscal(v, 3), "norm_kardex": lambda v: _norm_campo_fiscal(v, 3)},
     "parceiro": {"coluna_kardex": "parceiro", "norm_ct2": lambda v: _norm_campo_fiscal(v, 6), "norm_kardex": lambda v: _norm_campo_fiscal(v, 6)},
     "data": {"coluna_kardex": "data", "norm_ct2": _normalizar_texto_ct2, "norm_kardex": _data_kardex_para_aaaammdd},
-    "numseq": {"coluna_kardex": "sequencia", "norm_ct2": _normalizar_numseq_ct2, "norm_kardex": _normalizar_numseq_kardex},
+    "numseq": {"coluna_kardex": "sequencia", "norm_ct2": _normalizar_numseq, "norm_kardex": _normalizar_numseq},
 }
 
 
@@ -517,14 +515,28 @@ def calcular_diferencas_estoque(
     lps_com_layout = {lp: campos for lp, campos in mapa_lp_layout_campos.items() if campos}
     if lps_com_layout and "ct2_lp" in df_r.columns and "ct2_key" in df_r.columns:
         for lp_codigo, layout_campos in lps_com_layout.items():
+            # LP conhecido como devolucao (ver DEV_LP_COMPRA/DEV_LP_VENDA em
+            # razao_estoque.py): o CF do Kardex casado pode ser generico
+            # (ex.: "DE7"), sem nenhum CFOP pra identificar que e' devolucao
+            # -- confirmado com dado real (LP 672, Kardex CF=DE7, sem CFOP).
+            # Nesses casos o LP e' a UNICA fonte confiavel do grupo, entao
+            # forca "DEV - COMPRA"/"DEV - VENDA" nos DOIS lados (Kardex e
+            # Razao), em vez de so' copiar o codigo_movimento do Kardex pro
+            # Razao como no caso generico abaixo.
+            grupo_dev_forcado = None
+            if lp_codigo in DEV_LP_VENDA:
+                grupo_dev_forcado = "DEV - VENDA"
+            elif lp_codigo in DEV_LP_COMPRA:
+                grupo_dev_forcado = "DEV - COMPRA"
+
             campos_ordem = [c["campo"] for c in layout_campos]
 
-            kardex_lookup: dict[tuple, str] = {}
-            for _, krow in df_k.iterrows():
+            kardex_lookup: dict[tuple, tuple] = {}
+            for idx_k, krow in df_k.iterrows():
                 chave_k = _chave_kardex_por_layout(krow, campos_ordem)
                 if any(v is None or v == "" for v in chave_k):
                     continue
-                kardex_lookup[chave_k] = krow.get("codigo_movimento")
+                kardex_lookup[chave_k] = (idx_k, krow.get("codigo_movimento"))
 
             mask_lp = df_r["ct2_lp"].astype(str).str.strip() == lp_codigo
             mask_key_preenchido = df_r["ct2_key"].astype(str).str.strip() != ""
@@ -538,16 +550,24 @@ def calcular_diferencas_estoque(
                 chave_r = _chave_ct2_decodificada_por_layout(decoded, campos_ordem)
                 if any(v is None or v == "" for v in chave_r):
                     continue
-                novo_codigo = kardex_lookup.get(chave_r)
-                if novo_codigo:
+                match_kardex = kardex_lookup.get(chave_r)
+                if not match_kardex:
+                    continue
+                idx_k, novo_codigo = match_kardex
+                if grupo_dev_forcado:
+                    df_r.at[idx, "codigo_movimento"] = grupo_dev_forcado
+                    df_k.at[idx_k, "codigo_movimento"] = grupo_dev_forcado
+                    codigos_sem_cf_lp_vazio.add(grupo_dev_forcado)
+                    qtd_reclassificados += 1
+                elif novo_codigo:
                     df_r.at[idx, "codigo_movimento"] = novo_codigo
                     codigos_sem_cf_lp_vazio.add(novo_codigo)
                     qtd_reclassificados += 1
 
             if qtd_reclassificados:
                 logger.info(
-                    "[CALC DIFERENCAS ESTOQUE] Reclassificados por LP %s (layout generico): %s lancamentos",
-                    lp_codigo, qtd_reclassificados,
+                    "[CALC DIFERENCAS ESTOQUE] Reclassificados por LP %s (layout generico%s): %s lancamentos",
+                    lp_codigo, " -> " + grupo_dev_forcado if grupo_dev_forcado else "", qtd_reclassificados,
                 )
 
     # ===========================
