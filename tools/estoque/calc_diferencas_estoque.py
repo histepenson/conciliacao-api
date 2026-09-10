@@ -34,7 +34,7 @@ _DECOMP_DEADLINE = {"value": 0.0}
 
 # Codigos de movimento que representam entradas (debito no razao)
 CODIGOS_ENTRADA = {
-    "ENTRADAS", "DEV", "PR0",
+    "ENTRADAS", "DEV", "DEV - COMPRA", "DEV - VENDA", "PR0",
     "DE0", "DE1", "DE2", "DE3", "DE4", "DE5", "DE6", "DE7",
 }
 
@@ -713,14 +713,14 @@ def calcular_diferencas_estoque(
     # casos, so' o codigo_movimento reclassificado -- ver as duas
     # reclassificacoes logo no inicio da funcao).
     def _skip_cf_match(codigo_movimento):
-        return codigo_movimento in {"CPV", "DEV"} or codigo_movimento in codigos_sem_cf_lp_vazio
+        return codigo_movimento in {"CPV", "DEV", "DEV - COMPRA", "DEV - VENDA"} or codigo_movimento in codigos_sem_cf_lp_vazio
 
     # DEV e CPV: o Kardex sempre traz o ultimo dia do mes como "Operacao
     # Data" desses movimentos (nao a data real do lancamento), entao nunca
     # bate com a data real do Razao -- desliga a dimensao de data pra esses
     # codigo_movimento, comparando so' o valor total do grupo.
     def _skip_data_match(codigo_movimento):
-        return codigo_movimento in {"DEV", "CPV"}
+        return codigo_movimento in {"DEV", "DEV - COMPRA", "DEV - VENDA", "CPV"}
 
     def _matching_por_ct2_key(regs_kardex, regs_razao, mapa_lp_tipo):
         """

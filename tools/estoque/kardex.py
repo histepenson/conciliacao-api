@@ -139,12 +139,18 @@ def classificar_movimento_kardex(cf: str) -> tuple:
     cf_lookup = _cf_lookup_key(cf_upper)
 
     # DEV/CPV seguem a mesma logica: match explicito por lista de CFOP
+    # DEV e' segmentado em COMPRA (DEV_CFOPS) x VENDA (DEV_CFOPS_SAIDA) --
+    # cruzam com CFOPs diferentes e nao podem ser agrupados juntos na grid.
     if cf_lookup in DEV_CFOPS:
-        # Devolucao: sempre usar coluna de saidas no Kardex (normalizada em positivo)
-        return "DEV", "ENTRADA", "saidas_custo_total"
+        # Devolucao de compra: TES <= 500 no Kardex -> valor vai pra coluna
+        # de entradas (confirmado com dados reais: CFOP 1102/1202 sempre
+        # com Saidas Custo Total = 0 e Entradas Custo Total preenchido).
+        return "DEV - COMPRA", "ENTRADA", "entradas_custo_total"
     if cf_lookup in DEV_CFOPS_SAIDA:
-        # Devolucao: sempre usar coluna de saidas no Kardex (normalizada em positivo)
-        return "DEV", "ENTRADA", "saidas_custo_total"
+        # Devolucao de venda: TES > 500 no Kardex -> valor vai pra coluna
+        # de saidas (confirmado com dados reais: CFOP 5202 com Entradas
+        # Custo Total = 0 e Saidas Custo Total preenchido).
+        return "DEV - VENDA", "ENTRADA", "saidas_custo_total"
     if cf_lookup in CPV_CFOPS:
         return "CPV", "SAIDA", "saidas_custo_total"
 

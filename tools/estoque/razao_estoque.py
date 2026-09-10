@@ -25,6 +25,14 @@ from tools.banco.razao_banco import (
     formatar_data,
 )
 
+# LPs (Lancamento Padrao) que tratam devolucao no Razao -- confirmado que sao
+# 2 LPs diferentes: um pra devolucao de compra (nos devolvemos mercadoria a
+# um fornecedor) e outro pra devolucao de venda (cliente devolve mercadoria
+# pra nos). O historico do Razao ("DEV NF. 2/000023750-...") nao traz CFOP,
+# entao a segmentacao usa o LP (ct2_lp) do lancamento, nao o texto.
+DEV_LP_COMPRA = {"672"}
+DEV_LP_VENDA = {"641"}
+
 logger = logging.getLogger(__name__)
 
 # Mapeamento de codigos do Razao para codigos de agrupamento
@@ -101,15 +109,16 @@ def extrair_codigo_movimento(historico: str) -> str:
     Extrai codigo de movimento dos primeiros 3 caracteres do HISTORICO
     e aplica mapeamento.
 
-    Para CPV: extrai CFOP do historico (ex: "CPV CFOP: 5101 NF..." -> "5101")
-    Para DEV: mantem como "DEV"
+    Para DEV: mantem como "DEV" nesta etapa -- o historico real nao traz
+    CFOP embutido (ex.: "DEV NF. 2/000023750-KUHN DO BRASIL"), entao a
+    segmentacao em "DEV - COMPRA" x "DEV - VENDA" e' feita depois, em
+    normalizar_razao_estoque(), usando o LP (ct2_lp) do lancamento -- ver
+    DEV_LP_COMPRA / DEV_LP_VENDA.
     Demais: aplica mapeamento DE0-DE7->ENTRADAS, RE0-RE7->SAIDAS
 
     Exemplos:
     - "DE7 | TRANSFERENCIA DESTINO DATA: 25/11/" -> "ENTRADAS"
-    - "CPV CFOP: 5101 NF 000034619" -> "5101"
-    - "CPV CFOP: 6102 NF 000054321" -> "6102"
-    - "DEV CFOP: 1201 NF 000012345" -> "DEV"
+    - "DEV NF. 2/000023750-KUHN DO BRASIL" -> "DEV"
     - "RE0 | REQUISICAO DATA: 15/11/" -> "SAIDAS"
     - "PR0 | PRODUCAO DATA: 20/11/" -> "ENTRADAS"
     """
@@ -341,6 +350,14 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
     if mask_pr0.any():
         df_norm.loc[mask_pr0, "codigo_movimento"] = "PR0"
 
+    # DEV segmentado por LP: sao 2 lancamentos padrao diferentes (devolucao
+    # de compra x devolucao de venda), cruzam com CFOPs diferentes no
+    # Kardex e nao podem ficar agrupados juntos na grid.
+    mask_dev = df_norm["codigo_movimento"] == "DEV"
+    if mask_dev.any() and "ct2_lp" in df_norm.columns:
+        df_norm.loc[mask_dev & df_norm["ct2_lp"].isin(DEV_LP_COMPRA), "codigo_movimento"] = "DEV - COMPRA"
+        df_norm.loc[mask_dev & df_norm["ct2_lp"].isin(DEV_LP_VENDA), "codigo_movimento"] = "DEV - VENDA"
+
     # Extrair data de movimento do historico (esta e a data usada para matching)
     df_norm["data_movimento"] = df_norm["historico"].apply(
         lambda h: extrair_data_historico(h, ano_base)
@@ -372,7 +389,7 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
 
     # Fallback: codigos nao mapeados -> classificar por debito/credito
     mask_nao_mapeado = ~df_norm["codigo_movimento"].isin([
-        "ENTRADAS", "SAIDAS", "CPV", "DEV", "PR0",
+        "ENTRADAS", "SAIDAS", "CPV", "DEV", "DEV - COMPRA", "DEV - VENDA", "PR0",
         "DE0", "DE1", "DE2", "DE3", "DE4", "DE5", "DE6", "DE7",
         "RE0", "RE1", "RE2", "RE3", "RE4", "RE5", "RE6", "RE7",
         ""
