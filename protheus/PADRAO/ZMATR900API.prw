@@ -31,7 +31,6 @@ Local aArea := GetArea()
 Local oResp := JsonObject():New()
 Local oParams := JsonObject():New()
 Local aLinhas := {}
-Local oLinha := Nil
 Local cAliasTop := GetNextAlias()
 Local oError := Nil
 Local nPage := Max(1, Val(AllTrim(Self:page)))
@@ -62,11 +61,21 @@ Local dDataFim := CToD("")
 Local nTotalReg := 0
 Local nTotalPages := 1
 Local nOffset := 0
+Local nOffsetFim := 0
 Local nRecAtual := 0
+Local nIniReq := Seconds()
+Local nIniLoop := 0
+Local nLido := 0
 Local lHasMore := .F.
 Local cSelectD1 := ""
 Local cSelectD2 := ""
 Local cSelectD3 := ""
+Local cCustoColD1 := ""
+Local cCustoColD2 := ""
+Local cCustoColD3 := ""
+Local cCustoExpD1 := ""
+Local cCustoExpD2 := ""
+Local cCustoExpD3 := ""
 Local cWhereD1 := ""
 Local cWhereD2 := ""
 Local cWhereD3 := ""
@@ -79,9 +88,13 @@ Local cOrder := ""
 Local lCusRep := SuperGetMv("MV_CUSREP", .F., .F.) .And. MA330AvRep() .And. cTipoCusto == "2"
 Local cProdImp := GetMV("MV_PRODIMP")
 Local cLogPrefix := "[ZMATR900] "
-Local aDevCache := {}
 
 Self:SetContentType("application/json")
+
+// LOG: marcador de versao -- confirma que o fonte compilado e' este (paginacao
+// SQL-side via ROW_NUMBER/COUNT OVER + filtro de conta contabil). Se essa
+// linha nao aparecer no log, o AppServer esta rodando um RPO desatualizado.
+ConOut(cLogPrefix + "VERSAO_FONTE=2026-09-08-paginacao-sql-conta-contabil")
 
 // LOG: entrada da requisicao
 ConOut(cLogPrefix + "Requisicao recebida | data_ini=" + cDataIni + " data_fim=" + cDataFim + ;
@@ -117,6 +130,7 @@ EndIf
 
 nPageSize := IIf(nPageSize <= 0 .Or. nPageSize > 5000, 5000, nPageSize)
 nOffset := (nPage - 1) * nPageSize
+nOffsetFim := nOffset + nPageSize
 
 // mv_par usados internamente pelo CalcEst e funcoes do MATR900
 // Precisam estar setados antes do BeginSql e do loop de registros
@@ -142,22 +156,33 @@ ConOut(cLogPrefix + "Parametros normalizados | dDataIni=" + DToC(dDataIni) + " d
     " cProdImp=[" + cProdImp + "]")
 
 If lCusRep
-    cSelectD1 := "% D1_CUSRP" + Str(nMoeda,1,0) + " CUSTO,%"
-    cSelectD2 := "% D2_CUSRP" + Str(nMoeda,1,0) + " CUSTO,%"
-    cSelectD3 := "% D3_CUSRP" + Str(nMoeda,1,0) + " CUSTO,%"
+    cCustoColD1 := "D1_CUSRP" + Str(nMoeda,1,0)
+    cCustoColD2 := "D2_CUSRP" + Str(nMoeda,1,0)
+    cCustoColD3 := "D3_CUSRP" + Str(nMoeda,1,0)
 Else
-    cSelectD1 := "% D1_CUSTO" + IIf(nMoeda > 1, Str(nMoeda,1,0), "") + " CUSTO,%"
-    cSelectD2 := "% D2_CUSTO" + Str(nMoeda,1,0) + " CUSTO,%"
-    cSelectD3 := "% D3_CUSTO" + Str(nMoeda,1,0) + " CUSTO,%"
+    cCustoColD1 := "D1_CUSTO" + IIf(nMoeda > 1, Str(nMoeda,1,0), "")
+    cCustoColD2 := "D2_CUSTO" + Str(nMoeda,1,0)
+    cCustoColD3 := "D3_CUSTO" + Str(nMoeda,1,0)
 EndIf
+
+cSelectD1 := "% " + cCustoColD1 + " CUSTO,%"
+cSelectD2 := "% " + cCustoColD2 + " CUSTO,%"
+cSelectD3 := "% " + cCustoColD3 + " CUSTO,%"
+
+// Versoes "%...%" das mesmas colunas, para uso direto via %Exp:% dentro dos
+// CASE WHEN da query -- sem o wrapper %...%, o BeginSql injeta o valor como
+// literal de texto entre aspas (nome de coluna virava string, SQL invalido).
+cCustoExpD1 := "%" + cCustoColD1 + "%"
+cCustoExpD2 := "%" + cCustoColD2 + "%"
+cCustoExpD3 := "%" + cCustoColD3 + "%"
 
 cWhereD1 := "%AND D1_LOCAL >= '" + cLocalInf + "' AND D1_LOCAL <= '" + cLocalSup + "' AND%"
 cWhereD2 := "%AND D2_LOCAL >= '" + cLocalInf + "' AND D2_LOCAL <= '" + cLocalSup + "' AND%"
 cWhereD3 := "% D3_LOCAL >= '" + cLocalInf + "' AND D3_LOCAL <= '" + cLocalSup + "' AND"
 cWhereD3 += " SB1.B1_COD >= '" + cProdutoDe + "' AND SB1.B1_COD <= '" + cProdutoAte + "' AND"
 cWhereD3 += " SB1.B1_FILIAL = '" + xFilial("SB1") + "' AND SB1.B1_TIPO >= '" + cTipoDe + "' AND SB1.B1_TIPO <= '" + cTipoAte + "' AND"
-cWhereD3 += " SB1.B1_GRUPO >= '" + cGrupoDe + "' AND SB1.B1_GRUPO <= '" + cGrupoAte + "' AND"
-cWhereD3 += " SB1.B1_CONTA >= '" + cContaDe + "' AND SB1.B1_CONTA <= '" + cContaAte + "' AND SB1.B1_COD <> '" + cProdImp + "' AND SB1.D_E_L_E_T_=' ' AND%"
+cWhereD3 += " SB1.B1_GRUPO >= '" + cGrupoDe + "' AND SB1.B1_GRUPO <= '" + cGrupoAte + "' AND SB1.B1_COD <> '" + cProdImp + "' AND SB1.D_E_L_E_T_=' '"
+cWhereD3 += " AND SB1.B1_CONTA >= '" + cContaDe + "' AND SB1.B1_CONTA <= '" + cContaAte + "' AND%"
 cWhereD1C := IIf(lTodasFil, "% SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%", "% D1_FILIAL ='" + xFilial("SD1") + "' AND SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%")
 cWhereD2C := IIf(lTodasFil, "% SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%", "% D2_FILIAL ='" + xFilial("SD2") + "' AND SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%")
 cWhereD3C := IIf(lTodasFil, "%1=1 AND %", "% D3_FILIAL ='" + xFilial("SD3") + "' AND %")
@@ -167,11 +192,11 @@ cWhereB1C := "% SB1.B1_FILIAL = '" + xFilial("SB1") + "' AND SB1.B1_TIPO >= '" +
 
 cOrder := "%"
 If nOrdem == 1
-    cOrder += "2,"
+    cOrder += "PRODUTO,"
 Else
-    cOrder += "3,2,"
+    cOrder += "TIPO,PRODUTO,"
 EndIf
-cOrder += "9,12%"
+cOrder += "DTDIGIT,SEQUENCIA,ARQ,NRECNO%"
 
 // LOG: antes de executar o SQL
 ConOut(cLogPrefix + "Executando BeginSql | alias=" + cAliasTop + ;
@@ -180,138 +205,186 @@ ConOut(cLogPrefix + "Executando BeginSql | alias=" + cAliasTop + ;
     " filial_SF4=" + xFilial("SF4"))
 
 BeginSql Alias cAliasTop
-    SELECT  'SD1' ARQ,
-            SB1.B1_COD PRODUTO,
-            SB1.B1_TIPO TIPO,
-            SB1.B1_UM,
-            SB1.B1_GRUPO,
-            SB1.B1_CONTA CONTACONTABIL,
-            SB1.B1_DESC,
-            SB1.B1_POSIPI,
-            D1_SEQCALC SEQCALC,
-            D1_DTDIGIT DTDIGIT,
-            D1_TES TES,
-            D1_CF CF,
-            D1_NUMSEQ SEQUENCIA,
-            D1_DOC DOCUMENTO,
-            D1_SERIE SERIE,
-            D1_QUANT QUANTIDADE,
-            D1_QTSEGUM QUANT2UM,
-            D1_LOCAL ARMAZEM,
-            D1_FORNECE PARCEIRO,
-            D1_LOJA LOJA,
-            D1_ITEM ITEM,
-            D1_TIPO TIPONF,
-            %Exp:cSelectD1%
-            D1_LOTECTL LOTE,
-            SD1.R_E_C_N_O_ NRECNO,
-            SD1.D1_LOCAL ARMLOC
-    FROM %table:SB1% SB1, %table:SD1% SD1, %table:SF4% SF4
-    WHERE SB1.B1_COD = SD1.D1_COD AND %Exp:cWhereD1C%
-          SD1.D1_TES = SF4.F4_CODIGO AND SF4.F4_ESTOQUE = 'S' AND
-          SD1.D1_DTDIGIT >= %Exp:dDataIni% AND SD1.D1_DTDIGIT <= %Exp:dDataFim% AND SD1.D1_ORIGLAN <> 'LF'
-          %Exp:cWhereD1%
-          SD1.%NotDel% AND SF4.%NotDel%
-          %Exp:cWhereB1A% AND %Exp:cWhereB1C%
-    UNION
-    SELECT  'SD2',
-            SB1.B1_COD,
-            SB1.B1_TIPO,
-            SB1.B1_UM,
-            SB1.B1_GRUPO,
-            SB1.B1_CONTA,
-            SB1.B1_DESC,
-            SB1.B1_POSIPI,
-            D2_SEQCALC,
-            D2_EMISSAO,
-            D2_TES,
-            D2_CF,
-            D2_NUMSEQ,
-            D2_DOC,
-            D2_SERIE,
-            D2_QUANT,
-            D2_QTSEGUM,
-            D2_LOCAL,
-            D2_CLIENTE,
-            D2_LOJA,
-            D2_ITEM,
-            D2_TIPO,
-            %Exp:cSelectD2%
-            D2_LOTECTL,
-            SD2.R_E_C_N_O_,
-            SD2.D2_LOCAL
-    FROM %table:SB1% SB1, %table:SD2% SD2, %table:SF4% SF4
-    WHERE SB1.B1_COD = SD2.D2_COD AND %Exp:cWhereD2C%
-          SD2.D2_TES = SF4.F4_CODIGO AND SF4.F4_ESTOQUE = 'S' AND
-          SD2.D2_EMISSAO >= %Exp:dDataIni% AND SD2.D2_EMISSAO <= %Exp:dDataFim% AND SD2.D2_ORIGLAN <> 'LF'
-          %Exp:cWhereD2%
-          SD2.%NotDel% AND SF4.%NotDel%
-          %Exp:cWhereB1A% AND %Exp:cWhereB1C%
-    UNION
-    SELECT  'SD3',
-            SB1.B1_COD,
-            SB1.B1_TIPO,
-            SB1.B1_UM,
-            SB1.B1_GRUPO,
-            SB1.B1_CONTA,
-            SB1.B1_DESC,
-            SB1.B1_POSIPI,
-            D3_SEQCALC,
-            D3_EMISSAO,
-            D3_TM,
-            D3_CF,
-            D3_NUMSEQ,
-            D3_DOC,
-            ' ',
-            D3_QUANT,
-            D3_QTSEGUM,
-            D3_LOCAL,
-            D3_CC,
-            ' ',
-            ' ',
-            ' ',
-            %Exp:cSelectD3%
-            D3_LOTECTL,
-            SD3.R_E_C_N_O_,
-            SD3.D3_LOCAL
-    FROM %table:SB1% SB1, %table:SD3% SD3
-    WHERE SB1.B1_COD = SD3.D3_COD AND %Exp:cWhereD3C%
-          SD3.D3_EMISSAO >= %Exp:dDataIni% AND SD3.D3_EMISSAO <= %Exp:dDataFim% AND
-          %Exp:cWhereD3%
-          SD3.%NotDel%
-    ORDER BY %Exp:cOrder%
+    SELECT * FROM (
+        SELECT *,
+               ROW_NUMBER() OVER (ORDER BY %Exp:cOrder%) RN,
+               COUNT(*) OVER() TOTAL_REG
+        FROM (
+            SELECT  'SD1' ARQ,
+                    SB1.B1_COD PRODUTO,
+                    SB1.B1_TIPO TIPO,
+                    SB1.B1_UM,
+                    SB1.B1_GRUPO,
+                    SB1.B1_CONTA CONTACONTABIL,
+                    SB1.B1_DESC,
+                    SB1.B1_POSIPI,
+                    D1_SEQCALC SEQCALC,
+                    D1_DTDIGIT DTDIGIT,
+                    D1_TES TES,
+                    D1_CF CF,
+                    D1_NUMSEQ SEQUENCIA,
+                    D1_DOC DOCUMENTO,
+                    D1_SERIE SERIE,
+                    D1_ITEM ITEM,
+                    D1_QUANT QUANTIDADE,
+                    D1_QTSEGUM QUANT2UM,
+                    D1_LOCAL ARMAZEM,
+                    D1_FORNECE PARCEIRO,
+                    D1_LOJA LOJA,
+                    D1_TIPO TIPONF,
+                    %Exp:cSelectD1%
+                    D1_LOTECTL LOTE,
+                    SD1.R_E_C_N_O_ NRECNO,
+                    SD1.D1_LOCAL ARMLOC,
+                    CASE WHEN SD1.D1_TES <= '500' THEN SD1.D1_QUANT ELSE 0 END ENTRADA_QTD,
+                    CASE WHEN SD1.D1_TES <= '500' THEN SD1.%Exp:cCustoExpD1% ELSE 0 END ENTRADA_CUSTO,
+                    CASE WHEN SD1.D1_TES <= '500' THEN 0 ELSE SD1.D1_QUANT END SAIDA_QTD,
+                    CASE WHEN SD1.D1_TES <= '500' THEN 0 ELSE SD1.%Exp:cCustoExpD1% END SAIDA_CUSTO,
+                    CASE WHEN SD1.D1_TIPO = 'C' THEN 'C-' ELSE 'F-' END
+                        + LTRIM(RTRIM(ISNULL(SD1.D1_FORNECE,''))) PARCEIRO_FMT,
+                    CASE WHEN SD1.D1_TIPO = 'D' THEN 'S' ELSE 'N' END DEVOLUCAO
+            FROM %table:SB1% SB1, %table:SD1% SD1, %table:SF4% SF4
+            WHERE SB1.B1_COD = SD1.D1_COD AND %Exp:cWhereD1C%
+                  SD1.D1_TES = SF4.F4_CODIGO AND SF4.F4_ESTOQUE = 'S' AND
+                  SD1.D1_DTDIGIT >= %Exp:dDataIni% AND SD1.D1_DTDIGIT <= %Exp:dDataFim% AND SD1.D1_ORIGLAN <> 'LF'
+                  %Exp:cWhereD1%
+                  SD1.%NotDel% AND SF4.%NotDel%
+                  %Exp:cWhereB1A% AND %Exp:cWhereB1C%
+            UNION ALL
+            SELECT  'SD2',
+                    SB1.B1_COD,
+                    SB1.B1_TIPO,
+                    SB1.B1_UM,
+                    SB1.B1_GRUPO,
+                    SB1.B1_CONTA,
+                    SB1.B1_DESC,
+                    SB1.B1_POSIPI,
+                    D2_SEQCALC,
+                    D2_EMISSAO,
+                    D2_TES,
+                    D2_CF,
+                    D2_NUMSEQ,
+                    D2_DOC,
+                    D2_SERIE,
+                    D2_ITEM,
+                    D2_QUANT,
+                    D2_QTSEGUM,
+                    D2_LOCAL,
+                    D2_CLIENTE,
+                    D2_LOJA,
+                    D2_TIPO,
+                    %Exp:cSelectD2%
+                    D2_LOTECTL,
+                    SD2.R_E_C_N_O_,
+                    SD2.D2_LOCAL,
+                    CASE WHEN SD2.D2_TES <= '500' THEN SD2.D2_QUANT ELSE 0 END,
+                    CASE WHEN SD2.D2_TES <= '500' THEN SD2.%Exp:cCustoExpD2% ELSE 0 END,
+                    CASE WHEN SD2.D2_TES <= '500' THEN 0 ELSE SD2.D2_QUANT END,
+                    CASE WHEN SD2.D2_TES <= '500' THEN 0 ELSE SD2.%Exp:cCustoExpD2% END,
+                    CASE WHEN SD2.D2_TIPO IN ('B','D') THEN 'F-' ELSE 'C-' END
+                        + LTRIM(RTRIM(ISNULL(SD2.D2_CLIENTE,''))),
+                    CASE WHEN SD2.D2_TIPO = 'D' THEN 'S' ELSE 'N' END
+            FROM %table:SB1% SB1, %table:SD2% SD2, %table:SF4% SF4
+            WHERE SB1.B1_COD = SD2.D2_COD AND %Exp:cWhereD2C%
+                  SD2.D2_TES = SF4.F4_CODIGO AND SF4.F4_ESTOQUE = 'S' AND
+                  SD2.D2_EMISSAO >= %Exp:dDataIni% AND SD2.D2_EMISSAO <= %Exp:dDataFim% AND SD2.D2_ORIGLAN <> 'LF'
+                  %Exp:cWhereD2%
+                  SD2.%NotDel% AND SF4.%NotDel%
+                  %Exp:cWhereB1A% AND %Exp:cWhereB1C%
+            UNION ALL
+            SELECT  'SD3',
+                    SB1.B1_COD,
+                    SB1.B1_TIPO,
+                    SB1.B1_UM,
+                    SB1.B1_GRUPO,
+                    SB1.B1_CONTA,
+                    SB1.B1_DESC,
+                    SB1.B1_POSIPI,
+                    D3_SEQCALC,
+                    D3_EMISSAO,
+                    D3_TM,
+                    D3_CF,
+                    D3_NUMSEQ,
+                    D3_DOC,
+                    ' ',
+                    ' ',
+                    D3_QUANT,
+                    D3_QTSEGUM,
+                    D3_LOCAL,
+                    D3_CC,
+                    ' ',
+                    ' ',
+                    %Exp:cSelectD3%
+                    D3_LOTECTL,
+                    SD3.R_E_C_N_O_,
+                    SD3.D3_LOCAL,
+                    CASE WHEN SD3.D3_TM <= '500' THEN SD3.D3_QUANT ELSE 0 END,
+                    CASE WHEN SD3.D3_TM <= '500' THEN SD3.%Exp:cCustoExpD3% ELSE 0 END,
+                    CASE WHEN SD3.D3_TM <= '500' THEN 0 ELSE SD3.D3_QUANT END,
+                    CASE WHEN SD3.D3_TM <= '500' THEN 0 ELSE SD3.%Exp:cCustoExpD3% END,
+                    CASE WHEN LTRIM(RTRIM(ISNULL(SD3.D3_CC,''))) <> ''
+                         THEN 'CC' + LTRIM(RTRIM(ISNULL(SD3.D3_CC,''))) ELSE '' END,
+                    ''
+            FROM %table:SB1% SB1, %table:SD3% SD3
+            WHERE SB1.B1_COD = SD3.D3_COD AND %Exp:cWhereD3C%
+                  SD3.D3_EMISSAO >= %Exp:dDataIni% AND SD3.D3_EMISSAO <= %Exp:dDataFim% AND
+                  %Exp:cWhereD3%
+                  SD3.%NotDel%
+        ) MTR900_UNI
+    ) MTR900_PAG
+    WHERE RN > %Exp:nOffset% AND RN <= %Exp:nOffsetFim%
+    ORDER BY RN
 EndSql
 
 Begin Sequence
     DbSelectArea(cAliasTop)
-    TcSetField(cAliasTop, "DTDIGIT", "D", TamSx3("D1_DTDIGIT")[1], TamSx3("D1_DTDIGIT")[2])
+    TcSetField(cAliasTop, "DTDIGIT",       "D", TamSx3("D1_DTDIGIT")[1], TamSx3("D1_DTDIGIT")[2])
+    TCSetField(cAliasTop, "TOTAL_REG",     "N", 10, 0)
+    TCSetField(cAliasTop, "RN",            "N", 10, 0)
+    TCSetField(cAliasTop, "ENTRADA_QTD",   "N", TamSx3("D1_QUANT")[1], TamSx3("D1_QUANT")[2])
+    TCSetField(cAliasTop, "SAIDA_QTD",     "N", TamSx3("D1_QUANT")[1], TamSx3("D1_QUANT")[2])
+    TCSetField(cAliasTop, "ENTRADA_CUSTO", "N", TamSx3("D1_CUSTO")[1], TamSx3("D1_CUSTO")[2])
+    TCSetField(cAliasTop, "SAIDA_CUSTO",   "N", TamSx3("D1_CUSTO")[1], TamSx3("D1_CUSTO")[2])
 
     // LOG: resultado do SQL
     ConOut(cLogPrefix + "SQL executado | alias=" + cAliasTop + ;
-        " EOF=" + IIf((cAliasTop)->(EoF()), "S", "N"))
+        " EOF=" + IIf((cAliasTop)->(EoF()), "S", "N") + ;
+        " decorrido_ate_aqui=" + cValToChar(Seconds() - nIniReq) + "s")
 
+    // O SQL ja devolve so' a pagina pedida (corte por RN) -- TOTAL_REG vem do
+    // COUNT(*) OVER() (igual em toda linha) e reflete o total ja filtrado,
+    // antes do corte por RN. Sem reprocessamento do cursor inteiro por pagina.
+    If !(cAliasTop)->(Eof())
+        nTotalReg := (cAliasTop)->TOTAL_REG
+    EndIf
+
+    // LOG: checkpoints de progresso no laco -- separa "SQL Server demorando
+    // pra montar a 1a linha" (gap grande antes do primeiro checkpoint) de
+    // "DbSkip lento linha a linha" (gap crescendo de forma constante a cada
+    // checkpoint).
+    nIniLoop := Seconds()
     While !(cAliasTop)->(Eof())
-        oLinha := MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim, aDevCache)
-        nTotalReg++
-
-        If nTotalReg > nOffset .And. Len(aLinhas) < nPageSize
-            AAdd(aLinhas, oLinha)
-        Else
-            FreeObj(oLinha)
+        AAdd(aLinhas, MTR900ApiLinha(cAliasTop, cDocPor))
+        nLido++
+        If nLido % 500 == 0
+            ConOut(cLogPrefix + "Progresso do laco | linhas_lidas=" + cValToChar(nLido) + ;
+                " decorrido_laco=" + cValToChar(Seconds() - nIniLoop) + "s" + ;
+                " decorrido_total=" + cValToChar(Seconds() - nIniReq) + "s")
         EndIf
-
         (cAliasTop)->(DbSkip())
     EndDo
 
-    // Paginacao real: o loop percorre o cursor inteiro (sem sair
-    // antecipadamente), entao nTotalReg reflete o total de linhas filtradas.
+    ConOut(cLogPrefix + "Laco finalizado | total_lido=" + cValToChar(nLido) + ;
+        " tempo_laco=" + cValToChar(Seconds() - nIniLoop) + "s")
+
     nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
     lHasMore    := (nPage < nTotalPages)
 
     // LOG: registros retornados nesta pagina
     ConOut(cLogPrefix + "Pagina montada | registros_retornados=" + cValToChar(Len(aLinhas)) + ;
-        " total_processado=" + cValToChar(nTotalReg) + ;
-        " hasMore=" + IIf(lHasMore, "S", "N"))
+        " total_filtrado=" + cValToChar(nTotalReg) + ;
+        " hasMore=" + IIf(lHasMore, "S", "N") + ;
+        " tempo_total_requisicao=" + cValToChar(Seconds() - nIniReq) + "s")
 
     oParams["data_ini"] := cDataIni
     oParams["data_fim"] := cDataFim
@@ -364,65 +437,18 @@ FreeObj(oParams)
 RestArea(aArea)
 Return .T.
 
-Static Function MTR900ApiLinha(cAliasTop, cLocal, nMoeda, cDocPor, cTipoCusto, dDataFim, aDevCache)
+Static Function MTR900ApiLinha(cAliasTop, cDocPor)
 Local oLinha     := JsonObject():New()
-Local nSaldoQtd  := 0
-Local nSaldoVlr  := 0
-Local nEntQtd    := 0
-Local nEntCus    := 0
-Local nSaiQtd    := 0
-Local nSaiCus    := 0
-Local cArq       := AllTrim((cAliasTop)->ARQ)
 Local cDocNumero := IIf(cDocPor $ "Ss", AllTrim((cAliasTop)->SEQUENCIA), AllTrim((cAliasTop)->DOCUMENTO))
-Local cParceiro  := ""
-Local lDev       := .F.
-
-// Saldo (CalcEst) nao e' calculado: a conciliacao de estoque usa apenas os
-// movimentos (entradas/saidas), nao o saldo projetado na data base. CalcEst
-// chamado por linha era o gargalo do Kardex em empresas de alto volume de
-// movimento (ex.: Rancheiro).
-
-Do Case
-Case cArq == "SD1"
-    lDev := MTR900Dev("SD1", cAliasTop, aDevCache)
-    If (cAliasTop)->TES <= "500" .And. !lDev
-        nEntQtd := (cAliasTop)->QUANTIDADE
-        nEntCus := (cAliasTop)->CUSTO
-    Else
-        nSaiQtd := IIf(lDev, (cAliasTop)->QUANTIDADE * -1, (cAliasTop)->QUANTIDADE)
-        nSaiCus := IIf(lDev, (cAliasTop)->CUSTO * -1, (cAliasTop)->CUSTO)
-    EndIf
-    cParceiro := IIf(((cAliasTop)->TIPONF) == "C", "C-", "F-") + AllTrim((cAliasTop)->PARCEIRO)
-Case cArq == "SD2"
-    lDev := MTR900Dev("SD2", cAliasTop, aDevCache)
-    If (cAliasTop)->TES <= "500" .Or. lDev
-        nEntQtd := IIf(lDev, (cAliasTop)->QUANTIDADE * -1, (cAliasTop)->QUANTIDADE)
-        nEntCus := IIf(lDev, (cAliasTop)->CUSTO * -1, (cAliasTop)->CUSTO)
-    Else
-        nSaiQtd := (cAliasTop)->QUANTIDADE
-        nSaiCus := (cAliasTop)->CUSTO
-    EndIf
-    cParceiro := IIf(((cAliasTop)->TIPONF) $ "B|D", "F-", "C-") + AllTrim((cAliasTop)->PARCEIRO)
-Case cArq == "SD3"
-    If (cAliasTop)->TES <= "500"
-        nEntQtd := (cAliasTop)->QUANTIDADE
-        nEntCus := (cAliasTop)->CUSTO
-    Else
-        nSaiQtd := (cAliasTop)->QUANTIDADE
-        nSaiCus := (cAliasTop)->CUSTO
-    EndIf
-    cParceiro := IIf(!Empty(AllTrim((cAliasTop)->PARCEIRO)), "CC" + AllTrim((cAliasTop)->PARCEIRO), "")
-EndCase
 
 oLinha["Codigo"] := AllTrim((cAliasTop)->PRODUTO)
 oLinha["Descricao"] := AllTrim((cAliasTop)->B1_DESC)
 oLinha["UM"] := AllTrim((cAliasTop)->B1_UM)
 oLinha["Tipo"] := AllTrim((cAliasTop)->TIPO)
 oLinha["Grupo"] := AllTrim((cAliasTop)->B1_GRUPO)
-oLinha["Conta Contabil"] := AllTrim((cAliasTop)->CONTACONTABIL)
-oLinha["Custo Medio"] := IIf(nSaldoQtd <> 0, Round(nSaldoVlr / nSaldoQtd, 2), 0)
-oLinha["Qtd Saldo"] := Round(nSaldoQtd, 2)
-oLinha["Vlr Total Saldo"] := Round(nSaldoVlr, 2)
+oLinha["Custo Medio"] := 0
+oLinha["Qtd Saldo"] := 0
+oLinha["Vlr Total Saldo"] := 0
 oLinha["Posicao IPI"] := AllTrim((cAliasTop)->B1_POSIPI)
 oLinha["Endereco"] := ""
 oLinha["Operacao Data"] := DtoC((cAliasTop)->DTDIGIT)
@@ -430,44 +456,21 @@ oLinha["ARM"] := AllTrim((cAliasTop)->ARMLOC)
 oLinha["TES"] := AllTrim((cAliasTop)->TES)
 oLinha["CF"] := AllTrim((cAliasTop)->CF)
 oLinha["Documento Numero"] := cDocNumero
+oLinha["Sequencia"] := AllTrim((cAliasTop)->SEQUENCIA)
 oLinha["Doc"] := AllTrim((cAliasTop)->DOCUMENTO)
 oLinha["Serie"] := AllTrim((cAliasTop)->SERIE)
 oLinha["Loja"] := AllTrim((cAliasTop)->LOJA)
 oLinha["Item"] := AllTrim((cAliasTop)->ITEM)
-oLinha["Sequencia"] := AllTrim((cAliasTop)->SEQUENCIA)
-oLinha["Entradas Quantidade"] := Round(nEntQtd, 2)
-oLinha["Entradas Custo Total"] := Round(nEntCus, 2)
+oLinha["Entradas Quantidade"] := Round((cAliasTop)->ENTRADA_QTD, 2)
+oLinha["Entradas Custo Total"] := Round((cAliasTop)->ENTRADA_CUSTO, 2)
 oLinha["Custo Medio do Movimento"] := IIf((cAliasTop)->QUANTIDADE != 0, Round((cAliasTop)->CUSTO / (cAliasTop)->QUANTIDADE, 2), 0)
-oLinha["Saidas Quantidade"] := Round(nSaiQtd, 2)
-oLinha["Saidas Custo Total"] := Round(nSaiCus, 2)
-oLinha["Saldo Quantidade"] := Round(nSaldoQtd, 2)
-oLinha["Saldo Valor Total"] := Round(nSaldoVlr, 2)
-oLinha["CLI/FOR/CC/PJ/OP/OS"] := cParceiro
+oLinha["Saidas Quantidade"] := Round((cAliasTop)->SAIDA_QTD, 2)
+oLinha["Saidas Custo Total"] := Round((cAliasTop)->SAIDA_CUSTO, 2)
+oLinha["Saldo Quantidade"] := 0
+oLinha["Saldo Valor Total"] := 0
+oLinha["CLI/FOR/CC/PJ/OP/OS"] := AllTrim((cAliasTop)->PARCEIRO_FMT)
+oLinha["Devolucao"] := AllTrim((cAliasTop)->DEVOLUCAO)
 Return oLinha
-
-/*
-  MTR900Dev - Verifica se o movimento e uma devolucao consultando F4_DUPLIC na SF4.
-  SD1 (entrada): devolucao quando F4_DUPLIC = 'D' (devolucao de compra/entrada)
-  SD2 (saida):   devolucao quando F4_DUPLIC = 'D' (devolucao de venda/saida)
-  Replicado aqui pois MTR900Dev esta no matr900.prx e nao e visivel pela API REST.
-*/
-Static Function MTR900Dev(cTabela, cAliasTop, aDevCache)
-Local lDev    := .F.
-Local cTES    := AllTrim((cAliasTop)->TES)
-Local cFilSF4 := xFilial("SF4")
-Local cChave  := cFilSF4 + cTES
-Local nPos    := AScan(aDevCache, {|x| x[1] == cChave})
-
-If nPos > 0
-    lDev := aDevCache[nPos][2]
-Else
-    If Select("SF4") > 0
-        lDev := ( Posicione("SF4", 1, cChave, "F4_DUPLIC") == "D" )
-    EndIf
-    AAdd(aDevCache, {cChave, lDev})
-EndIf
-
-Return lDev
 
 Static Function MTR900ApiErro(cCodigo, cMensagem, cDetalhe)
 Local oErro := JsonObject():New()
