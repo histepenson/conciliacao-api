@@ -286,8 +286,15 @@ def _decodificar_ct2_key_por_layout(ct2_key: Any, layout_campos: list) -> dict |
     if not layout_campos:
         return None
     key = str(ct2_key or "").strip()
-    largura_min = max((c["inicio"] + c["tamanho"] for c in layout_campos), default=0)
-    if largura_min == 0 or len(key) < largura_min:
+    # So' exige a chave alcancar o INICIO do ultimo campo, nao a largura
+    # total -- o Protheus corta espacos a direita ao gravar CT2_KEY, entao
+    # um campo curto no final (ex.: item "16" em vez de "0016") deixa a
+    # chave real mais curta que a soma nominal de inicio+tamanho de todos
+    # os campos. Fatiar alem do fim da string so' devolve menos caracteres
+    # (nao estoura), e o chamador ja descarta chave cujo campo decodificado
+    # vier vazio.
+    inicio_min = min((c["inicio"] for c in layout_campos), default=0)
+    if not key or len(key) <= inicio_min:
         return None
     return {
         c["campo"]: key[c["inicio"]: c["inicio"] + c["tamanho"]].strip()
@@ -757,7 +764,7 @@ def calcular_diferencas_estoque(
     def _skip_data_match(codigo_movimento):
         return codigo_movimento in {"DEV", "DEV - COMPRA", "DEV - VENDA", "CPV"}
 
-    def _matching_por_ct2_key(regs_kardex, regs_razao, mapa_lp_tipo):
+    def _matching_por_ct2_key(regs_kardex, regs_razao, mapa_lp_tipo, mapa_lp_layout_campos=None):
         """
         Passada 0 (antes do matching agregado por data+cf): casa Kardex x
         Razao pela chave nativa que o Protheus grava na CT2 -- mas essa
@@ -772,6 +779,16 @@ def calcular_diferencas_estoque(
           nativo por posicao fixa (_decodificar_ct2_key_fiscal) e compara
           campo-a-campo (doc, serie, parceiro, codigo_produto) contra os
           valores ja normalizados do Kardex.
+        - LPs com layout_campos cadastrado (mapa_lp_layout_campos) mas sem
+          tipo_chave: mesmo mecanismo de decode generico por posicao usado
+          na reclassificacao de grupo (_decodificar_ct2_key_por_layout +
+          _chave_ct2_decodificada_por_layout/_chave_kardex_por_layout), so'
+          que aplicado no pareamento registro-a-registro em vez de so'
+          rotular o grupo. Sem isso, LPs cadastrados so' com layout_campos
+          (ex.: LP 678) nunca casam individualmente e caem inteiros no
+          bucket generico de CPV/DEV, mesmo quando o registro existe dos
+          dois lados (confirmado com dado real: doc 000025423 item 16,
+          R$71,57, existe identico em Kardex e Razao mas nao casava).
 
         Ver tambem: reclassificacao por NUMSEQ no inicio de
         calcular_diferencas_estoque (roda ANTES do agrupamento por
@@ -779,20 +796,28 @@ def calcular_diferencas_estoque(
         que ja estao no mesmo grupo, mas a reclassificacao por numseq
         precisa mover o registro do Razao pro grupo certo primeiro).
 
-        Linhas do Razao cujo ct2_lp nao esta em mapa_lp_tipo (LP nao
-        configurado) nao entram em nenhuma das duas passadas e seguem pro
-        fluxo existente de matching por (data, cf). So' consome o par
-        quando chave E valor batem (tolerancia de R$ 0,01) -- sem fallback
-        global, mesmo principio de tools/fiscal/match_ct2_sft.py (evita
-        falso positivo por colisao de chave; implementacao independente
-        aqui, ver memoria feedback_isolamento_entre_processos).
+        Linhas do Razao cujo ct2_lp nao esta em mapa_lp_tipo nem em
+        mapa_lp_layout_campos (LP nao configurado) nao entram em nenhuma
+        das passadas e seguem pro fluxo existente de matching por (data,
+        cf). So' consome o par quando chave E valor batem (tolerancia de
+        R$ 0,01) -- sem fallback global, mesmo principio de
+        tools/fiscal/match_ct2_sft.py (evita falso positivo por colisao de
+        chave; implementacao independente aqui, ver memoria
+        feedback_isolamento_entre_processos).
         """
         mapa_lp_tipo = mapa_lp_tipo or {}
+        mapa_lp_layout_campos = {
+            lp: campos for lp, campos in (mapa_lp_layout_campos or {}).items()
+            if campos and lp not in mapa_lp_tipo
+        }
 
         por_estoque_razao: dict = {}
         por_fiscal_razao: dict = {}
+        # {lp_codigo: {chave_decodificada: [idx_razao, ...]}}
+        por_layout_razao: dict[str, dict] = {lp: {} for lp in mapa_lp_layout_campos}
         for idx, reg in enumerate(regs_razao):
-            tipo = mapa_lp_tipo.get(str(reg.get("ct2_lp") or "").strip())
+            lp = str(reg.get("ct2_lp") or "").strip()
+            tipo = mapa_lp_tipo.get(lp)
             if tipo == "ESTOQUE":
                 chave = reg.get("ct2_key") or ""
                 if chave:
@@ -801,6 +826,14 @@ def calcular_diferencas_estoque(
                 decoded = _decodificar_ct2_key_fiscal(reg.get("ct2_key") or "")
                 if decoded:
                     por_fiscal_razao.setdefault(_chave_fiscal(decoded), []).append(idx)
+            elif lp in mapa_lp_layout_campos:
+                layout_campos = mapa_lp_layout_campos[lp]
+                decoded = _decodificar_ct2_key_por_layout(reg.get("ct2_key") or "", layout_campos)
+                if decoded:
+                    campos_ordem = [c["campo"] for c in layout_campos]
+                    chave = _chave_ct2_decodificada_por_layout(decoded, campos_ordem)
+                    if not any(v is None or v == "" for v in chave):
+                        por_layout_razao[lp].setdefault(chave, []).append(idx)
 
         usados_kardex = set()
         usados_razao = set()
@@ -817,6 +850,16 @@ def calcular_diferencas_estoque(
                 # evita casar por acidente registros totalmente vazios
                 if chave_fiscal[0] or chave_fiscal[2]:
                     candidatos = [i for i in por_fiscal_razao.get(chave_fiscal, []) if i not in usados_razao]
+
+            if not candidatos:
+                for lp, layout_campos in mapa_lp_layout_campos.items():
+                    campos_ordem = [c["campo"] for c in layout_campos]
+                    chave = _chave_kardex_por_layout(reg_k, campos_ordem)
+                    if any(v is None or v == "" for v in chave):
+                        continue
+                    candidatos = [i for i in por_layout_razao[lp].get(chave, []) if i not in usados_razao]
+                    if candidatos:
+                        break
 
             if not candidatos:
                 continue
@@ -845,7 +888,7 @@ def calcular_diferencas_estoque(
           _skip_data_match)
         Compara soma de valor por chave.
         """
-        regs_kardex, regs_razao = _matching_por_ct2_key(regs_kardex, regs_razao, mapa_lp_tipo)
+        regs_kardex, regs_razao = _matching_por_ct2_key(regs_kardex, regs_razao, mapa_lp_tipo, mapa_lp_layout_campos)
         k_ag = _agrupar_para_matching(regs_kardex, usar_cf=match_cf, usar_data=match_data)
         r_ag = _agrupar_para_matching(regs_razao, usar_cf=match_cf, usar_data=match_data)
 
