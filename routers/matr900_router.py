@@ -48,6 +48,8 @@ async def get_kardex(
     lista_sem_movimento: Optional[str] = Query("2"),
     lista_transferencia: Optional[str] = Query("1"),
     considera_filiais: Optional[str] = Query("2"),
+    filial_de: Optional[str] = Query(None),
+    filial_ate: Optional[str] = Query(None),
     tipo_custo: Optional[str] = Query("1", description="1=Medio 2=Reposicao"),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     context: EmpresaContext = Depends(get_empresa_context),
@@ -73,6 +75,8 @@ async def get_kardex(
         "lista_sem_movimento": lista_sem_movimento,
         "lista_transferencia": lista_transferencia,
         "considera_filiais": considera_filiais,
+        "filial_de": filial_de,
+        "filial_ate": filial_ate,
         "tipo_custo": tipo_custo,
     }
 
@@ -114,6 +118,8 @@ async def get_como_base_kardex(
     lista_sem_movimento: Optional[str] = Query("2"),
     lista_transferencia: Optional[str] = Query("1"),
     considera_filiais: Optional[str] = Query("2"),
+    filial_de: Optional[str] = Query(None),
+    filial_ate: Optional[str] = Query(None),
     tipo_custo: Optional[str] = Query("1"),
     empresa_id: Optional[int] = Query(None, description="ID da empresa"),
     context: EmpresaContext = Depends(get_empresa_context),
@@ -138,6 +144,8 @@ async def get_como_base_kardex(
         "lista_sem_movimento": lista_sem_movimento,
         "lista_transferencia": lista_transferencia,
         "considera_filiais": considera_filiais,
+        "filial_de": filial_de,
+        "filial_ate": filial_ate,
         "tipo_custo": tipo_custo,
         "pageSize": pageSize or 5000,
     }

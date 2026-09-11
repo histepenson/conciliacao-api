@@ -421,6 +421,7 @@ def calcular_diferencas_estoque(
     mapa_lp_tipo: Dict[str, str] | None = None,
     mapa_lp_movimento_ct2_vazio: Dict[str, str] | None = None,
     mapa_lp_layout_campos: Dict[str, list] | None = None,
+    lps_matching_agregado_por_dia: set | None = None,
 ) -> Dict[str, Any]:
     """
     Calcula diferencas entre Kardex e Razao Contabil de Estoque
@@ -466,6 +467,21 @@ def calcular_diferencas_estoque(
         que casar exatamente nos campos configurados (ver
         _decodificar_ct2_key_por_layout / _chave_kardex_por_layout). LPs
         ausentes do mapa nao entram nessa passada.
+
+    lps_matching_agregado_por_dia : set[str], opcional
+        LPs onde uma linha do Razao aglutina VARIAS linhas do Kardex (ex.:
+        baixa de insumo por Ordem de Producao na Rancheiro, LP 666/668 --
+        o Kardex baixa em dezenas de lancamentos individuais ao longo do
+        dia, mas o Razao lanca UMA linha soma por dia). Esses LPs ainda
+        entram na reclassificacao de rotulo (mapa_lp_layout_campos, acima)
+        pra virar o codigo_movimento certo, mas sao EXCLUIDOS do pareamento
+        individual registro-a-registro (_matching_por_ct2_key) -- tentar
+        casar 1:1 sempre falha nesse padrao (chave bate, valor nao).
+        Caem no fallback de _agrupar_para_matching (soma por data, sem
+        exigir CF igual), que compara o total do dia dos dois lados --
+        comparacao correta pra esse padrao. Isolado por design: nao afeta
+        LPs de outras empresas (ex.: grupo RIMAVE, matching 1 nota = 1
+        lancamento, que continua exato).
 
     Retorna:
     --------
@@ -806,9 +822,20 @@ def calcular_diferencas_estoque(
         feedback_isolamento_entre_processos).
         """
         mapa_lp_tipo = mapa_lp_tipo or {}
+        # LPs em lps_matching_agregado_por_dia (via closure, ver
+        # calcular_diferencas_estoque) ja' tiveram o codigo_movimento
+        # rotulado certo na reclassificacao de grupo (passada anterior,
+        # usa mapa_lp_layout_campos completo) -- mas aqui, no pareamento
+        # individual, sao excluidos de propositos: a baixa desses LPs e'
+        # aglutinada por OP no Razao (varias linhas de Kardex = 1 linha do
+        # Razao), entao tentar casar registro-a-registro sempre falha.
+        # Deixa cair no fallback de _agrupar_para_matching (data, sem cf),
+        # que soma o dia inteiro dos dois lados -- comparacao correta pra
+        # esse padrao (confirmado real: Rancheiro, LP 666, "BX INSUMOS OP").
+        lps_agregado = lps_matching_agregado_por_dia or set()
         mapa_lp_layout_campos = {
             lp: campos for lp, campos in (mapa_lp_layout_campos or {}).items()
-            if campos and lp not in mapa_lp_tipo
+            if campos and lp not in mapa_lp_tipo and lp not in lps_agregado
         }
 
         por_estoque_razao: dict = {}

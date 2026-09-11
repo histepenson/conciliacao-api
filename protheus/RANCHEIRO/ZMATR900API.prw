@@ -22,6 +22,8 @@ wsrestful ZMATR900API description "MATR900 - Kardex Fisico-Financeiro"
     wsdata ordem                as string
     wsdata lista_sem_movimento  as string
     wsdata considera_filiais    as string
+    wsdata filial_de            as string
+    wsdata filial_ate           as string
     wsdata tipo_custo           as string
     wsmethod GET getKardex description "Kardex Fisico-Financeiro" wssyntax "/api/v1/matr900" PATH "/api/v1/matr900"
 EndwsRestFul
@@ -53,8 +55,12 @@ Local cDocPor := Upper(IIf(Empty(AllTrim(Self:documento_por)), "D", AllTrim(Self
 Local nMoeda := Max(1, Val(IIf(Empty(AllTrim(Self:moeda)), "1", AllTrim(Self:moeda))))
 Local nOrdem := Max(1, Val(IIf(Empty(AllTrim(Self:ordem)), "1", AllTrim(Self:ordem))))
 Local cSemMov := IIf(Empty(AllTrim(Self:lista_sem_movimento)), "2", AllTrim(Self:lista_sem_movimento))
-// considera_filiais: "1"=filial corrente  "2"=todas as filiais (logica original do MATR900)
+// considera_filiais: "1"=filtra pela faixa filial_de/filial_ate (default =
+// filial corrente quando a faixa vem vazia, preserva o comportamento antigo)
+// "2"=todas as filiais (logica original do MATR900)
 Local lTodasFil := (AllTrim(Self:considera_filiais) == "2")
+Local cFilialDe := AllTrim(Self:filial_de)
+Local cFilialAte := AllTrim(Self:filial_ate)
 Local cTipoCusto := IIf(Empty(AllTrim(Self:tipo_custo)), "1", AllTrim(Self:tipo_custo))
 Local dDataIni := CToD("")
 Local dDataFim := CToD("")
@@ -67,6 +73,11 @@ Local nIniReq := Seconds()
 Local nIniLoop := 0
 Local nLido := 0
 Local lHasMore := .F.
+// Filiais distintas efetivamente retornadas pelo SQL nesta pagina -- log de
+// diagnostico pra confirmar que o filtro filial_de/filial_ate (ou filial
+// corrente, quando vazio) esta' restringindo certo.
+Local aFiliaisVistas := {}
+Local cFilialLinha := ""
 Local cSelectD1 := ""
 Local cSelectD2 := ""
 Local cSelectD3 := ""
@@ -106,7 +117,9 @@ ConOut(cLogPrefix + "Requisicao recebida | data_ini=" + cDataIni + " data_fim=" 
     " armazem=[" + IIf(Empty(cLocal), "TODOS", cLocal) + "]" + ;
     " local_de=[" + cLocalInf + "] local_ate=[" + cLocalSup + "]" + ;
     " doc_por=" + cDocPor + " moeda=" + cValToChar(nMoeda) + ;
-    " todas_filiais=" + IIf(lTodasFil, "S", "N") + " tipo_custo=" + cTipoCusto)
+    " todas_filiais=" + IIf(lTodasFil, "S", "N") + ;
+    " filial_de=[" + cFilialDe + "] filial_ate=[" + cFilialAte + "]" + ;
+    " tipo_custo=" + cTipoCusto)
 
 If Len(cDataIni) <> 8 .Or. Len(cDataFim) <> 8
     ConOut(cLogPrefix + "ERRO VALIDACAO: data_ini ou data_fim invalido | data_ini=" + cDataIni + " data_fim=" + cDataFim)
@@ -183,9 +196,15 @@ cWhereD3 += " SB1.B1_COD >= '" + cProdutoDe + "' AND SB1.B1_COD <= '" + cProduto
 cWhereD3 += " SB1.B1_FILIAL = '" + xFilial("SB1") + "' AND SB1.B1_TIPO >= '" + cTipoDe + "' AND SB1.B1_TIPO <= '" + cTipoAte + "' AND"
 cWhereD3 += " SB1.B1_GRUPO >= '" + cGrupoDe + "' AND SB1.B1_GRUPO <= '" + cGrupoAte + "' AND SB1.B1_COD <> '" + cProdImp + "' AND SB1.D_E_L_E_T_=' '"
 cWhereD3 += " AND SB1.B1_CONTA >= '" + cContaDe + "' AND SB1.B1_CONTA <= '" + cContaAte + "' AND%"
-cWhereD1C := IIf(lTodasFil, "% SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%", "% D1_FILIAL ='" + xFilial("SD1") + "' AND SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%")
-cWhereD2C := IIf(lTodasFil, "% SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%", "% D2_FILIAL ='" + xFilial("SD2") + "' AND SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%")
-cWhereD3C := IIf(lTodasFil, "%1=1 AND %", "% D3_FILIAL ='" + xFilial("SD3") + "' AND %")
+// Faixa de filial (filial_de/filial_ate): quando informada, filtra o
+// movimento por essa faixa em vez de restringir a' filial corrente -- se
+// vier vazia, cai no comportamento antigo (so' a filial corrente do alias).
+cWhereD1C := IIf(lTodasFil, "% SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%", ;
+    "% D1_FILIAL >= '" + IIf(Empty(cFilialDe), xFilial("SD1"), cFilialDe) + "' AND D1_FILIAL <= '" + IIf(Empty(cFilialAte), xFilial("SD1"), cFilialAte) + "' AND SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%")
+cWhereD2C := IIf(lTodasFil, "% SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%", ;
+    "% D2_FILIAL >= '" + IIf(Empty(cFilialDe), xFilial("SD2"), cFilialDe) + "' AND D2_FILIAL <= '" + IIf(Empty(cFilialAte), xFilial("SD2"), cFilialAte) + "' AND SF4.F4_FILIAL = '" + xFilial("SF4") + "' AND%")
+cWhereD3C := IIf(lTodasFil, "%1=1 AND %", ;
+    "% D3_FILIAL >= '" + IIf(Empty(cFilialDe), xFilial("SD3"), cFilialDe) + "' AND D3_FILIAL <= '" + IIf(Empty(cFilialAte), xFilial("SD3"), cFilialAte) + "' AND %")
 cWhereB1A := "% AND SB1.B1_COD >= '" + cProdutoDe + "' AND SB1.B1_COD <= '" + cProdutoAte + "'"
 cWhereB1A += " AND SB1.B1_CONTA >= '" + cContaDe + "' AND SB1.B1_CONTA <= '" + cContaAte + "'%"
 cWhereB1C := "% SB1.B1_FILIAL = '" + xFilial("SB1") + "' AND SB1.B1_TIPO >= '" + cTipoDe + "' AND SB1.B1_TIPO <= '" + cTipoAte + "' AND SB1.B1_GRUPO >= '" + cGrupoDe + "' AND SB1.B1_GRUPO <= '" + cGrupoAte + "' AND SB1.B1_COD <> '" + cProdImp + "' AND SB1.D_E_L_E_T_=' '%"
@@ -211,6 +230,7 @@ BeginSql Alias cAliasTop
                COUNT(*) OVER() TOTAL_REG
         FROM (
             SELECT  'SD1' ARQ,
+                    SD1.D1_FILIAL FILIAL,
                     SB1.B1_COD PRODUTO,
                     SB1.B1_TIPO TIPO,
                     SB1.B1_UM,
@@ -225,6 +245,7 @@ BeginSql Alias cAliasTop
                     D1_NUMSEQ SEQUENCIA,
                     D1_DOC DOCUMENTO,
                     D1_SERIE SERIE,
+                    D1_ITEM ITEM,
                     D1_QUANT QUANTIDADE,
                     D1_QTSEGUM QUANT2UM,
                     D1_LOCAL ARMAZEM,
@@ -251,6 +272,7 @@ BeginSql Alias cAliasTop
                   %Exp:cWhereB1A% AND %Exp:cWhereB1C%
             UNION ALL
             SELECT  'SD2',
+                    SD2.D2_FILIAL,
                     SB1.B1_COD,
                     SB1.B1_TIPO,
                     SB1.B1_UM,
@@ -265,6 +287,7 @@ BeginSql Alias cAliasTop
                     D2_NUMSEQ,
                     D2_DOC,
                     D2_SERIE,
+                    D2_ITEM,
                     D2_QUANT,
                     D2_QTSEGUM,
                     D2_LOCAL,
@@ -291,6 +314,7 @@ BeginSql Alias cAliasTop
                   %Exp:cWhereB1A% AND %Exp:cWhereB1C%
             UNION ALL
             SELECT  'SD3',
+                    SD3.D3_FILIAL,
                     SB1.B1_COD,
                     SB1.B1_TIPO,
                     SB1.B1_UM,
@@ -304,6 +328,7 @@ BeginSql Alias cAliasTop
                     D3_CF,
                     D3_NUMSEQ,
                     D3_DOC,
+                    ' ',
                     ' ',
                     D3_QUANT,
                     D3_QTSEGUM,
@@ -362,6 +387,10 @@ Begin Sequence
     nIniLoop := Seconds()
     While !(cAliasTop)->(Eof())
         AAdd(aLinhas, MTR900ApiLinha(cAliasTop, cDocPor))
+        cFilialLinha := AllTrim((cAliasTop)->FILIAL)
+        If AScan(aFiliaisVistas, cFilialLinha) == 0
+            AAdd(aFiliaisVistas, cFilialLinha)
+        EndIf
         nLido++
         If nLido % 500 == 0
             ConOut(cLogPrefix + "Progresso do laco | linhas_lidas=" + cValToChar(nLido) + ;
@@ -371,8 +400,13 @@ Begin Sequence
         (cAliasTop)->(DbSkip())
     EndDo
 
+    cFilialLinha := ""
+    For nRecAtual := 1 To Len(aFiliaisVistas)
+        cFilialLinha += IIf(nRecAtual > 1, ",", "") + aFiliaisVistas[nRecAtual]
+    Next nRecAtual
     ConOut(cLogPrefix + "Laco finalizado | total_lido=" + cValToChar(nLido) + ;
-        " tempo_laco=" + cValToChar(Seconds() - nIniLoop) + "s")
+        " tempo_laco=" + cValToChar(Seconds() - nIniLoop) + "s" + ;
+        " filiais_retornadas=" + cValToChar(Len(aFiliaisVistas)) + " [" + cFilialLinha + "]")
 
     nTotalPages := Max(1, Int((nTotalReg + nPageSize - 1) / nPageSize))
     lHasMore    := (nPage < nTotalPages)
@@ -399,6 +433,8 @@ Begin Sequence
     oParams["ordem"] := nOrdem
     oParams["lista_sem_movimento"] := cSemMov
     oParams["considera_filiais"] := IIf(lTodasFil, "2", "1")
+    oParams["filial_de"] := cFilialDe
+    oParams["filial_ate"] := cFilialAte
     oParams["tipo_custo"] := cTipoCusto
     oParams["page"] := nPage
     oParams["pageSize"] := nPageSize
@@ -438,6 +474,7 @@ Static Function MTR900ApiLinha(cAliasTop, cDocPor)
 Local oLinha     := JsonObject():New()
 Local cDocNumero := IIf(cDocPor $ "Ss", AllTrim((cAliasTop)->SEQUENCIA), AllTrim((cAliasTop)->DOCUMENTO))
 
+oLinha["Filial"] := AllTrim((cAliasTop)->FILIAL)
 oLinha["Codigo"] := AllTrim((cAliasTop)->PRODUTO)
 oLinha["Descricao"] := AllTrim((cAliasTop)->B1_DESC)
 oLinha["UM"] := AllTrim((cAliasTop)->B1_UM)
@@ -454,6 +491,10 @@ oLinha["TES"] := AllTrim((cAliasTop)->TES)
 oLinha["CF"] := AllTrim((cAliasTop)->CF)
 oLinha["Documento Numero"] := cDocNumero
 oLinha["Sequencia"] := AllTrim((cAliasTop)->SEQUENCIA)
+oLinha["Doc"] := AllTrim((cAliasTop)->DOCUMENTO)
+oLinha["Serie"] := AllTrim((cAliasTop)->SERIE)
+oLinha["Loja"] := AllTrim((cAliasTop)->LOJA)
+oLinha["Item"] := AllTrim((cAliasTop)->ITEM)
 oLinha["Entradas Quantidade"] := Round((cAliasTop)->ENTRADA_QTD, 2)
 oLinha["Entradas Custo Total"] := Round((cAliasTop)->ENTRADA_CUSTO, 2)
 oLinha["Custo Medio do Movimento"] := IIf((cAliasTop)->QUANTIDADE != 0, Round((cAliasTop)->CUSTO / (cAliasTop)->QUANTIDADE, 2), 0)
