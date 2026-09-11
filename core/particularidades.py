@@ -19,3 +19,4 @@ class ChaveParticularidade(str, Enum):
     TEM_CROMS051 = "tem_croms051"
     TEM_CONFERENCIA_LEASING = "tem_conferencia_leasing"
     TEM_CONFERENCIA_FOLHA = "tem_conferencia_folha"
+    IGNORA_LOJA_CODIGO_FINANCEIRO = "ignora_loja_codigo_financeiro"

@@ -240,29 +240,31 @@ def _get_processador() -> ProcessadorContasPagar:
     return _processador
 
 
-def normalizar_planilha_contas_pagar(entrada: Any) -> pd.DataFrame:
+def normalizar_planilha_contas_pagar(entrada: Any, considera_loja: bool = True) -> pd.DataFrame:
     """
     Normaliza planilha de contas a pagar e agrupa por codigo.
 
     Args:
         entrada: DataFrame ou caminho para arquivo Excel
+        considera_loja: Se False, a loja e' ignorada na montagem do codigo
 
     Returns:
         DataFrame com colunas: codigo, cliente, valor, dias_vencidos, TIPO
 
     Nota: O campo 'cliente' contem o nome do fornecedor.
     """
-    return _get_processador().normalizar(entrada)
+    return _get_processador().normalizar(entrada, considera_loja=considera_loja)
 
 
-def normalizar_planilha_contas_pagar_detalhada(entrada: Any) -> pd.DataFrame:
+def normalizar_planilha_contas_pagar_detalhada(entrada: Any, considera_loja: bool = True) -> pd.DataFrame:
     """
     Normaliza planilha de contas a pagar mantendo detalhes.
 
     Args:
         entrada: DataFrame ou caminho para arquivo Excel
+        considera_loja: Se False, a loja e' ignorada na montagem do codigo
 
     Returns:
         DataFrame com registros detalhados
     """
-    return _get_processador().normalizar_detalhado(entrada)
+    return _get_processador().normalizar_detalhado(entrada, considera_loja=considera_loja)

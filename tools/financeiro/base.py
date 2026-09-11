@@ -388,7 +388,7 @@ def formatar_codigo(base: str, loja: str, prefixo: str = "C") -> str:
     return f"{prefixo}{base}{loja}"
 
 
-def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> pd.DataFrame:
+def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C", considera_loja: bool = True) -> pd.DataFrame:
     """
     Normaliza uma serie de codigos de cliente/fornecedor.
 
@@ -398,6 +398,9 @@ def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> p
     Args:
         serie_cliente: Series com os valores originais
         prefixo: Prefixo para o codigo (C=cliente, F=fornecedor)
+        considera_loja: Se False, a loja e' ignorada na montagem do codigo
+            (empresas cujo item contabil nao segrega por loja -- particularidade
+            "ignora_loja_codigo_financeiro" em empresa_configuracao)
 
     Returns:
         DataFrame com colunas 'codigo' e 'cliente'
@@ -412,10 +415,12 @@ def normalizar_codigo_cliente(serie_cliente: pd.Series, prefixo: str = "C") -> p
 
     # Extrair base (preserva letras + digitos) e loja (apenas digitos)
     base_clean = base_split.astype(str).str.replace(r"[^a-zA-Z0-9]", "", regex=True)
-    loja_digits = loja_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
-
-    # Quando nao tem separador '-', loja fica vazia (todos os digitos sao o codigo)
-    loja_digits = loja_digits.where(loja_digits.str.len() > 0, "")
+    if considera_loja:
+        loja_digits = loja_split.astype(str).str.extract(r"(\d+)", expand=False).fillna("")
+        # Quando nao tem separador '-', loja fica vazia (todos os digitos sao o codigo)
+        loja_digits = loja_digits.where(loja_digits.str.len() > 0, "")
+    else:
+        loja_digits = pd.Series("", index=serie_cliente.index)
 
     # Formatar codigo final
     codigo = prefixo + base_clean + loja_digits
@@ -518,12 +523,14 @@ class ProcessadorFinanceiroBase(ABC):
         self.logger.info(f"Total de registros lidos: {len(df)}")
         return df
 
-    def normalizar_base(self, entrada: Any) -> pd.DataFrame:
+    def normalizar_base(self, entrada: Any, considera_loja: bool = True) -> pd.DataFrame:
         """
         Executa normalizacao base comum a todos os tipos.
 
         Args:
             entrada: DataFrame ou caminho para arquivo
+            considera_loja: Se False, a loja e' ignorada na montagem do codigo
+                (particularidade "ignora_loja_codigo_financeiro" por empresa)
 
         Returns:
             DataFrame normalizado com colunas padrao
@@ -567,13 +574,21 @@ class ProcessadorFinanceiroBase(ABC):
             df["ct2_prefixo"] = df["prefixo"].astype(str).str.strip() if "prefixo" in df.columns else None
             df["ct2_numero"] = df["numero"].astype(str).str.strip() if "numero" in df.columns else None
 
-            df["codigo"] = df[col_codigo_pronto].astype(str).str.strip()
+            if considera_loja:
+                df["codigo"] = df[col_codigo_pronto].astype(str).str.strip()
+            else:
+                # codigo_cli/codigo_for ja vem com a loja embutida (montado no
+                # ADVPL como prefixo+cliente/fornecedor+loja) -- reconstroi sem
+                # loja a partir do campo base cru (cliente/fornecedor) em vez
+                # de tentar remover o sufixo do codigo pronto.
+                df["codigo"] = self.get_prefixo_codigo() + df[col_cliefor_raw].astype(str).str.strip()
             nome_col = next((c for c in ["nome_cliente", "nome_fornecedor", col_cliente] if c in df.columns), None)
             df["cliente"] = df[nome_col].astype(str).str.strip() if nome_col else df["codigo"]
         else:
             codigo_df = normalizar_codigo_cliente(
                 df[col_cliente],
-                prefixo=self.get_prefixo_codigo()
+                prefixo=self.get_prefixo_codigo(),
+                considera_loja=considera_loja,
             )
             df["codigo"] = codigo_df["codigo"]
             df["cliente"] = codigo_df["cliente"]
@@ -817,17 +832,18 @@ class ProcessadorFinanceiroBase(ABC):
             avisos=avisos
         )
 
-    def normalizar(self, entrada: Any) -> pd.DataFrame:
+    def normalizar(self, entrada: Any, considera_loja: bool = True) -> pd.DataFrame:
         """
         Normaliza planilha e agrupa por codigo.
 
         Args:
             entrada: DataFrame ou caminho para arquivo
+            considera_loja: Se False, a loja e' ignorada na montagem do codigo
 
         Returns:
             DataFrame agrupado com colunas: codigo, cliente, valor, dias_vencidos, TIPO
         """
-        df = self.normalizar_base(entrada)
+        df = self.normalizar_base(entrada, considera_loja=considera_loja)
 
         # Agrupar por codigo
         df_agrupado = (
@@ -849,17 +865,18 @@ class ProcessadorFinanceiroBase(ABC):
 
         return df_agrupado
 
-    def normalizar_detalhado(self, entrada: Any) -> pd.DataFrame:
+    def normalizar_detalhado(self, entrada: Any, considera_loja: bool = True) -> pd.DataFrame:
         """
         Normaliza planilha mantendo detalhes por registro.
 
         Args:
             entrada: DataFrame ou caminho para arquivo
+            considera_loja: Se False, a loja e' ignorada na montagem do codigo
 
         Returns:
             DataFrame com todos os registros detalhados
         """
-        df = self.normalizar_base(entrada)
+        df = self.normalizar_base(entrada, considera_loja=considera_loja)
         return df[[
             "codigo", "cliente", "valor",
             "data_emissao", "data_vencimento",
