@@ -433,13 +433,15 @@ class ConciliacaoService:
             df_razao_filtrado = self._filtrar_razao_por_conta(df_razao_geral, conta_contabil)
 
             analise_service = AnaliseDiferencasService()
-            # Usa financeiro filtrado pelo mes de emissao para comparar com CTBR480
-            # (que ja contem apenas o mes de analise); se nao houver filtro, usa o completo
-            df_fin_para_analise = (
-                df_fin_mes
-                if (df_fin_mes is not None and not df_fin_mes.empty)
-                else financeiro_norm
-            )
+            # Usa o financeiro COMPLETO (saldo em aberto de todos os periodos), nao
+            # so' o mes de emissao -- a contabilidade (valor_contabilidade) tambem e'
+            # o saldo acumulado da conta (Saldo atual do CTBR140), entao comparar um
+            # financeiro filtrado por mes contra uma contabilidade acumulada gerava
+            # divergencias enganosas para titulos antigos (ex: PA/NDF de anos
+            # anteriores aparecendo como "SO_CONTABILIDADE" com Valor Financeiro
+            # R$ 0,00 mesmo tendo titulos em aberto). df_fin_mes continua calculado
+            # acima só para o campo informativo `analise_movimentos_mes`.
+            df_fin_para_analise = financeiro_norm
 
             # Mapa de saldo anterior por codigo (item do CTBR140) para o grid de Lancamentos Razao
             saldo_ant_map: dict[str, float] = {}
