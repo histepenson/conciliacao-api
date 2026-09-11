@@ -476,6 +476,7 @@ Local cDocNumero := IIf(cDocPor $ "Ss", AllTrim((cAliasTop)->SEQUENCIA), AllTrim
 
 oLinha["Filial"] := AllTrim((cAliasTop)->FILIAL)
 oLinha["Codigo"] := AllTrim((cAliasTop)->PRODUTO)
+oLinha["Conta Contabil"] := AllTrim((cAliasTop)->CONTACONTABIL)
 oLinha["Descricao"] := AllTrim((cAliasTop)->B1_DESC)
 oLinha["UM"] := AllTrim((cAliasTop)->B1_UM)
 oLinha["Tipo"] := AllTrim((cAliasTop)->TIPO)

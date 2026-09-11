@@ -12,13 +12,18 @@ import json
 
 from schemas.conciliacao_estoque_schema import (
     RequestConciliacaoEstoque,
+    ConsultarDivergenciaRequest,
 )
 from services.conciliacao_estoque_service import ConciliacaoEstoqueService
 from services.conciliacao_estoque_efetivacao_service import ConciliacaoEstoqueEfetivacaoService
 from services import balancete_service
 from services import lancamento_padrao_ct2_service
+from services.estoque_consulta_divergencia_service import consultar_divergencia_kardex
+from services.matr900_service import Matr900Service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
+from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
+from core.protheus import resolve_protheus_config
 from db import get_db
 from sqlalchemy.orm import Session
 
@@ -100,6 +105,33 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
             status_code=500,
             detail=f"Erro interno ao processar conciliacao de estoque: {str(e)}"
         )
+
+
+@router.post("/estoque/consultar-divergencia")
+async def consultar_divergencia_razao(
+    payload: ConsultarDivergenciaRequest,
+    context: EmpresaContext = Depends(get_empresa_context),
+    db: Session = Depends(get_db),
+):
+    """
+    Consulta pontual no Kardex (todas as contas contabeis) para um
+    lancamento "Só Razão" sem correspondencia -- decodifica o ct2_key pelo
+    layout cadastrado do LP e busca no Protheus sem restringir conta
+    contabil. Se achar, mostra em qual conta o produto esta' classificado
+    (reclassificacao, nao falta de estoque); se nao achar, confirma que o
+    lancamento nao gerou movimento fisico nesse periodo.
+    """
+    empresa_id = resolve_empresa_id(context, payload.empresa_id)
+    cfg = resolve_protheus_config(empresa_id, db)
+    svc = Matr900Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
+    try:
+        return await consultar_divergencia_kardex(
+            db, empresa_id, payload.ct2_lp, payload.ct2_key,
+            payload.data_ini, payload.data_fim, svc,
+        )
+    except Exception as e:
+        logger.exception(f"Erro ao consultar divergencia no Kardex: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Erro ao consultar Protheus: {str(e)}")
 
 
 @router.post("/estoque/efetivar", response_model=EfetivarConciliacaoResponse, status_code=201)
