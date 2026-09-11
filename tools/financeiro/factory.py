@@ -123,7 +123,8 @@ def listar_tipos_disponiveis() -> list[str]:
 
 def normalizar_planilha(
     entrada: Any,
-    tipo: TipoFinanceiro | str
+    tipo: TipoFinanceiro | str,
+    considera_loja: bool = True,
 ) -> pd.DataFrame:
     """
     Normaliza planilha financeira usando o processador apropriado.
@@ -133,6 +134,7 @@ def normalizar_planilha(
     Args:
         entrada: DataFrame ou caminho para arquivo Excel
         tipo: Tipo de processamento (enum ou string)
+        considera_loja: Se False, a loja e' ignorada na montagem do codigo
 
     Returns:
         DataFrame normalizado e agrupado
@@ -146,12 +148,13 @@ def normalizar_planilha(
     else:
         processador = get_processador(tipo)
 
-    return processador.normalizar(entrada)
+    return processador.normalizar(entrada, considera_loja=considera_loja)
 
 
 def normalizar_planilha_detalhada(
     entrada: Any,
-    tipo: TipoFinanceiro | str
+    tipo: TipoFinanceiro | str,
+    considera_loja: bool = True,
 ) -> pd.DataFrame:
     """
     Normaliza planilha financeira mantendo detalhes por registro.
@@ -159,6 +162,7 @@ def normalizar_planilha_detalhada(
     Args:
         entrada: DataFrame ou caminho para arquivo Excel
         tipo: Tipo de processamento (enum ou string)
+        considera_loja: Se False, a loja e' ignorada na montagem do codigo
 
     Returns:
         DataFrame detalhado (nao agrupado)
@@ -168,7 +172,7 @@ def normalizar_planilha_detalhada(
     else:
         processador = get_processador(tipo)
 
-    return processador.normalizar_detalhado(entrada)
+    return processador.normalizar_detalhado(entrada, considera_loja=considera_loja)
 
 
 def validar_layout_planilha(

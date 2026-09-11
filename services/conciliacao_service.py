@@ -201,18 +201,23 @@ class ConciliacaoService:
     # ==================================================
     # EXECUCAO ASSINCRONA (suporta ctbr480_params)
     # ==================================================
-    async def executar_async(self, request: RequestConciliacao, config: ProtheusConfig) -> dict:
+    async def executar_async(self, request: RequestConciliacao, config: ProtheusConfig, considera_loja: bool = True) -> dict:
         """
         Versao assincrona do executar() com suporte a busca automatica do CTBR480.
         Quando base_contabil_geral.ctbr480_params estiver preenchido, busca o razao
         diretamente do Protheus antes de executar a conciliacao.
+
+        Args:
+            considera_loja: Se False, a loja e' ignorada na montagem do codigo do
+                financeiro (particularidade "ignora_loja_codigo_financeiro" -- empresas
+                cujo item contabil nao segrega por loja)
         """
         # Injeta registros do Protheus se ctbr480_params estiver presente
         if request.base_contabil_geral and request.base_contabil_geral.ctbr480_params:
             registros = await self._buscar_razao_geral_protheus(request, config)
             request.base_contabil_geral.registros = registros
 
-        return self.executar(request)
+        return self.executar(request, considera_loja=considera_loja)
 
     # ==================================================
     # PONTO DE EXTENSAO
@@ -236,9 +241,13 @@ class ConciliacaoService:
     # ==================================================
     # EXECUCAO PRINCIPAL
     # ==================================================
-    def executar(self, request: RequestConciliacao) -> dict:
+    def executar(self, request: RequestConciliacao, considera_loja: bool = True) -> dict:
         """
         Retorna dict para compatibilidade com o frontend.
+
+        Args:
+            considera_loja: Se False, a loja e' ignorada na montagem do codigo do
+                financeiro (particularidade "ignora_loja_codigo_financeiro")
         """
         _t_total = time.perf_counter()
         logger.info(" Executando conciliacao contabil")
@@ -277,8 +286,8 @@ class ConciliacaoService:
         # Usar o processador apropriado via factory
         try:
             processador = get_processador_por_nome(tipo_financeiro)
-            financeiro_norm = processador.normalizar(df_financeiro_raw)
-            financeiro_detalhado = processador.normalizar_detalhado(df_financeiro_raw)
+            financeiro_norm = processador.normalizar(df_financeiro_raw, considera_loja=considera_loja)
+            financeiro_detalhado = processador.normalizar_detalhado(df_financeiro_raw, considera_loja=considera_loja)
             logger.info(" %s normalizado via factory: %s registros", tipo_financeiro.upper(), len(financeiro_norm))
         except ValueError as e:
             # Se for erro de layout, propagar com mensagem clara
@@ -286,8 +295,8 @@ class ConciliacaoService:
                 raise ValueError(f"Erro no layout do arquivo financeiro: {str(e)}")
             # Fallback para o metodo legado (contas a receber) se tipo nao reconhecido
             logger.warning(" Tipo '%s' nao reconhecido, usando processador padrao (contas_receber)", tipo_financeiro)
-            financeiro_norm = normalizar_planilha_financeira(df_financeiro_raw)
-            financeiro_detalhado = normalizar_planilha_financeira_detalhada(df_financeiro_raw)
+            financeiro_norm = normalizar_planilha_financeira(df_financeiro_raw, considera_loja=considera_loja)
+            financeiro_detalhado = normalizar_planilha_financeira_detalhada(df_financeiro_raw, considera_loja=considera_loja)
             logger.info(" Financeiro normalizado (legado): %s registros", len(financeiro_norm))
 
         logger.info("[TEMPO] Etapa 1 (normalizar financeiro): %.3fs", time.perf_counter() - _t0)

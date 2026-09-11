@@ -174,6 +174,11 @@ async def processar_conciliacao(
         # ainda esta aberto -- decide so' qual classe de service usar abaixo.
         tem_croms051 = bool(obter_valor(db, ctx.empresa_id, ChaveParticularidade.TEM_CROMS051.value))
 
+        # Empresas cujo item contabil nao segrega por loja precisam que o
+        # codigo do financeiro (Contas a Receber/Pagar) seja montado sem a
+        # loja tambem, senao o merge com a contabilidade nunca casa.
+        ignora_loja = bool(obter_valor(db, ctx.empresa_id, ChaveParticularidade.IGNORA_LOJA_CODIGO_FINANCEIRO.value))
+
         # Resolve base_croms051 via carga_id (le do banco) -- precisa acontecer
         # com o `db` ainda aberto, antes de libera-lo abaixo.
         if tem_croms051:
@@ -207,7 +212,7 @@ async def processar_conciliacao(
             )
 
         # Usa executar_async para suportar busca automatica do CTBR480
-        resultado = await service.executar_async(request, protheus_config)
+        resultado = await service.executar_async(request, protheus_config, considera_loja=not ignora_loja)
 
         logger.info(" Conciliacao processada com sucesso")
         logger.info(" Resultado: %s", resultado.get("resumo", {}))
