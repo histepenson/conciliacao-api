@@ -220,6 +220,7 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
     col_loja = "loja" if "loja" in df.columns else None
     col_item = "item" if "item" in df.columns else None
     col_sequencia = "sequencia" if "sequencia" in df.columns else None
+    col_conta_contabil = "conta_contabil" if "conta_contabil" in df.columns else None
     col_parceiro = obter_coluna(df, ["cli_for_cc_pj_op_os"])
 
     logger.info(f"[KARDEX] Coluna DATA: {col_data}")
@@ -314,6 +315,15 @@ def normalizar_kardex(entrada: Any) -> pd.DataFrame:
         df_norm["armazem"] = df[col_arm].astype(str).str.strip()
     else:
         df_norm["armazem"] = ""
+
+    # Conta contabil do produto (B1_CONTA) -- usada pra consultar o Kardex
+    # sem restringir conta na tela de conciliacao (ver "Consultar" nos
+    # registros Só Razão): confirma se um lancamento sem match e' porque o
+    # produto esta cadastrado em outra conta, e nao por falta de estoque.
+    if col_conta_contabil:
+        df_norm["conta_contabil"] = df[col_conta_contabil].astype(str).str.strip()
+    else:
+        df_norm["conta_contabil"] = ""
 
     # Classificar cada linha
     classificacao = df_norm["cf"].apply(classificar_movimento_kardex)

@@ -96,6 +96,17 @@ class RegistroSoRazao(BaseModel):
     tipo: str = ""
 
 
+class ConsultarDivergenciaRequest(BaseModel):
+    """Consulta pontual no Kardex (todas as contas) para um lancamento
+    'Só Razão' sem correspondencia -- decodifica o ct2_key pelo layout
+    cadastrado do LP e busca no Protheus sem restringir conta contabil."""
+    empresa_id: Optional[int] = None
+    ct2_lp: str
+    ct2_key: str
+    data_ini: str
+    data_fim: str
+
+
 class RelatorioConciliacaoEstoque(BaseModel):
     """Relatorio completo da conciliacao de estoque."""
     resumo: Dict[str, Any]
