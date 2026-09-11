@@ -17,6 +17,7 @@ _PARAMS_MATR900 = [
     "conta_de", "conta_ate",
     "armazem", "documento_por", "moeda", "ordem",
     "lista_sem_movimento", "lista_transferencia", "considera_filiais",
+    "filial_de", "filial_ate",
     "tipo_custo",
 ]
 
