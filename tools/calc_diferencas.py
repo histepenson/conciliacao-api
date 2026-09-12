@@ -67,6 +67,15 @@ def calcular_diferencas(df_financeiro: pd.DataFrame, df_contabilidade: pd.DataFr
         df_merge[['valor_fin', 'valor_cont']].fillna(0.0)
     )
 
+    # Saldo contabil em modulo -- mesmo tratamento ja aplicado por codigo em
+    # AnaliseDiferencasService (valor_contabilidade.abs()). O saldo do
+    # balancete pode vir negativo (convencao de debito/credito do Protheus)
+    # sem que isso signifique "menos titulo em aberto"; somar os valores com
+    # sinal aqui fazia contas com clientes/fornecedores credores e devedores
+    # se cancelarem no total, as vezes ate invertendo o sinal do resumo
+    # geral mesmo com os itens individuais corretos.
+    df_merge['valor_cont'] = df_merge['valor_cont'].abs()
+
     # Usar cliente do financeiro, se nao existir usar da contabilidade
     df_merge['cliente'] = df_merge['cliente_fin'].fillna(df_merge['cliente_cont'])
     
