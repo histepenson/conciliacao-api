@@ -55,6 +55,13 @@ def calcular_diferencas(df_financeiro: pd.DataFrame, df_contabilidade: pd.DataFr
     df_merge = fin_idx.join(cont_idx, how='outer', lsuffix='_fin', rsuffix='_cont')
     df_merge = df_merge.reset_index()
 
+    # Presenca real em cada base (antes do fillna) -- usada para classificar
+    # 'origem' abaixo. Nao usar o VALOR (pode ser exatamente 0 e ainda assim
+    # o codigo existir nas duas bases, ex: titulo quitado com saldo liquido
+    # zero) para nao classificar errado como "So Financeiro"/"So Contabilidade".
+    presente_fin = df_merge['valor_fin'].notna()
+    presente_cont = df_merge['valor_cont'].notna()
+
     # Preencher valores NaN com 0 em uma unica operacao
     df_merge[['valor_fin', 'valor_cont']] = (
         df_merge[['valor_fin', 'valor_cont']].fillna(0.0)
@@ -76,10 +83,12 @@ def calcular_diferencas(df_financeiro: pd.DataFrame, df_contabilidade: pd.DataFr
         * 100
     )
     
-    # Classificar origem dos registros (vetorizado com numpy.select via pd.Series.where)
+    # Classificar origem dos registros pela presenca real em cada base (nao
+    # pelo valor -- um codigo presente nos dois lados mas com saldo liquido
+    # zero num deles continua sendo "Ambos", nao "So Financeiro"/"So Contabilidade").
     df_merge['origem'] = 'Ambos'
-    df_merge.loc[df_merge['valor_fin'] == 0, 'origem'] = 'So Contabilidade'
-    df_merge.loc[df_merge['valor_cont'] == 0, 'origem'] = 'So Financeiro'
+    df_merge.loc[~presente_fin, 'origem'] = 'So Contabilidade'
+    df_merge.loc[~presente_cont, 'origem'] = 'So Financeiro'
     
     # Classificar tipo de diferenca (vetorizado)
     import numpy as np
