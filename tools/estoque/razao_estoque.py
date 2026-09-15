@@ -294,6 +294,7 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
     col_lote_doc = obter_coluna(df, ["lote_sub_doc_linha", "lote", "documento", "doc"])
     col_ct2_key = obter_coluna(df, ["ct2_key"])
     col_ct2_lp = obter_coluna(df, ["ct2_lp"])
+    col_conta = obter_coluna(df, ["conta", "conta_contabil"])
 
     logger.info(f"[RAZAO ESTOQUE] Coluna DATA: {col_data}")
     logger.info(f"[RAZAO ESTOQUE] Coluna HISTORICO: {col_historico}")
@@ -338,6 +339,14 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
         df_norm["ct2_lp"] = df[col_ct2_lp].astype(str).str.strip()
     else:
         df_norm["ct2_lp"] = ""
+
+    # conta_contabil: conta do lancamento (campo "conta" do CTBR400) -- usada
+    # pela consulta de divergencia Kardex->Razao pra informar em qual conta
+    # um movimento so' kardex foi encontrado. Ausente em cargas antigas.
+    if col_conta:
+        df_norm["conta_contabil"] = df[col_conta].astype(str).str.strip()
+    else:
+        df_norm["conta_contabil"] = ""
 
     # Extrair CF original (3 primeiros caracteres do historico, sem mapeamento)
     df_norm["cf_original"] = df_norm["historico"].apply(extrair_cf_original)

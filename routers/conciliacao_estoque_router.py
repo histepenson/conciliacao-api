@@ -13,13 +13,19 @@ import json
 from schemas.conciliacao_estoque_schema import (
     RequestConciliacaoEstoque,
     ConsultarDivergenciaRequest,
+    ConsultarDivergenciaRazaoRequest,
+    ConsultarDivergenciaResponse,
 )
 from services.conciliacao_estoque_service import ConciliacaoEstoqueService
 from services.conciliacao_estoque_efetivacao_service import ConciliacaoEstoqueEfetivacaoService
 from services import balancete_service
 from services import lancamento_padrao_ct2_service
-from services.estoque_consulta_divergencia_service import consultar_divergencia_kardex
+from services.estoque_consulta_divergencia_service import (
+    consultar_divergencia_kardex,
+    consultar_divergencia_razao_contabil,
+)
 from services.matr900_service import Matr900Service
+from services.ctbr400_service import Ctbr400Service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
 from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
@@ -131,6 +137,36 @@ async def consultar_divergencia_razao(
         )
     except Exception as e:
         logger.exception(f"Erro ao consultar divergencia no Kardex: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Erro ao consultar Protheus: {str(e)}")
+
+
+@router.post("/estoque/consultar-divergencia-razao", response_model=ConsultarDivergenciaResponse)
+async def consultar_divergencia_kardex_no_razao(
+    payload: ConsultarDivergenciaRazaoRequest,
+    context: EmpresaContext = Depends(get_empresa_context),
+    db: Session = Depends(get_db),
+):
+    """
+    Inverso do endpoint acima: consulta pontual no Razao Contabil (CTBR400,
+    todas as contas contabeis) para um movimento "Só Kardex" sem
+    correspondencia. Busca por produto no periodo e decodifica o ct2_key de
+    cada lancamento retornado pelo layout do respectivo LP, comparando
+    contra a chave montada a partir dos campos brutos do proprio registro
+    do Kardex. Se achar, mostra em qual conta o lancamento contabil esta'
+    (reclassificacao, nao falta de lancamento); se nao achar, confirma que
+    o movimento fisico genuinamente nao gerou lancamento contabil nesse
+    periodo.
+    """
+    empresa_id = resolve_empresa_id(context, payload.empresa_id)
+    cfg = resolve_protheus_config(empresa_id, db)
+    svc = Ctbr400Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
+    try:
+        return await consultar_divergencia_razao_contabil(
+            db, empresa_id, payload.kardex_registro,
+            payload.data_ini, payload.data_fim, svc,
+        )
+    except Exception as e:
+        logger.exception(f"Erro ao consultar divergencia no Razao: {str(e)}")
         raise HTTPException(status_code=502, detail=f"Erro ao consultar Protheus: {str(e)}")
 
 

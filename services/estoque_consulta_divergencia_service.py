@@ -1,28 +1,31 @@
 """
-Consulta pontual do Kardex (MATR900) para diagnosticar um lancamento
-"Só Razão" sem correspondencia na Conciliacao de Estoque.
+Consulta pontual do Kardex (MATR900) ou do Razao Contabil (CTBR400) para
+diagnosticar um lancamento sem correspondencia na Conciliacao de Estoque.
 
-Decodifica o CT2_KEY do lancamento (pelo layout_campos cadastrado do LP,
-ver models/lancamento_padrao.py::LancamentoPadraoCt2Layout) e busca no
-Kardex SEM restringir conta contabil (conta_de/conta_ate omitidos) -- se
-achar o movimento, o lancamento so' esta' classificado em outra conta
-contabil (nao e' falta de estoque); se nao achar, o produto genuinamente
-nao gerou movimento fisico nesse periodo (ver caso real: produto MUC3060,
-LP 650, Rivema -- confirmado ausente do Kardex em qualquer conta).
+Decodifica o CT2_KEY (pelo layout_campos cadastrado do LP, ver
+models/lancamento_padrao.py::LancamentoPadraoCt2Layout) e busca no lado
+oposto SEM restringir conta contabil (conta_de/conta_ate omitidos) -- se
+achar o movimento/lancamento, ele so' esta' classificado em outra conta
+contabil (nao e' divergencia real); se nao achar, confirma que
+genuinamente nao ha' correspondencia nesse periodo (ver caso real: produto
+MUC3060, LP 650, Rivema -- confirmado ausente do Kardex em qualquer conta).
 """
 
 import logging
 
 import pandas as pd
 
+from core.data_base import parse_ano_mes
 from tools.estoque.calc_diferencas_estoque import (
     _decodificar_ct2_key_por_layout,
     _chave_ct2_decodificada_por_layout,
     _chave_kardex_por_layout,
 )
 from tools.estoque.kardex import normalizar_kardex
+from tools.estoque.razao_estoque import normalizar_razao_estoque
 from services.lancamento_padrao_ct2_service import obter_mapa_layout_campos
 from services.matr900_service import Matr900Service
+from services.ctbr400_service import Ctbr400Service
 
 logger = logging.getLogger(__name__)
 
@@ -79,3 +82,92 @@ async def consultar_divergencia_kardex(
             }
 
     return {"encontrado": False, "motivo": "sem_movimento_fisico"}
+
+
+async def consultar_divergencia_razao_contabil(
+    db,
+    empresa_id: int,
+    kardex_registro: dict,
+    data_ini: str,
+    data_fim: str,
+    ctbr400_service: Ctbr400Service,
+) -> dict:
+    """
+    Inverso de consultar_divergencia_kardex: dado um lancamento "Só Kardex"
+    (sem ct2_lp/ct2_key proprios -- sao conceitos do lado Razao), busca no
+    Razao Contabil (CTBR400) SEM restringir conta contabil. Cada linha do
+    razao retornada ja' traz seu proprio ct2_lp, entao o layout e' resolvido
+    por linha (nao ha' um LP unico conhecido de antemao pro lado Kardex).
+    """
+    mapa_layout = obter_mapa_layout_campos(db, empresa_id)
+    if not mapa_layout:
+        return {"encontrado": False, "motivo": "nenhum_lp_com_layout_cadastrado"}
+
+    produto = str(kardex_registro.get("codigo_produto") or "").strip()
+    if not produto:
+        return {"encontrado": False, "motivo": "produto_nao_informado"}
+
+    query = {
+        "data_ini": data_ini,
+        "data_fim": data_fim,
+        "item_de": produto,
+        "item_ate": produto,
+        "consid_filiais": "2",  # todas as filiais -- nao restringir aqui tambem
+        # conta_de/conta_ate OMITIDOS DE PROPOSITO: busca em todas as contas
+    }
+
+    logger.info(
+        "[CONSULTAR DIVERGENCIA RAZAO] empresa_id=%s produto=%s periodo=%s-%s",
+        empresa_id, produto, data_ini, data_fim,
+    )
+
+    registros = await ctbr400_service.buscar_como_registros(query)
+    if not registros:
+        return {"encontrado": False, "motivo": "sem_lancamento_contabil"}
+
+    ano_base, _mes = parse_ano_mes(data_fim)
+    df_razao = normalizar_razao_estoque(pd.DataFrame(registros), ano_base=ano_base)
+
+    campos_ordem_por_lp: dict[str, list] = {}
+    chave_alvo_por_lp: dict[str, tuple] = {}
+
+    for _, linha in df_razao.iterrows():
+        lp = str(linha.get("ct2_lp") or "").strip()
+        if not lp:
+            continue
+
+        if lp not in campos_ordem_por_lp:
+            layout_campos = mapa_layout.get(lp)
+            if not layout_campos:
+                campos_ordem_por_lp[lp] = None
+            else:
+                campos_ordem = [c["campo"] for c in layout_campos]
+                chave_alvo = _chave_kardex_por_layout(kardex_registro, campos_ordem)
+                campos_ordem_por_lp[lp] = campos_ordem
+                chave_alvo_por_lp[lp] = chave_alvo
+
+        campos_ordem = campos_ordem_por_lp[lp]
+        if not campos_ordem:
+            continue
+
+        chave_alvo = chave_alvo_por_lp.get(lp)
+        if not chave_alvo or not all(chave_alvo):
+            continue
+
+        layout_campos = mapa_layout[lp]
+        decoded = _decodificar_ct2_key_por_layout(linha.get("ct2_key"), layout_campos)
+        if not decoded:
+            continue
+        chave_linha = _chave_ct2_decodificada_por_layout(decoded, campos_ordem)
+        if chave_linha == chave_alvo:
+            return {
+                "encontrado": True,
+                "conta_contabil": linha.get("conta_contabil") or "",
+                "ct2_lp": lp,
+                "historico": linha.get("historico") or "",
+                "data_movimento": linha.get("data_movimento") or "",
+                "debito": float(linha.get("debito") or 0),
+                "credito": float(linha.get("credito") or 0),
+            }
+
+    return {"encontrado": False, "motivo": "sem_lancamento_contabil"}
