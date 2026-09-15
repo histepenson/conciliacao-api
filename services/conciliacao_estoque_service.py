@@ -50,6 +50,7 @@ class ConciliacaoEstoqueService:
         mapa_lp_tipo: Dict[str, str] | None = None,
         mapa_lp_movimento_ct2_vazio: Dict[str, str] | None = None,
         mapa_lp_layout_campos: Dict[str, list] | None = None,
+        matches_manuais: list | None = None,
     ) -> Dict[str, Any]:
         """
         Executa a conciliacao de estoque.
@@ -73,6 +74,11 @@ class ConciliacaoEstoqueService:
         chamador via lancamento_padrao_ct2_service.py::
         obter_mapa_layout_campos -- layout generico de posicoes do CT2_KEY
         cadastrado por LP (matching generico, ver calc_diferencas_estoque).
+
+        matches_manuais: list[MatchingManualEstoque], resolvido pelo
+        chamador via matching_manual_estoque_service.py::listar -- matchings
+        manuais ativos do periodo/conta, reaplicados a cada execucao (ver
+        aplicar_matches_manuais_estoque em calc_diferencas_estoque).
 
         Returns:
             Dict com relatorio completo da conciliacao
@@ -126,6 +132,7 @@ class ConciliacaoEstoqueService:
             mapa_lp_tipo=mapa_lp_tipo,
             mapa_lp_movimento_ct2_vazio=mapa_lp_movimento_ct2_vazio,
             mapa_lp_layout_campos=mapa_lp_layout_campos,
+            matches_manuais=matches_manuais,
         )
 
         resumo = resultado["resumo"]
@@ -143,6 +150,7 @@ class ConciliacaoEstoqueService:
             "movimentos_por_grupo": resultado["movimentos_por_grupo"],
             "grupos_divergentes": resultado["grupos_divergentes"],
             "grupos_conciliados": resultado["grupos_conciliados"],
+            "matches_manuais_aplicados": resultado.get("matches_manuais_aplicados", []),
             "observacoes": [
                 f"Conciliacao de estoque da conta {conta_contabil}",
                 f"Data-base: {request.parametros.data_base}",

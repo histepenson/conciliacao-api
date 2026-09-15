@@ -16,10 +16,15 @@ from schemas.conciliacao_estoque_schema import (
     ConsultarDivergenciaRazaoRequest,
     ConsultarDivergenciaResponse,
 )
+from schemas.matching_manual_estoque_schema import (
+    RequestCriarMatchingManualEstoque,
+    MatchingManualEstoqueOut,
+)
 from services.conciliacao_estoque_service import ConciliacaoEstoqueService
 from services.conciliacao_estoque_efetivacao_service import ConciliacaoEstoqueEfetivacaoService
 from services import balancete_service
 from services import lancamento_padrao_ct2_service
+from services import matching_manual_estoque_service
 from services.estoque_consulta_divergencia_service import (
     consultar_divergencia_kardex,
     consultar_divergencia_razao_contabil,
@@ -30,6 +35,7 @@ from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConcili
 from middleware.auth import get_current_user, CurrentUser
 from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
 from core.protheus import resolve_protheus_config
+from core.data_base import parse_ano_mes
 from db import get_db
 from sqlalchemy.orm import Session
 
@@ -75,11 +81,18 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
         mapa_lp_layout_campos = lancamento_padrao_ct2_service.obter_mapa_layout_campos(
             db, request.parametros.empresa_id
         )
+        ano_periodo, mes_periodo = parse_ano_mes(request.parametros.data_base)
+        periodo = f"{ano_periodo}-{mes_periodo:02d}"
+        matches_manuais = matching_manual_estoque_service.listar(
+            db, empresa_id=request.parametros.empresa_id,
+            periodo=periodo, conta_contabil=request.base_razao.conta_contabil,
+        )
         resultado = service.executar(
             request,
             mapa_lp_tipo=mapa_lp_tipo,
             mapa_lp_movimento_ct2_vazio=mapa_lp_movimento_ct2_vazio,
             mapa_lp_layout_campos=mapa_lp_layout_campos,
+            matches_manuais=matches_manuais,
         )
 
         # Validar saldo calculado contra balancete importado (se houver)
