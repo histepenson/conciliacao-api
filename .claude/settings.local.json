@@ -553,7 +553,8 @@
       "Bash(venv/Scripts/python.exe --version)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('tools/estoque/calc_diferencas_estoque.py', encoding='utf-8'\\).read\\(\\)\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\('tools/estoque/kardex.py', encoding='utf-8'\\).read\\(\\)\\)\")",
-      "Bash(APP_ENV=develop PYTHONPATH=. venv/Scripts/python.exe -c ' *)"
+      "Bash(APP_ENV=develop PYTHONPATH=. venv/Scripts/python.exe -c ' *)",
+      "Bash(APP_ENV=develop venv/Scripts/python.exe -m alembic heads)"
     ],
     "additionalDirectories": [
       "c:\\conciliacao-app\\src\\pages",

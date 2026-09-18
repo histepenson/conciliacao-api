@@ -107,6 +107,30 @@ class ConsultarDivergenciaRequest(BaseModel):
     data_fim: str
 
 
+class ConsultarDivergenciaRazaoRequest(BaseModel):
+    """Consulta pontual no Razao Contabil (CTBR400, todas as contas) para
+    um movimento 'Só Kardex' sem correspondencia -- busca por produto no
+    periodo e decodifica o ct2_key de cada lancamento retornado pelo
+    layout do respectivo LP (ct2_lp), comparando contra a chave montada a
+    partir dos campos brutos do proprio registro do Kardex."""
+    empresa_id: Optional[int] = None
+    kardex_registro: Dict[str, Any]
+    data_ini: str
+    data_fim: str
+
+
+class ConsultarDivergenciaResponse(BaseModel):
+    """Resposta das consultas pontuais de divergencia (Kardex<->Razao)."""
+    encontrado: bool
+    motivo: Optional[str] = None
+    conta_contabil: Optional[str] = None
+    ct2_lp: Optional[str] = None
+    historico: Optional[str] = None
+    data_movimento: Optional[str] = None
+    debito: Optional[float] = None
+    credito: Optional[float] = None
+
+
 class RelatorioConciliacaoEstoque(BaseModel):
     """Relatorio completo da conciliacao de estoque."""
     resumo: Dict[str, Any]

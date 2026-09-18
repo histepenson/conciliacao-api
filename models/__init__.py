@@ -52,6 +52,9 @@ from .empresa_configuracao import EmpresaConfiguracao
 # 9. Matching manual fiscal (Impostos / Pre-Conferencia)
 from .matching_manual_fiscal import MatchingManualFiscal, MatchingManualFiscalItem
 
+# 9b. Matching manual estoque (Kardex x Razao CTBR400)
+from .matching_manual_estoque import MatchingManualEstoque, MatchingManualEstoqueItem
+
 # 10. Conferencia LEASING (BBC)
 from .operacao_financeira import OperacaoFinanceira
 from .leasing_lote_importacao import LeasingLoteImportacao
@@ -99,6 +102,9 @@ __all__ = [
     # Matching manual fiscal (Impostos / Pre-Conferencia)
     "MatchingManualFiscal",
     "MatchingManualFiscalItem",
+    # Matching manual estoque (Kardex x Razao CTBR400)
+    "MatchingManualEstoque",
+    "MatchingManualEstoqueItem",
     # Conferencia LEASING (BBC)
     "OperacaoFinanceira",
     "LeasingLoteImportacao",

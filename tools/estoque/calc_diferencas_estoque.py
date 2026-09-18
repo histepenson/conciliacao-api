@@ -314,6 +314,100 @@ def _chave_kardex_por_layout(reg_kardex: dict, campos_ordem: list) -> tuple:
     )
 
 
+TOLERANCIA_MATCH_MANUAL = 0.01
+
+
+def aplicar_matches_manuais_estoque(
+    regs_kardex: list, regs_razao: list, matches: list,
+    tolerancia: float = TOLERANCIA_MATCH_MANUAL,
+) -> tuple:
+    """
+    Remove de regs_kardex/regs_razao os registros que batem -- por
+    documento_numero+codigo_produto+armazem+data+valor (kardex) e por
+    historico+data+valor (razao) -- com um item de matching manual ativo
+    (ver services/matching_manual_estoque_service.py). So' considera
+    registros ainda nao consumidos (por indice) e matchings do MESMO
+    codigo_movimento do grupo sendo processado (matches ja' vem filtrado
+    por chamador ou nao, tanto faz -- codigo_movimento errado nunca bate
+    por chave de negocio).
+
+    Retorna (regs_kardex_restantes, regs_razao_restantes,
+             conciliados_manual_kardex, conciliados_manual_razao,
+             matches_aplicados). Os "restantes" devem ser usados no lugar
+    dos originais antes do matching automatico (_matching_registros); os
+    "conciliados_manual_*" sao os registros removidos -- precisam ser
+    guardados num bucket proprio pelo chamador, senao desaparecem da
+    resposta (conciliados_kardex/conciliados_razao tambem sao calculados
+    a partir dos mesmos regs_kardex/regs_razao, ja reduzidos).
+    """
+    if not matches:
+        return regs_kardex, regs_razao, [], [], []
+
+    kardex_indices_consumidos: set = set()
+    razao_indices_consumidos: set = set()
+    matches_aplicados: list = []
+
+    for m in matches:
+        itens_kardex = [i for i in m.itens if i.lado == "kardex"]
+        itens_razao = [i for i in m.itens if i.lado == "razao"]
+
+        kardex_encontrados: list = []
+        for item in itens_kardex:
+            item_dados = item.dados_json or {}
+            for idx, rec in enumerate(regs_kardex):
+                if idx in kardex_indices_consumidos:
+                    continue
+                valor = round(float(rec.get("valor") or 0), 2)
+                if (
+                    str(rec.get("documento_numero") or "").strip() == str(item.documento_numero or "").strip()
+                    and str(rec.get("codigo_produto") or "").strip() == str(item_dados.get("codigo_produto") or "").strip()
+                    and str(rec.get("armazem") or "").strip() == str(item_dados.get("armazem") or "").strip()
+                    and str(rec.get("data") or "").strip() == str(item.data or "").strip()
+                    and round(abs(valor - float(item.valor)), 2) <= tolerancia
+                ):
+                    kardex_indices_consumidos.add(idx)
+                    kardex_encontrados.append(idx)
+                    break
+
+        razao_encontrados: list = []
+        for item in itens_razao:
+            for idx, rec in enumerate(regs_razao):
+                if idx in razao_indices_consumidos:
+                    continue
+                valor = round(float(rec.get("valor") or 0), 2)
+                if (
+                    str(rec.get("historico") or "").strip() == str(item.historico or "").strip()
+                    and str(rec.get("data") or "").strip() == str(item.data or "").strip()
+                    and round(abs(valor - float(item.valor)), 2) <= tolerancia
+                ):
+                    razao_indices_consumidos.add(idx)
+                    razao_encontrados.append(idx)
+                    break
+
+        if kardex_encontrados or razao_encontrados:
+            matches_aplicados.append({
+                "matching_manual_id": m.id,
+                "codigo_movimento": m.codigo_movimento,
+                "qtd_kardex": len(kardex_encontrados),
+                "qtd_razao": len(razao_encontrados),
+            })
+
+    conciliados_manual_kardex = [
+        {**rec, "matched_manual": True} for idx, rec in enumerate(regs_kardex) if idx in kardex_indices_consumidos
+    ]
+    conciliados_manual_razao = [
+        {**rec, "matched_manual": True} for idx, rec in enumerate(regs_razao) if idx in razao_indices_consumidos
+    ]
+    regs_kardex_restantes = [rec for idx, rec in enumerate(regs_kardex) if idx not in kardex_indices_consumidos]
+    regs_razao_restantes = [rec for idx, rec in enumerate(regs_razao) if idx not in razao_indices_consumidos]
+
+    return (
+        regs_kardex_restantes, regs_razao_restantes,
+        conciliados_manual_kardex, conciliados_manual_razao,
+        matches_aplicados,
+    )
+
+
 def _selecionar_registros_para_total(registros: list, total_alvo: float) -> list:
     """
     Seleciona subconjunto de registros cuja soma de 'valor' fecha o total_alvo.
@@ -422,6 +516,7 @@ def calcular_diferencas_estoque(
     mapa_lp_movimento_ct2_vazio: Dict[str, str] | None = None,
     mapa_lp_layout_campos: Dict[str, list] | None = None,
     lps_matching_agregado_por_dia: set | None = None,
+    matches_manuais: list | None = None,
 ) -> Dict[str, Any]:
     """
     Calcula diferencas entre Kardex e Razao Contabil de Estoque
@@ -483,6 +578,14 @@ def calcular_diferencas_estoque(
         LPs de outras empresas (ex.: grupo RIMAVE, matching 1 nota = 1
         lancamento, que continua exato).
 
+    matches_manuais : list[MatchingManualEstoque], opcional
+        Matchings manuais ativos do periodo/conta (ver
+        services/matching_manual_estoque_service.py::listar), pra reaplicar
+        correspondencias que o usuario confirmou manualmente em uma
+        execucao anterior porque o matching automatico nao achou sozinho.
+        Aplicado por grupo, ANTES do matching automatico individual
+        (_matching_registros) -- ver aplicar_matches_manuais_estoque.
+
     Retorna:
     --------
     dict contendo:
@@ -492,6 +595,9 @@ def calcular_diferencas_estoque(
         - 'grupos_conciliados': Grupos conciliados
         - 'registros_so_kardex': Registros individuais do Kardex sem match no Razao
         - 'registros_so_razao': Registros individuais do Razao sem match no Kardex
+        - 'matches_manuais_aplicados': Matchings manuais que encontraram
+          correspondencia nos dados desta execucao (para a tela marcar
+          "casado manualmente")
     """
     logger.info("[CALC DIFERENCAS ESTOQUE] Iniciando calculo")
 
@@ -711,6 +817,7 @@ def calcular_diferencas_estoque(
                 "codigo_movimento": cm,
                 "ct2_key": str(reg.get("ct2_key", "") or "").strip(),
                 "ct2_lp": str(reg.get("ct2_lp", "") or "").strip(),
+                "conta_contabil": str(reg.get("conta_contabil", "") or "").strip(),
                 "_origem": "razao",
             })
         return registros
@@ -995,6 +1102,7 @@ def calcular_diferencas_estoque(
     movimentos_por_grupo = []
     grupos_divergentes = []
     grupos_conciliados = []
+    matches_manuais_aplicados: list = []
 
     for _, row in df_merge.iterrows():
         cm = str(row["codigo_movimento"]) if row["codigo_movimento"] else ""
@@ -1033,9 +1141,22 @@ def calcular_diferencas_estoque(
         grupo_info["qtd_registros_kardex"] = len(regs_k)
         grupo_info["qtd_registros_razao"] = len(regs_r)
 
+        # Matches manuais (ver aplicar_matches_manuais_estoque) sao aplicados
+        # ANTES do matching automatico -- os registros consumidos saem de
+        # regs_k_restantes/regs_r_restantes e viram um bucket proprio
+        # (conciliados_manual_*), pra nao entrar na disputa do matching
+        # automatico nem sumir da resposta.
+        matches_deste_grupo = [m for m in (matches_manuais or []) if not m.codigo_movimento or m.codigo_movimento == cm]
+        regs_k_restantes, regs_r_restantes, conc_manual_k, conc_manual_r, matches_aplicados_grupo = (
+            aplicar_matches_manuais_estoque(regs_k, regs_r, matches_deste_grupo)
+        )
+        grupo_info["conciliados_manual_kardex"] = conc_manual_k
+        grupo_info["conciliados_manual_razao"] = conc_manual_r
+        matches_manuais_aplicados.extend(matches_aplicados_grupo)
+
         match_cf = not _skip_cf_match(cm)
         match_data = not _skip_data_match(cm)
-        so_k, so_r = _matching_registros(regs_k, regs_r, match_cf=match_cf, match_data=match_data, mapa_lp_tipo=mapa_lp_tipo)
+        so_k, so_r = _matching_registros(regs_k_restantes, regs_r_restantes, match_cf=match_cf, match_data=match_data, mapa_lp_tipo=mapa_lp_tipo)
         grupo_info["so_kardex"] = so_k
         grupo_info["so_razao"] = so_r
         grupo_info["total_so_kardex"] = round(sum(float(r.get("valor", 0) or 0) for r in so_k), 2)
@@ -1150,4 +1271,5 @@ def calcular_diferencas_estoque(
         "movimentos_por_grupo": movimentos_por_grupo,
         "grupos_divergentes": grupos_divergentes,
         "grupos_conciliados": grupos_conciliados,
+        "matches_manuais_aplicados": matches_manuais_aplicados,
     }

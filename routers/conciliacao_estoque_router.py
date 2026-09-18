@@ -13,17 +13,29 @@ import json
 from schemas.conciliacao_estoque_schema import (
     RequestConciliacaoEstoque,
     ConsultarDivergenciaRequest,
+    ConsultarDivergenciaRazaoRequest,
+    ConsultarDivergenciaResponse,
+)
+from schemas.matching_manual_estoque_schema import (
+    RequestCriarMatchingManualEstoque,
+    MatchingManualEstoqueOut,
 )
 from services.conciliacao_estoque_service import ConciliacaoEstoqueService
 from services.conciliacao_estoque_efetivacao_service import ConciliacaoEstoqueEfetivacaoService
 from services import balancete_service
 from services import lancamento_padrao_ct2_service
-from services.estoque_consulta_divergencia_service import consultar_divergencia_kardex
+from services import matching_manual_estoque_service
+from services.estoque_consulta_divergencia_service import (
+    consultar_divergencia_kardex,
+    consultar_divergencia_razao_contabil,
+)
 from services.matr900_service import Matr900Service
+from services.ctbr400_service import Ctbr400Service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
 from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
 from core.protheus import resolve_protheus_config
+from core.data_base import parse_ano_mes
 from db import get_db
 from sqlalchemy.orm import Session
 
@@ -69,11 +81,18 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
         mapa_lp_layout_campos = lancamento_padrao_ct2_service.obter_mapa_layout_campos(
             db, request.parametros.empresa_id
         )
+        ano_periodo, mes_periodo = parse_ano_mes(request.parametros.data_base)
+        periodo = f"{ano_periodo}-{mes_periodo:02d}"
+        matches_manuais = matching_manual_estoque_service.listar(
+            db, empresa_id=request.parametros.empresa_id,
+            periodo=periodo, conta_contabil=request.base_razao.conta_contabil,
+        )
         resultado = service.executar(
             request,
             mapa_lp_tipo=mapa_lp_tipo,
             mapa_lp_movimento_ct2_vazio=mapa_lp_movimento_ct2_vazio,
             mapa_lp_layout_campos=mapa_lp_layout_campos,
+            matches_manuais=matches_manuais,
         )
 
         # Validar saldo calculado contra balancete importado (se houver)
@@ -131,6 +150,36 @@ async def consultar_divergencia_razao(
         )
     except Exception as e:
         logger.exception(f"Erro ao consultar divergencia no Kardex: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Erro ao consultar Protheus: {str(e)}")
+
+
+@router.post("/estoque/consultar-divergencia-razao", response_model=ConsultarDivergenciaResponse)
+async def consultar_divergencia_kardex_no_razao(
+    payload: ConsultarDivergenciaRazaoRequest,
+    context: EmpresaContext = Depends(get_empresa_context),
+    db: Session = Depends(get_db),
+):
+    """
+    Inverso do endpoint acima: consulta pontual no Razao Contabil (CTBR400,
+    todas as contas contabeis) para um movimento "Só Kardex" sem
+    correspondencia. Busca por produto no periodo e decodifica o ct2_key de
+    cada lancamento retornado pelo layout do respectivo LP, comparando
+    contra a chave montada a partir dos campos brutos do proprio registro
+    do Kardex. Se achar, mostra em qual conta o lancamento contabil esta'
+    (reclassificacao, nao falta de lancamento); se nao achar, confirma que
+    o movimento fisico genuinamente nao gerou lancamento contabil nesse
+    periodo.
+    """
+    empresa_id = resolve_empresa_id(context, payload.empresa_id)
+    cfg = resolve_protheus_config(empresa_id, db)
+    svc = Ctbr400Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
+    try:
+        return await consultar_divergencia_razao_contabil(
+            db, empresa_id, payload.kardex_registro,
+            payload.data_ini, payload.data_fim, svc,
+        )
+    except Exception as e:
+        logger.exception(f"Erro ao consultar divergencia no Razao: {str(e)}")
         raise HTTPException(status_code=502, detail=f"Erro ao consultar Protheus: {str(e)}")
 
 

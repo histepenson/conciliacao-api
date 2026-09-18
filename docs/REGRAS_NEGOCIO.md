@@ -324,6 +324,24 @@ Dentro de cada grupo (`codigo_movimento`), os registros são normalizados para u
 
 Quando uma pendência precisa ser "explicada" por múltiplos lançamentos, o sistema usa um algoritmo de **soma de subconjunto em centavos** (DP/programação dinâmica, com poda por proximidade ao alvo) para encontrar quais registros somam exatamente o valor da diferença (tolerância de 1 centavo).
 
+### 7.6 Consulta pontual de divergência (drill-down "Consultar")
+
+Nas abas **"Só Razão"** e **"Só Kardex"** do resultado, cada registro que tem os campos necessários ganha um botão **"Consultar"** que investiga se a divergência é uma **reclassificação de conta contábil** (o lançamento existe, só está em outra conta) em vez de uma divergência real. Implementado em `services/estoque_consulta_divergencia_service.py`.
+
+Reutiliza as mesmas primitivas de decodificação de CT2_KEY por layout de LP usadas no matching principal (`tools/estoque/calc_diferencas_estoque.py`: `_decodificar_ct2_key_por_layout`, `_chave_ct2_decodificada_por_layout`, `_chave_kardex_por_layout`), buscando no Protheus **sem restringir conta contábil** (`conta_de`/`conta_ate` omitidos).
+
+**Razão → Kardex** (`consultar_divergencia_kardex`, endpoint `POST /conciliacoes/estoque/consultar-divergencia`):
+- Entrada: `ct2_lp` + `ct2_key` do lançamento "Só Razão".
+- Decodifica o `ct2_key` pelo layout do LP, monta a chave alvo, busca no Kardex (MATR900) por produto/período em todas as contas.
+- `motivo` quando não encontrado: `lp_sem_layout_cadastrado` (LP sem layout em Admin → LP x CT2_KEY), `nao_decodificou` (falha ao decodificar), `sem_movimento_fisico` (produto genuinamente sem movimento no período).
+
+**Kardex → Razão** (`consultar_divergencia_razao_contabil`, endpoint `POST /conciliacoes/estoque/consultar-divergencia-razao`):
+- Entrada: o registro bruto "Só Kardex" (sem `ct2_lp`/`ct2_key` próprios — são conceitos do lado Razão).
+- Busca no Razão Contábil (CTBR400) por produto/período em todas as contas; como não há um LP conhecido de antemão, cada linha retornada é resolvida pelo seu **próprio** `ct2_lp` (presente no CTBR400/ZCT2RAZAPI), decodificada e comparada contra a chave montada a partir dos campos brutos do registro do Kardex.
+- `motivo` quando não encontrado: `nenhum_lp_com_layout_cadastrado`, `produto_nao_informado`, `sem_lancamento_contabil` (movimento físico genuinamente sem lançamento contábil no período).
+
+Em ambos os casos, "encontrado" devolve a `conta_contabil` onde o lançamento/movimento realmente está — a interpretação de negócio é sempre a mesma: **reclassificação entre contas, não divergência real**.
+
 ---
 
 ## 8. Módulo de Estoque (Saldos e Fechamento)
