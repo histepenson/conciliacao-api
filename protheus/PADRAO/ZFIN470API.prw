@@ -40,6 +40,8 @@ wsrestful ZFIN470API description "FINR470 - Extrato Bancario"
 	wsdata taxa_moeda         as string
 	wsdata saldo_compart      as string
 	wsdata todas_filiais      as string
+	wsdata filial_de          as string
+	wsdata filial_ate         as string
 	wsdata data_conv_saldo    as string
 
 	wsmethod GET getExtrato description "Extrato bancario por periodo" wssyntax "/api/v1/finr470" PATH "/api/v1/finr470"
@@ -78,6 +80,8 @@ Local cLinhasPagina  := AllTrim(Self:linhas_pagina)
 Local cTaxaMoeda     := AllTrim(Self:taxa_moeda)
 Local cSaldoCompart  := AllTrim(Self:saldo_compart)
 Local cTodasFiliais  := AllTrim(Self:todas_filiais)
+Local cFilialDe      := AllTrim(Self:filial_de)
+Local cFilialAte     := AllTrim(Self:filial_ate)
 Local cDataConvSaldo := AllTrim(Self:data_conv_saldo)
 Local nPage          := Max(1, Val(AllTrim(Self:page)))
 Local nPageSize      := Val(AllTrim(Self:pageSize))
@@ -282,7 +286,11 @@ If lAllFil
 	aFiliais := AdmGetFil(.F., lGestao, "SA6", lVldUnNeg, Nil, .F., lTudoComp)
 	nFiliais := Len(aFiliais)
 	For nI := 1 To nFiliais
-		AAdd(aSelFil, aFiliais[nI, 1])
+		// Range de filial (opcional): so restringe quando De e Ate foram informados
+		If Empty(cFilialDe) .Or. Empty(cFilialAte) .Or. ;
+			(AllTrim(aFiliais[nI, 1]) >= cFilialDe .And. AllTrim(aFiliais[nI, 1]) <= cFilialAte)
+			AAdd(aSelFil, aFiliais[nI, 1])
+		EndIf
 	Next nI
 	cSqlWhere += FinSelFil(aSelFil, "SE5", .F., .F.) + " AND "
 Else
