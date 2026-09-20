@@ -13,7 +13,7 @@ _PARAMS_FINR470 = [
     "banco", "agencia", "conta",
     "data_ini", "data_fim",
     "moeda", "situacao", "linhas_pagina",
-    "taxa_moeda", "saldo_compart", "todas_filiais", "data_conv_saldo",
+    "taxa_moeda", "saldo_compart", "todas_filiais", "filial_de", "filial_ate", "data_conv_saldo",
     "page", "pageSize",
 ]
 
