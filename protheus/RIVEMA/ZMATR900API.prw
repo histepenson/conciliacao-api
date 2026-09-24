@@ -351,6 +351,7 @@ BeginSql Alias cAliasTop
             WHERE SB1.B1_COD = SD3.D3_COD AND %Exp:cWhereD3C%
                   SD3.D3_EMISSAO >= %Exp:dDataIni% AND SD3.D3_EMISSAO <= %Exp:dDataFim% AND
                   %Exp:cWhereD3%
+                  SD3.D3_ESTORNO <> 'S' AND
                   SD3.%NotDel%
         ) MTR900_UNI
     ) MTR900_PAG
