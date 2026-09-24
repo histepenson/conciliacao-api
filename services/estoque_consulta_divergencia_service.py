@@ -115,7 +115,11 @@ async def consultar_divergencia_razao_contabil(
         "item_de": produto,
         "item_ate": produto,
         "consid_filiais": "2",  # todas as filiais -- nao restringir aqui tambem
-        # conta_de/conta_ate OMITIDOS DE PROPOSITO: busca em todas as contas
+        # Todas as contas: o ZCT2RAZAPI exige conta_de/conta_ate (422 se vazios),
+        # entao vai a faixa completa em vez de omitir -- mesma faixa que o
+        # Ct2RazCt5Service usa por padrao.
+        "conta_de": "0",
+        "conta_ate": "zzzzzzzzzzzzz",
     }
 
     logger.info(
