@@ -41,6 +41,7 @@ class LpCt2LayoutCreate(BaseModel):
     tipo_chave: Optional[str] = None  # "ESTOQUE" | "COMPRA" | "VENDA" -- usado quando CT2_KEY vem preenchido
     codigo_movimento_ct2_vazio: Optional[str] = None  # ex.: "RE1" -- usado quando CT2_KEY vem vazio
     layout_campos: Optional[List[CampoLayoutCt2]] = None  # layout generico por campo/posicao (matching de Estoque)
+    sequencias_credito_imposto: Optional[List[str]] = None  # ex.: ["002", "029", "030"] -- creditos de imposto abatidos da nota
     descricao: Optional[str] = None
 
 
@@ -48,6 +49,7 @@ class LpCt2LayoutUpdate(BaseModel):
     tipo_chave: Optional[str] = None
     codigo_movimento_ct2_vazio: Optional[str] = None
     layout_campos: Optional[List[CampoLayoutCt2]] = None
+    sequencias_credito_imposto: Optional[List[str]] = None
     descricao: Optional[str] = None
 
 
@@ -58,6 +60,7 @@ class LpCt2LayoutOut(BaseModel):
     tipo_chave: Optional[str] = None
     codigo_movimento_ct2_vazio: Optional[str] = None
     layout_campos: Optional[List[CampoLayoutCt2]] = None
+    sequencias_credito_imposto: Optional[List[str]] = None
     descricao: Optional[str] = None
     created_at: datetime
     updated_at: datetime

@@ -68,6 +68,12 @@ class LancamentoPadraoCt2Layout(Base):
     # parceiro com zero a esquerda) e' inferido desse catalogo fixo pelo
     # NOME, nao configurado aqui.
     layout_campos = Column(JSONB, nullable=True)
+    # Sequencias (CT5_SEQUEN) deste LP que lancam CREDITO DE IMPOSTO recuperavel
+    # (ICMS/PIS/COFINS) na conta de estoque, ex.: ["002", "029", "030"]. O Kardex
+    # ja' vem liquido desses impostos, entao a Conciliacao de Estoque abate esses
+    # creditos do lancamento de compra da propria nota em vez de trata-los como
+    # movimento a parte (ver tools/estoque/razao_estoque.py::abater_creditos_imposto).
+    sequencias_credito_imposto = Column(JSONB, nullable=True)
     descricao = Column(String(200))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

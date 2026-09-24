@@ -62,7 +62,7 @@ MAPEAMENTO_CODIGO_RAZAO = {
 }
 
 
-def _extrair_codigo_base_historico(historico: str) -> str:
+def _extrair_codigo_base_historico(historico: str, estrito: bool = False) -> str:
     """
     Extrai codigo-base (CPV/DEV/DE*/RE*/PR0) do historico.
     """
@@ -73,7 +73,16 @@ def _extrair_codigo_base_historico(historico: str) -> str:
     # Aceita variacoes com separadores: "PR 0", "PR-0", "DE 7", "RE/0", "CPV/PD/BO"
     # CMV e' a mesma coisa que CPV (nomenclatura diferente por empresa -- ver
     # MAPEAMENTO_CODIGO_RAZAO), ja' normalizado aqui pra "CPV".
-    match = re.search(r"(CPV|CMV|BON|DEV|DE\D*[0-7]|RE\D*[0-7]|PR\D*0)", texto)
+    if estrito:
+        # Modo estrito (so' empresas com a particularidade
+        # estoque_razao_ct2razct5): o codigo precisa estar no INICIO do
+        # historico e so' admite separador (nao-alfanumerico) entre as letras
+        # e o digito. Sem isso o "RE" de "CREDITADO" + o numero da nota virava
+        # RE0-RE7 ("COFINS CREDITADO NFE 2414" -> RE2), e o mesmo vale pra
+        # DE/PR dentro de qualquer palavra.
+        match = re.match(r"\s*(CPV|CMV|BON|DEV|DE[^A-Z0-9]*[0-7]|RE[^A-Z0-9]*[0-7]|PR[^A-Z0-9]*0)", texto)
+    else:
+        match = re.search(r"(CPV|CMV|BON|DEV|DE\D*[0-7]|RE\D*[0-7]|PR\D*0)", texto)
     if match:
         bruto = match.group(1)
         normalizado = re.sub(r"\D", "", bruto)
@@ -92,7 +101,7 @@ def _extrair_codigo_base_historico(historico: str) -> str:
     return texto[:3].strip()
 
 
-def extrair_cf_original(historico: str) -> str:
+def extrair_cf_original(historico: str, estrito: bool = False) -> str:
     """
     Extrai o codigo original (primeiros 3 caracteres) do HISTORICO sem mapeamento.
 
@@ -101,10 +110,10 @@ def extrair_cf_original(historico: str) -> str:
     - "CPV CFOP: 5101 NF 000034619" -> "CPV"
     - "RE0 | REQUISICAO DATA: 15/11/" -> "RE0"
     """
-    return _extrair_codigo_base_historico(historico)
+    return _extrair_codigo_base_historico(historico, estrito)
 
 
-def extrair_codigo_movimento(historico: str) -> str:
+def extrair_codigo_movimento(historico: str, estrito: bool = False) -> str:
     """
     Extrai codigo de movimento dos primeiros 3 caracteres do HISTORICO
     e aplica mapeamento.
@@ -122,7 +131,7 @@ def extrair_codigo_movimento(historico: str) -> str:
     - "RE0 | REQUISICAO DATA: 15/11/" -> "SAIDAS"
     - "PR0 | PRODUCAO DATA: 20/11/" -> "ENTRADAS"
     """
-    codigo = _extrair_codigo_base_historico(historico)
+    codigo = _extrair_codigo_base_historico(historico, estrito)
 
     # Aplicar mapeamento (CPV->CPV, DEV->DEV, DE0->ENTRADAS, etc)
     return MAPEAMENTO_CODIGO_RAZAO.get(codigo, codigo)
@@ -241,7 +250,83 @@ def extrair_data_historico(historico: str, ano_base: int = None) -> str:
     return ""
 
 
-def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame:
+def _sequencia_do_origem(origem: Any) -> str:
+    """Extrai a sequencia do LP do prefixo "LP-SEQ" de ct2_origem (ex.:
+    "650-002 - usuario" -> "002")."""
+    partes = str(origem or "").strip()[:7].split("-")
+    return partes[1].strip() if len(partes) == 2 else ""
+
+
+def _chave_nota(row: Any) -> str:
+    """Chave que liga os lancamentos de uma mesma nota: o CT2_KEY quando
+    veio preenchido; senao data + LP + numero da nota (ultimo token do
+    historico, ex.: "ICMS CREDITADO NFE 2414" -> "2414")."""
+    key = str(row["ct2_key"] or "").strip()
+    if key:
+        return f"K|{key}"
+    tokens = str(row["historico"] or "").split()
+    nota = tokens[-1] if tokens else ""
+    return f"H|{row['data_lancamento']}|{row['ct2_lp']}|{nota}"
+
+
+def abater_creditos_imposto(df_norm: pd.DataFrame, mapa_lp_sequencias_credito: Optional[dict]) -> pd.DataFrame:
+    """
+    Remove do razao os lancamentos de CREDITO DE IMPOSTO recuperavel (ICMS/
+    PIS/COFINS) dos LPs de estoque configurados e abate o valor do
+    lancamento de compra (debito) da mesma nota.
+
+    O Kardex ja' entra liquido desses impostos (custo = NF - ICMS - PIS -
+    COFINS), entao o razao da nota so' fecha com o Kardex depois do abatimento.
+    Ex.: NF 2414 = 52.189,72 (debito) - 13.259,40 - 642,35 - 2.958,70 =
+    35.329,27 (= Kardex).
+
+    Isolado por configuracao: so' mexe em linhas cujo (ct2_lp, ct2_sequen)
+    esta em mapa_lp_sequencias_credito ({lp_codigo: {sequencias}}, ver
+    services/lancamento_padrao_ct2_service.py::obter_mapa_sequencias_credito_imposto).
+    Sem mapa (LP/empresa nao configurado) devolve o DataFrame intacto.
+    Credito que nao achar o debito da mesma nota fica no razao, pra nao
+    perder valor em silencio.
+    """
+    if not mapa_lp_sequencias_credito or df_norm.empty:
+        return df_norm
+
+    df = df_norm.copy()
+    lp = df["ct2_lp"].astype(str).str.strip()
+    seq = df["ct2_sequen"].astype(str).str.strip()
+    eh_credito_imposto = pd.Series(
+        [s in mapa_lp_sequencias_credito.get(l, ()) for l, s in zip(lp, seq)], index=df.index
+    ) & (df["credito"] > 0) & (df["debito"] == 0)
+    if not eh_credito_imposto.any():
+        return df_norm
+
+    df["_chave_nota"] = df.apply(_chave_nota, axis=1)
+    creditos_por_nota = df.loc[eh_credito_imposto].groupby("_chave_nota")["credito"].sum()
+
+    remover = []
+    for chave, total in creditos_por_nota.items():
+        candidatos = df[(df["_chave_nota"] == chave) & ~eh_credito_imposto & (df["debito"] > 0)]
+        if candidatos.empty:
+            continue
+        idx_debito = candidatos["debito"].idxmax()
+        if df.at[idx_debito, "debito"] < total:
+            continue
+        df.at[idx_debito, "debito"] = round(float(df.at[idx_debito, "debito"]) - float(total), 2)
+        remover.extend(df.index[eh_credito_imposto & (df["_chave_nota"] == chave)].tolist())
+
+    if remover:
+        logger.info(
+            "[RAZAO ESTOQUE] Creditos de imposto abatidos da nota: %s lancamentos | total=%.2f",
+            len(remover), float(df.loc[remover, "credito"].sum()),
+        )
+    return df.drop(index=remover).drop(columns=["_chave_nota"])
+
+
+def normalizar_razao_estoque(
+    entrada: Any,
+    ano_base: int = None,
+    mapa_lp_sequencias_credito: Optional[dict] = None,
+    historico_estrito: bool = False,
+) -> pd.DataFrame:
     """
     Normaliza relatorio de Razao Contabil de Estoque (CTBR400).
 
@@ -294,6 +379,8 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
     col_lote_doc = obter_coluna(df, ["lote_sub_doc_linha", "lote", "documento", "doc"])
     col_ct2_key = obter_coluna(df, ["ct2_key"])
     col_ct2_lp = obter_coluna(df, ["ct2_lp"])
+    col_ct2_sequen = obter_coluna(df, ["ct2_sequen"])
+    col_ct2_origem = obter_coluna(df, ["ct2_origem"])
     col_conta = obter_coluna(df, ["conta", "conta_contabil"])
 
     logger.info(f"[RAZAO ESTOQUE] Coluna DATA: {col_data}")
@@ -340,6 +427,17 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
     else:
         df_norm["ct2_lp"] = ""
 
+    # ct2_sequen: sequencia do LP (CT5_SEQUEN) -- so' vem no CT2RAZCT5. Cargas
+    # antigas sem o campo caem no prefixo "LP-SEQ" de ct2_origem.
+    if mapa_lp_sequencias_credito:
+        df_norm["ct2_sequen"] = ""
+        if col_ct2_sequen:
+            df_norm["ct2_sequen"] = df[col_ct2_sequen].astype(str).str.strip()
+        if col_ct2_origem:
+            sem_seq = df_norm["ct2_sequen"].isin(["", "nan", "None"])
+            if sem_seq.any():
+                df_norm.loc[sem_seq, "ct2_sequen"] = df.loc[sem_seq, col_ct2_origem].apply(_sequencia_do_origem)
+
     # conta_contabil: conta do lancamento (campo "conta" do CTBR400) -- usada
     # pela consulta de divergencia Kardex->Razao pra informar em qual conta
     # um movimento so' kardex foi encontrado. Ausente em cargas antigas.
@@ -349,10 +447,10 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
         df_norm["conta_contabil"] = ""
 
     # Extrair CF original (3 primeiros caracteres do historico, sem mapeamento)
-    df_norm["cf_original"] = df_norm["historico"].apply(extrair_cf_original)
+    df_norm["cf_original"] = df_norm["historico"].apply(lambda h: extrair_cf_original(h, historico_estrito))
 
     # Extrair codigo de movimento do historico (com mapeamento para ENTRADAS/SAIDAS)
-    df_norm["codigo_movimento"] = df_norm["historico"].apply(extrair_codigo_movimento)
+    df_norm["codigo_movimento"] = df_norm["historico"].apply(lambda h: extrair_codigo_movimento(h, historico_estrito))
 
     # Regra explicita de segmentacao: PR0 permanece PR0 no Razao
     mask_pr0 = df_norm["cf_original"] == "PR0"
@@ -390,6 +488,10 @@ def normalizar_razao_estoque(entrada: Any, ano_base: int = None) -> pd.DataFrame
         df_norm["credito"] = df[col_credito].apply(parse_numero_brasileiro).abs()
     else:
         df_norm["credito"] = 0.0
+
+    # Creditos de imposto (ICMS/PIS/COFINS) dos LPs de estoque configurados:
+    # abatidos da propria nota, ja' que o Kardex entra liquido de imposto.
+    df_norm = abater_creditos_imposto(df_norm, mapa_lp_sequencias_credito)
 
     # Valor liquido e tipo
     df_norm["valor"] = df_norm["debito"] - df_norm["credito"]

@@ -158,7 +158,7 @@ Local nCasDecE2      := IIf(Len(aTamE2Tx) >= 2, aTamE2Tx[2], 8)
 Local nCasDec        := IIf(Len(aTamE5Tx) >= 2, aTamE5Tx[2], 8)
 
 Self:SetContentType("application/json")
-ConOut("ZFIN470API - [1] inicio banco=" + cBanco + " ag=" + cAgencia + " cta=" + cConta)
+ConOut("ZFIN470API v2026-09-20-range-filial - [1] inicio banco=" + cBanco + " ag=" + cAgencia + " cta=" + cConta)
 
 If Empty(cBanco) .Or. Empty(cAgencia) .Or. Empty(cConta)
 	oError := JsonObject():New()

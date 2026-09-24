@@ -51,6 +51,8 @@ class ConciliacaoEstoqueService:
         mapa_lp_movimento_ct2_vazio: Dict[str, str] | None = None,
         mapa_lp_layout_campos: Dict[str, list] | None = None,
         matches_manuais: list | None = None,
+        mapa_lp_sequencias_credito: Dict[str, set] | None = None,
+        historico_estrito: bool = False,
     ) -> Dict[str, Any]:
         """
         Executa a conciliacao de estoque.
@@ -74,6 +76,16 @@ class ConciliacaoEstoqueService:
         chamador via lancamento_padrao_ct2_service.py::
         obter_mapa_layout_campos -- layout generico de posicoes do CT2_KEY
         cadastrado por LP (matching generico, ver calc_diferencas_estoque).
+
+        mapa_lp_sequencias_credito: {lp_codigo: {sequencias}}, resolvido pelo
+        chamador via lancamento_padrao_ct2_service.py::
+        obter_mapa_sequencias_credito_imposto -- creditos de imposto dos LPs
+        de estoque, abatidos da nota na normalizacao do Razao (ver
+        razao_estoque.abater_creditos_imposto).
+
+        historico_estrito: True so' pra empresas com a particularidade
+        estoque_razao_ct2razct5 (ver core/particularidades.py) -- codigo de
+        movimento so' e' aceito no inicio do historico.
 
         matches_manuais: list[MatchingManualEstoque], resolvido pelo
         chamador via matching_manual_estoque_service.py::listar -- matchings
@@ -115,7 +127,12 @@ class ConciliacaoEstoqueService:
         logger.info(f"   Registros recebidos: {len(df_razao_raw)}")
 
         try:
-            df_razao = normalizar_razao_estoque(df_razao_raw, ano_base=ano_base)
+            df_razao = normalizar_razao_estoque(
+                df_razao_raw,
+                ano_base=ano_base,
+                mapa_lp_sequencias_credito=mapa_lp_sequencias_credito,
+                historico_estrito=historico_estrito,
+            )
             logger.info(f"   Lancamentos normalizados: {len(df_razao)}")
         except Exception as e:
             logger.error(f"   ERRO ao normalizar Razao: {str(e)}")

@@ -60,6 +60,7 @@ def criar(db: Session, data: dict) -> LancamentoPadraoCt2Layout:
         tipo_chave=data.get("tipo_chave"),
         codigo_movimento_ct2_vazio=data.get("codigo_movimento_ct2_vazio"),
         layout_campos=data.get("layout_campos"),
+        sequencias_credito_imposto=data.get("sequencias_credito_imposto"),
         descricao=data.get("descricao"),
     )
     db.add(layout)
@@ -78,6 +79,8 @@ def atualizar(db: Session, layout_id: int, data: dict) -> LancamentoPadraoCt2Lay
     if "layout_campos" in data:
         _validar_layout_campos(data["layout_campos"])
         layout.layout_campos = data["layout_campos"]
+    if "sequencias_credito_imposto" in data:
+        layout.sequencias_credito_imposto = data["sequencias_credito_imposto"]
     if "descricao" in data:
         layout.descricao = data["descricao"]
 
