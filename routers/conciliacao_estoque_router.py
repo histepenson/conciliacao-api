@@ -24,6 +24,8 @@ from services.conciliacao_estoque_service import ConciliacaoEstoqueService
 from services.conciliacao_estoque_efetivacao_service import ConciliacaoEstoqueEfetivacaoService
 from services import balancete_service
 from services import lancamento_padrao_ct2_service
+from services.empresa_configuracao_service import obter_valor
+from core.particularidades import ChaveParticularidade
 from services import matching_manual_estoque_service
 from services.estoque_consulta_divergencia_service import (
     consultar_divergencia_kardex,
@@ -81,6 +83,17 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
         mapa_lp_layout_campos = lancamento_padrao_ct2_service.obter_mapa_layout_campos(
             db, request.parametros.empresa_id
         )
+        # Tratamento exclusivo das empresas com a particularidade
+        # estoque_razao_ct2razct5 (razao via CT2RAZCT5): credito de imposto
+        # abatido da nota + codigo do historico so' no inicio do texto.
+        # Demais empresas seguem exatamente o fluxo anterior.
+        razao_ct2razct5 = bool(obter_valor(
+            db, request.parametros.empresa_id, ChaveParticularidade.ESTOQUE_RAZAO_CT2RAZCT5.value
+        ))
+        mapa_lp_sequencias_credito = (
+            lancamento_padrao_ct2_service.obter_mapa_sequencias_credito_imposto(db, request.parametros.empresa_id)
+            if razao_ct2razct5 else None
+        )
         ano_periodo, mes_periodo = parse_ano_mes(request.parametros.data_base)
         periodo = f"{ano_periodo}-{mes_periodo:02d}"
         matches_manuais = matching_manual_estoque_service.listar(
@@ -93,6 +106,8 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
             mapa_lp_movimento_ct2_vazio=mapa_lp_movimento_ct2_vazio,
             mapa_lp_layout_campos=mapa_lp_layout_campos,
             matches_manuais=matches_manuais,
+            mapa_lp_sequencias_credito=mapa_lp_sequencias_credito,
+            historico_estrito=razao_ct2razct5,
         )
 
         # Validar saldo calculado contra balancete importado (se houver)

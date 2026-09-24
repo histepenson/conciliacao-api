@@ -55,3 +55,22 @@ def obter_mapa_layout_campos(db: Session, empresa_id: int) -> dict[str, list]:
         .all()
     )
     return {linha.lp_codigo: linha.layout_campos for linha in linhas}
+
+
+def obter_mapa_sequencias_credito_imposto(db: Session, empresa_id: int) -> dict[str, set[str]]:
+    """Retorna {lp_codigo: {sequencias}} pra empresa -- sequencias (CT5_SEQUEN)
+    do LP que lancam credito de imposto recuperavel na conta de estoque. Na
+    conciliacao de estoque esses creditos sao abatidos do lancamento de compra
+    da propria nota (o Kardex ja' vem liquido de imposto). So' LPs cadastrados
+    aqui sofrem esse tratamento -- LPs ausentes seguem o fluxo normal."""
+    linhas = (
+        db.query(LancamentoPadraoCt2Layout)
+        .filter(LancamentoPadraoCt2Layout.empresa_id == empresa_id)
+        .filter(LancamentoPadraoCt2Layout.sequencias_credito_imposto.isnot(None))
+        .all()
+    )
+    return {
+        linha.lp_codigo: {str(s).strip() for s in linha.sequencias_credito_imposto if str(s).strip()}
+        for linha in linhas
+        if linha.sequencias_credito_imposto
+    }

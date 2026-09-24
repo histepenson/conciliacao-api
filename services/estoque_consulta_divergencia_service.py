@@ -23,7 +23,9 @@ from tools.estoque.calc_diferencas_estoque import (
 )
 from tools.estoque.kardex import normalizar_kardex
 from tools.estoque.razao_estoque import normalizar_razao_estoque
-from services.lancamento_padrao_ct2_service import obter_mapa_layout_campos
+from services.lancamento_padrao_ct2_service import obter_mapa_layout_campos, obter_mapa_sequencias_credito_imposto
+from services.empresa_configuracao_service import obter_valor
+from core.particularidades import ChaveParticularidade
 from services.matr900_service import Matr900Service
 from services.ctbr400_service import Ctbr400Service
 
@@ -126,7 +128,13 @@ async def consultar_divergencia_razao_contabil(
         return {"encontrado": False, "motivo": "sem_lancamento_contabil"}
 
     ano_base, _mes = parse_ano_mes(data_fim)
-    df_razao = normalizar_razao_estoque(pd.DataFrame(registros), ano_base=ano_base)
+    razao_ct2razct5 = bool(obter_valor(db, empresa_id, ChaveParticularidade.ESTOQUE_RAZAO_CT2RAZCT5.value))
+    df_razao = normalizar_razao_estoque(
+        pd.DataFrame(registros),
+        ano_base=ano_base,
+        mapa_lp_sequencias_credito=obter_mapa_sequencias_credito_imposto(db, empresa_id) if razao_ct2razct5 else None,
+        historico_estrito=razao_ct2razct5,
+    )
 
     campos_ordem_por_lp: dict[str, list] = {}
     chave_alvo_por_lp: dict[str, tuple] = {}
