@@ -28,11 +28,13 @@ from services.empresa_configuracao_service import obter_valor
 from core.particularidades import ChaveParticularidade
 from services import matching_manual_estoque_service
 from services.estoque_consulta_divergencia_service import (
+    RazaoCt2RazCt5Adapter,
     consultar_divergencia_kardex,
     consultar_divergencia_razao_contabil,
 )
 from services.matr900_service import Matr900Service
 from services.ctbr400_service import Ctbr400Service
+from services.ct2raz_ct5_service import Ct2RazCt5Service
 from schemas.efetivacao_schema import EfetivarConciliacaoResponse, StatusConciliacao
 from middleware.auth import get_current_user, CurrentUser
 from middleware.tenant import EmpresaContext, get_empresa_context, resolve_empresa_id
@@ -187,7 +189,13 @@ async def consultar_divergencia_kardex_no_razao(
     """
     empresa_id = resolve_empresa_id(context, payload.empresa_id)
     cfg = resolve_protheus_config(empresa_id, db)
-    svc = Ctbr400Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
+    # Empresas com a particularidade estoque_razao_ct2razct5 consultam o razao
+    # pelo CT2RAZCT5 (o mesmo relatorio da carga da conciliacao); as demais
+    # seguem no Ctbr400Service, sem mudanca.
+    if obter_valor(db, empresa_id, ChaveParticularidade.ESTOQUE_RAZAO_CT2RAZCT5.value):
+        svc = RazaoCt2RazCt5Adapter(Ct2RazCt5Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix))
+    else:
+        svc = Ctbr400Service(cfg.url, cfg.user, cfg.password, cfg.tenant, cfg.rest_prefix)
     try:
         return await consultar_divergencia_razao_contabil(
             db, empresa_id, payload.kardex_registro,

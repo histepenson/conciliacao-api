@@ -28,8 +28,30 @@ from services.empresa_configuracao_service import obter_valor
 from core.particularidades import ChaveParticularidade
 from services.matr900_service import Matr900Service
 from services.ctbr400_service import Ctbr400Service
+from services.ct2raz_ct5_service import Ct2RazCt5Service
 
 logger = logging.getLogger(__name__)
+
+
+class RazaoCt2RazCt5Adapter:
+    """Faz o Ct2RazCt5Service responder como o Ctbr400Service pra consulta de
+    divergencia (buscar_como_registros = todas as paginas). Usado so' pelas
+    empresas com a particularidade estoque_razao_ct2razct5 (razao da
+    conciliacao de estoque via CT2RAZCT5). O Ct2RazCt5Service em si nao muda."""
+
+    def __init__(self, svc: Ct2RazCt5Service):
+        self._svc = svc
+
+    async def buscar_como_registros(self, params: dict) -> list[dict]:
+        linhas: list[dict] = []
+        pagina = 1
+        while True:
+            resp = await self._svc.buscar_como_registros_pagina({**params, "page": pagina})
+            linhas.extend(resp.get("registros", []))
+            if not resp.get("hasMore"):
+                break
+            pagina += 1
+        return linhas
 
 
 async def consultar_divergencia_kardex(
