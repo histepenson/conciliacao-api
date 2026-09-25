@@ -160,6 +160,10 @@ async def consultar_divergencia_razao_contabil(
         ano_base=ano_base,
         mapa_lp_sequencias_credito=obter_mapa_sequencias_credito_imposto(db, empresa_id) if razao_ct2razct5 else None,
         historico_estrito=razao_ct2razct5,
+        regras_historico_movimento=(
+            [("BX INSUMOS OP", "RE1")]
+            if obter_valor(db, empresa_id, ChaveParticularidade.ESTOQUE_BX_INSUMOS_RE1.value) else None
+        ),
     )
 
     campos_ordem_por_lp: dict[str, list] = {}
