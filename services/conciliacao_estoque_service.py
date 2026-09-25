@@ -53,6 +53,7 @@ class ConciliacaoEstoqueService:
         matches_manuais: list | None = None,
         mapa_lp_sequencias_credito: Dict[str, set] | None = None,
         historico_estrito: bool = False,
+        codigos_ignorados: set | None = None,
     ) -> Dict[str, Any]:
         """
         Executa a conciliacao de estoque.
@@ -82,6 +83,10 @@ class ConciliacaoEstoqueService:
         obter_mapa_sequencias_credito_imposto -- creditos de imposto dos LPs
         de estoque, abatidos da nota na normalizacao do Razao (ver
         razao_estoque.abater_creditos_imposto).
+
+        codigos_ignorados: codigos de movimento fora do calculo e da grade
+        (ex.: {"RE4", "DE4"}), resolvido pelo chamador conforme a
+        particularidade estoque_lista_re4_de4 da empresa.
 
         historico_estrito: True so' pra empresas com a particularidade
         estoque_razao_ct2razct5 (ver core/particularidades.py) -- codigo de
@@ -150,6 +155,7 @@ class ConciliacaoEstoqueService:
             mapa_lp_movimento_ct2_vazio=mapa_lp_movimento_ct2_vazio,
             mapa_lp_layout_campos=mapa_lp_layout_campos,
             matches_manuais=matches_manuais,
+            codigos_ignorados=codigos_ignorados,
         )
 
         resumo = resultado["resumo"]
