@@ -517,6 +517,7 @@ def calcular_diferencas_estoque(
     mapa_lp_layout_campos: Dict[str, list] | None = None,
     lps_matching_agregado_por_dia: set | None = None,
     matches_manuais: list | None = None,
+    codigos_ignorados: set | None = None,
 ) -> Dict[str, Any]:
     """
     Calcula diferencas entre Kardex e Razao Contabil de Estoque
@@ -585,6 +586,12 @@ def calcular_diferencas_estoque(
         execucao anterior porque o matching automatico nao achou sozinho.
         Aplicado por grupo, ANTES do matching automatico individual
         (_matching_registros) -- ver aplicar_matches_manuais_estoque.
+
+    codigos_ignorados : set[str], opcional
+        Codigos de movimento que NAO entram no calculo nem na grade, dos dois
+        lados (ex.: {"RE4", "DE4"} -- transferencias que se anulam, em empresas
+        que nao as contabilizam). Aplicado depois das reclassificacoes por LP,
+        antes do agrupamento; vazio/None = nada e' ignorado.
 
     Retorna:
     --------
@@ -713,6 +720,20 @@ def calcular_diferencas_estoque(
                     "[CALC DIFERENCAS ESTOQUE] Reclassificados por LP %s (layout generico%s): %s lancamentos",
                     lp_codigo, " -> " + grupo_dev_forcado if grupo_dev_forcado else "", qtd_reclassificados,
                 )
+
+    # Codigos ignorados por configuracao da empresa (ex.: RE4/DE4). Depois das
+    # reclassificacoes por LP (um lancamento do Razao pode virar RE4/DE4 por
+    # elas) e antes de qualquer agrupamento/matching/total, pra sair do
+    # calculo e da grade ao mesmo tempo.
+    if codigos_ignorados:
+        ignorados = {_normalizar_codigo_movimento(cod) for cod in codigos_ignorados}
+        qtd_k, qtd_r = len(df_k), len(df_r)
+        df_k = df_k[~df_k["codigo_movimento"].isin(ignorados)].copy()
+        df_r = df_r[~df_r["codigo_movimento"].isin(ignorados)].copy()
+        logger.info(
+            "[CALC DIFERENCAS ESTOQUE] Codigos ignorados %s: Kardex -%s, Razao -%s registros",
+            sorted(ignorados), qtd_k - len(df_k), qtd_r - len(df_r),
+        )
 
     # ===========================
     # 1. AGRUPAR KARDEX por codigo_movimento

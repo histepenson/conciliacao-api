@@ -92,6 +92,13 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
         razao_ct2razct5 = bool(obter_valor(
             db, request.parametros.empresa_id, ChaveParticularidade.ESTOQUE_RAZAO_CT2RAZCT5.value
         ))
+        # RE4/DE4 (transferencias que se anulam) so' entram no calculo e na grade
+        # quando a empresa marca a particularidade estoque_lista_re4_de4 -- ha'
+        # empresas que nao contabilizam esses movimentos.
+        lista_re4_de4 = bool(obter_valor(
+            db, request.parametros.empresa_id, ChaveParticularidade.ESTOQUE_LISTA_RE4_DE4.value
+        ))
+        codigos_ignorados = None if lista_re4_de4 else {"RE4", "DE4"}
         mapa_lp_sequencias_credito = (
             lancamento_padrao_ct2_service.obter_mapa_sequencias_credito_imposto(db, request.parametros.empresa_id)
             if razao_ct2razct5 else None
@@ -110,6 +117,7 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
             matches_manuais=matches_manuais,
             mapa_lp_sequencias_credito=mapa_lp_sequencias_credito,
             historico_estrito=razao_ct2razct5,
+            codigos_ignorados=codigos_ignorados,
         )
 
         # Validar saldo calculado contra balancete importado (se houver)
