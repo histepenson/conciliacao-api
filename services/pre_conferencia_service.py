@@ -501,7 +501,28 @@ def conferir(
             lps_sem_cfop.append(grupo_nome)
             continue
 
-        sft_lp = _filtrar_sft(cfops_set, tes_set, cfops_excluir_set, tes_excluir_set, especies_set, especies_excluir_set, series_set)
+        # O SFT do grupo e' a UNIAO do SFT de cada LP, cada um filtrado pelos SEUS
+        # proprios filtros. Juntar os filtros de todos os LPs num so' conjunto
+        # (cfops_set/tes_set/...) e aplicar a todos fazia o filtro de um LP
+        # restringir os demais (ex.: o TES "067" so' do LP 650-081 deixava o SFT
+        # do grupo USO CONSUMO so' com as notas desse LP). LP sem filtro proprio
+        # nao entra: nao restringe nem amplia, como antes.
+        sft_por_registro: dict[int, dict] = {}
+        for m in members:
+            if not (m.cfops or m.tes_codes or m.especies or m.series):
+                continue
+            sft_m = _filtrar_sft(
+                {str(c).strip() for c in m.cfops} if m.cfops else set(),
+                {str(t).strip() for t in m.tes_codes} if m.tes_codes else None,
+                {str(c).strip() for c in m.cfops_excluir} if m.cfops_excluir else None,
+                {str(t).strip() for t in m.tes_codes_excluir} if m.tes_codes_excluir else None,
+                {str(e).strip() for e in m.especies} if m.especies else None,
+                {str(e).strip() for e in m.especies_excluir} if m.especies_excluir else None,
+                {str(sr).strip() for sr in m.series} if m.series else None,
+            )
+            for reg in sft_m:
+                sft_por_registro.setdefault(id(reg), reg)
+        sft_lp = list(sft_por_registro.values())
         sft_lp = _aplicar_valor_calc(sft_lp, colunas_valor_grupo)
         total_sft = round(sum(s["_valor_calc"] for s in sft_lp), 2)
         diferenca = round(total_ct2 - total_sft, 2)
