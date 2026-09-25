@@ -303,6 +303,16 @@ def conferir(
             # ct2_itemc sempre traz o fornecedor correto (CT2_ITEMC do Protheus)
             ct2_itemc = str(rec.get("ct2_itemc") or "").strip()
             cliefor_itemc = _norm_cliefor(ct2_itemc) if ct2_itemc else None
+            # CT2_ITEMC vem no formato "F" + fornecedor(6) + loja(2) (ex.: F02001201),
+            # enquanto o cliefor do SFT e' so' o codigo (020012). Pegar os 6
+            # primeiros caracteres do itemc cru da "F02001" e a mesma NF virava
+            # "so' SFT" + "so' CT2". Por isso tambem se tenta o itemc SEM o prefixo
+            # de letra, e vale o que existir no SFT (o primeiro continua sendo o
+            # comportamento antigo, entao nada que casava deixa de casar).
+            cliefor_itemc_alt = (
+                _norm_cliefor(re.sub(r"^[A-Za-z](?=\d)", "", ct2_itemc)) if ct2_itemc else None
+            )
+            cands_itemc = [c for c in dict.fromkeys([cliefor_itemc, cliefor_itemc_alt]) if c]
 
             # Tenta extrair filial + nf do historico
             m_filial = _HIST_RE_COM_FILIAL.match(hist)
@@ -310,7 +320,12 @@ def conferir(
                 nf_norm = _norm_nf(m_filial.group(1))
                 filial_norm = _norm_filial(m_filial.group(2))
                 if cliefor_itemc:
-                    # Chave completa: filial + nf + fornecedor do ct2_itemc
+                    # Chave completa: filial + nf + fornecedor do ct2_itemc --
+                    # usa a grafia que existe no SFT dessa filial+nf, se houver.
+                    no_sft = {c for c, _ in sft_por_filial_nf.get((filial_norm, nf_norm), [])}
+                    for cand in cands_itemc:
+                        if cand in no_sft:
+                            return (filial_norm, nf_norm, cand)
                     return (filial_norm, nf_norm, cliefor_itemc)
                 # Fallback: resolver cliefor via SFT por valor
                 candidatos = sft_por_filial_nf.get((filial_norm, nf_norm), [])
@@ -327,9 +342,10 @@ def conferir(
                 nf_norm = _norm_nf(m_nf.group(1))
                 if cliefor_itemc:
                     # Busca filial no SFT pelo par (nf, cliefor)
-                    for f, c, _ in sft_por_nf.get(nf_norm, []):
-                        if c == cliefor_itemc:
-                            return (f, nf_norm, cliefor_itemc)
+                    for cand in cands_itemc:
+                        for f, c, _ in sft_por_nf.get(nf_norm, []):
+                            if c == cand:
+                                return (f, nf_norm, cand)
                 # Fallback por valor
                 candidatos = sft_por_nf.get(nf_norm, [])
                 exatos = [(f, c, t) for f, c, t in candidatos if abs(t - debito) <= 0.01]
