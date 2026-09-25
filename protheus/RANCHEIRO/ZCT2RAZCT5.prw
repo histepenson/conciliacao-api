@@ -25,6 +25,7 @@ Parametros:
   vlr_zerado    = 1=Incluir zeros | 2=Excluir zeros (default "2")
   filial_de     = filial inicial (default "")
   filial_ate    = filial final   (default "zzzzzzzzz")
+  lote          = lote da CT2 (default "008810"; "TODOS" = todos os lotes, sem filtro)
   custo_de      = centro de custo inicial (aceito, nao filtra em CT2)
   custo_ate     = centro de custo final   (aceito, nao filtra em CT2)
   page          = pagina (default 1)
@@ -160,7 +161,11 @@ EndIf
 
 cWhere += " AND CT2_FILORI BETWEEN '" + cFilialDe + "' AND '" + cFilialAte + "'"
 
-cWhere += " AND CT2_LOTE = '" + cLote + "'"
+// lote=TODOS: sem filtro de lote (a conciliacao de estoque precisa de todos os lotes
+// da conta: 008810 compras, 008820 vendas, 008840 estoque). Vazio continua = 008810.
+If Upper(cLote) <> "TODOS"
+    cWhere += " AND CT2_LOTE = '" + cLote + "'"
+EndIf
 
 // --- Paginacao no proprio SQL via ROW_NUMBER() OVER() -- evita reexecutar e
 // rematerializar o resultado inteiro (UNION + LEFT JOIN na CT5) a cada
