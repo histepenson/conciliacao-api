@@ -99,6 +99,12 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
             db, request.parametros.empresa_id, ChaveParticularidade.ESTOQUE_LISTA_RE4_DE4.value
         ))
         codigos_ignorados = None if lista_re4_de4 else {"RE4", "DE4"}
+        # Rancheiro: "BX INSUMOS OP ..." sem CT2_KEY conta como RE1.
+        regras_historico_movimento = (
+            [("BX INSUMOS OP", "RE1")]
+            if obter_valor(db, request.parametros.empresa_id, ChaveParticularidade.ESTOQUE_BX_INSUMOS_RE1.value)
+            else None
+        )
         mapa_lp_sequencias_credito = (
             lancamento_padrao_ct2_service.obter_mapa_sequencias_credito_imposto(db, request.parametros.empresa_id)
             if razao_ct2razct5 else None
@@ -118,6 +124,7 @@ def processar_conciliacao_estoque(request: RequestConciliacaoEstoque, db: Sessio
             mapa_lp_sequencias_credito=mapa_lp_sequencias_credito,
             historico_estrito=razao_ct2razct5,
             codigos_ignorados=codigos_ignorados,
+            regras_historico_movimento=regras_historico_movimento,
         )
 
         # Validar saldo calculado contra balancete importado (se houver)

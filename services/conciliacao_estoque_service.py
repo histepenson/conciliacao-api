@@ -54,6 +54,7 @@ class ConciliacaoEstoqueService:
         mapa_lp_sequencias_credito: Dict[str, set] | None = None,
         historico_estrito: bool = False,
         codigos_ignorados: set | None = None,
+        regras_historico_movimento: list | None = None,
     ) -> Dict[str, Any]:
         """
         Executa a conciliacao de estoque.
@@ -87,6 +88,10 @@ class ConciliacaoEstoqueService:
         codigos_ignorados: codigos de movimento fora do calculo e da grade
         (ex.: {"RE4", "DE4"}), resolvido pelo chamador conforme a
         particularidade estoque_lista_re4_de4 da empresa.
+
+        regras_historico_movimento: [(prefixo, codigo)] aplicado so' aos lancamentos
+        sem CT2_KEY (ver razao_estoque.normalizar_razao_estoque), resolvido pelo
+        chamador conforme a particularidade estoque_bx_insumos_re1.
 
         historico_estrito: True so' pra empresas com a particularidade
         estoque_razao_ct2razct5 (ver core/particularidades.py) -- codigo de
@@ -137,6 +142,7 @@ class ConciliacaoEstoqueService:
                 ano_base=ano_base,
                 mapa_lp_sequencias_credito=mapa_lp_sequencias_credito,
                 historico_estrito=historico_estrito,
+                regras_historico_movimento=regras_historico_movimento,
             )
             logger.info(f"   Lancamentos normalizados: {len(df_razao)}")
         except Exception as e:

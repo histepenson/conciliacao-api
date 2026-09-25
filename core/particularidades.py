@@ -22,3 +22,4 @@ class ChaveParticularidade(str, Enum):
     IGNORA_LOJA_CODIGO_FINANCEIRO = "ignora_loja_codigo_financeiro"
     ESTOQUE_RAZAO_CT2RAZCT5 = "estoque_razao_ct2razct5"
     ESTOQUE_LISTA_RE4_DE4 = "estoque_lista_re4_de4"
+    ESTOQUE_BX_INSUMOS_RE1 = "estoque_bx_insumos_re1"

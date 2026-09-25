@@ -326,6 +326,7 @@ def normalizar_razao_estoque(
     ano_base: int = None,
     mapa_lp_sequencias_credito: Optional[dict] = None,
     historico_estrito: bool = False,
+    regras_historico_movimento: Optional[list] = None,
 ) -> pd.DataFrame:
     """
     Normaliza relatorio de Razao Contabil de Estoque (CTBR400).
@@ -456,6 +457,24 @@ def normalizar_razao_estoque(
     mask_pr0 = df_norm["cf_original"] == "PR0"
     if mask_pr0.any():
         df_norm.loc[mask_pr0, "codigo_movimento"] = "PR0"
+
+    # Regras de historico por empresa (particularidade): historico que COMECA com
+    # um prefixo conhecido vira um codigo de movimento fixo, mas so' nos
+    # lancamentos SEM CT2_KEY -- com a chave preenchida quem classifica e' o
+    # casamento pelo layout do LP contra o Kardex. Ex.: Rancheiro, "BX INSUMOS
+    # OP ..." -> RE1 (baixa de insumo por ordem de producao).
+    if regras_historico_movimento:
+        hist_norm = df_norm["historico"].astype(str).str.upper().str.replace(r"\s+", " ", regex=True).str.strip()
+        sem_key = df_norm["ct2_key"].astype(str).str.strip().isin(["", "nan", "None"])
+        for prefixo, codigo in regras_historico_movimento:
+            mask_regra = sem_key & hist_norm.str.startswith(str(prefixo).upper())
+            if mask_regra.any():
+                df_norm.loc[mask_regra, "codigo_movimento"] = codigo
+                df_norm.loc[mask_regra, "cf_original"] = codigo
+                logger.info(
+                    "[RAZAO ESTOQUE] Regra de historico %r -> %s (sem CT2_KEY): %s lancamentos",
+                    prefixo, codigo, int(mask_regra.sum()),
+                )
 
     # DEV segmentado por LP: sao 2 lancamentos padrao diferentes (devolucao
     # de compra x devolucao de venda), cruzam com CFOPs diferentes no
